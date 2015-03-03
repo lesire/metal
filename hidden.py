@@ -29,19 +29,32 @@ Messages are dictionnary, with at least the key "type" that can be :
 The field "time" is an int, in ms, measured from the startTime given in the "start" message
 """
 
+class FileFilter(logging.Filter):
+    def __init__(self, l):
+        self.l = l
+
+    def filter(self, record):
+        return os.path.splitext(os.path.basename(record.pathname))[0] in self.l
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description='Execute a plan')
     parser.add_argument('planFile', metavar='plan', type=str)
     parser.add_argument('--logLevel', type=str, default="info")
+    parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
     parser.add_argument('--agentName', metavar="agent", type=str)
-    parser.add_argument('--executor', type=str, metavar="action executor (eg., 'morse')")
+    parser.add_argument('--executor', type=str, choices=["morse", "dummy"], default="dummy", metavar="action executor (eg., 'morse')")
     args = parser.parse_args()
-    
+
     #Configure the logger
     numeric_level = getattr(logging, args.logLevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % args.logLevel)
     logging.basicConfig(level=numeric_level, format='%(levelname)s(%(filename)s:%(lineno)d):%(message)s')
+
+    if args.logFilter is not None:
+        f = FileFilter(args.logFilter)
+        logging.getLogger().addFilter(f)
     
     #Get the plan
     if not os.access(args.planFile, os.R_OK):
@@ -54,8 +67,10 @@ def main(argv):
     with open(args.planFile) as f:
         planString = " ".join(f.readlines())
 
-    if 'morse' in args.executor:
+    if args.executor == "morse":
         ex = MORSEActionExecutor()
+    elif args.executor == "dummy":
+        ex = DummyActionExecutor()
     else:
         ex = None
 

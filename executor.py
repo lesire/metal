@@ -37,6 +37,8 @@ class Executor(threading.Thread):
     def update(self):
         currentTime = time.time()
         
+        self.actionExecutor.update()
+        
         for action in [a for t,a in self.nextEvents if t <= currentTime]:
             self.outQueue.put({"type":"endAction", "action":action, "time": self.user_time(currentTime)})
             logging.info("End of action %s" % action["name"])
@@ -56,6 +58,7 @@ class Executor(threading.Thread):
         try:
             self.actionExecutor.execute(action, self.action_callback)
         except AttributeError:
+            logging.error("Cannot execute %s." % action["name"])
             pass
 
         logging.info("Start of action %s at %s" % (msg["action"]["name"], currentTime))
