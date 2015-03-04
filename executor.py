@@ -61,7 +61,11 @@ class Executor(threading.Thread):
             logging.error("Cannot execute %s." % action["name"])
             pass
 
-        logging.info("Start of action %s at %s" % (msg["action"]["name"], currentTime))
+    def stopAction(self, msg):
+        action = msg["action"]
+        currentTime = time.time()
+        logging.info("Stop of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)))
+        self.actionExecutor.stop(action)
 
     def startExecutor(self, msg):
         logging.info("Executor received start message")
@@ -94,6 +98,8 @@ class Executor(threading.Thread):
                     self.startExecutor(msg)
                 elif msg["type"] == "startAction":
                     self.startAction(msg)
+                elif msg["type"] == "stopAction":
+                    self.stopAction(msg)
                 else:
                     logging.warning("Executor received unknown message %s" % msg)
                     

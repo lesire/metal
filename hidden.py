@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 import time
+import signal
 
 try:
     import Queue
@@ -22,13 +23,17 @@ from action_executor import *
 Messages are dictionnary, with at least the key "type" that can be :
  - start        (supervisor -> executor): beginning of the execution
  - stop         (supervisor -> executor)
- - startAction  (supervisor -> executor)
- - endAction    (executor -> supervisor)
+ - startAction  (supervisor -> executor) : for uncontrollable and controllable actions
+ - endAction    (executor -> supervisor) : for uncontrollable and controllable actions
+ - stopAction    (supervisor -> executor) : for controllable actions
  - alea         (executor -> supervisor)
 
 The field "time" is an int, in ms, measured from the startTime given in the "start" message
 """
 
+"""
+Filter used to filter the logs based on their filenames
+"""
 class FileFilter(logging.Filter):
     def __init__(self, l):
         self.l = l
@@ -36,14 +41,35 @@ class FileFilter(logging.Filter):
     def filter(self, record):
         return os.path.splitext(os.path.basename(record.pathname))[0] in self.l
 
+supervisorThread = None
+def sigHandler(signum, frame):
+    logging.info('Signal handler called with signal %s' % signum)
+    
+    if supervisorThread is not None:
+        logging.info("Starting supervision")
+        supervisorThread.start()
 
+def launchAgentArchitecture(ex, planString, agentName):
+    q1 = Queue.Queue() 
+    q2 = Queue.Queue() 
+    
+    threadSupervisor = supervisor.Supervisor(q1, q2, planString, agent=agentName)
+    threadExecutor = executor.Executor(q2, q1, ex)
+    
+
+    #threadSupervisor.start()
+    threadExecutor.start()
+    
+    return threadSupervisor
+    
 def main(argv):
     parser = argparse.ArgumentParser(description='Execute a plan')
-    parser.add_argument('planFile', metavar='plan', type=str)
     parser.add_argument('--logLevel', type=str, default="info")
     parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
     parser.add_argument('--agentName', metavar="agent", type=str)
-    parser.add_argument('--executor', type=str, choices=["morse", "dummy"], default="dummy", metavar="action executor (eg., 'morse')")
+    parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma"], default="dummy", metavar="action executor (eg., 'morse')")
+    parser.add_argument('--waitSignal', action="store_true")
+    parser.add_argument('planFile', metavar='plan', type=str)
     args = parser.parse_args()
 
     #Configure the logger
@@ -61,9 +87,6 @@ def main(argv):
         logging.error("Cannot open plan file : %s" % args.planFile)
         sys.exit(1)
     
-    q1 = Queue.Queue() 
-    q2 = Queue.Queue() 
-    
     with open(args.planFile) as f:
         planString = " ".join(f.readlines())
 
@@ -71,22 +94,33 @@ def main(argv):
         ex = MORSEActionExecutor()
     elif args.executor == "dummy":
         ex = DummyActionExecutor()
+    elif args.executor == "dummy-ma":
+        if args.agentName is None:
+            logging.error("Cannot use executor dummy-ma without an agent name")
+            sys.exit(1)
+            
+        folder = "/tmp/hidden2"
+        for f in os.listdir(folder):
+            os.remove(os.path.join(folder, f))
+        ex = DummyMAActionExecutor(args.agentName, folder)
     else:
         ex = None
 
-    threadSupervisor = supervisor.Supervisor(q1, q2, planString, agent=args.agentName)
-    threadExecutor = executor.Executor(q2, q1, ex)
+    s = launchAgentArchitecture(ex, planString, args.agentName)
     
-    threadSupervisor.start()
-    threadExecutor.start()
-    
+    if args.waitSignal:
+        global supervisorThread
+        supervisorThread = s
+        signal.signal(signal.SIGUSR1, sigHandler)
+        logging.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
+    else:
+        s.start()
+
     while threading.active_count() > 1:
         time.sleep(1)
     
 if __name__=="__main__":
-    import sys
     try:
         main(sys.argv)
     except KeyboardInterrupt:
-        import os
         os._exit(1)

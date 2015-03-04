@@ -10,6 +10,8 @@ except ImportError:
     print("[error] cannot import pystn")
     sys.exit(1)
 
+def isActionControllable(actionName):
+    return "communicate" in actionName
 
 timeDelta = 1
 timeFactor = 1000 # all float duration are multiplied by this and then cast into int
@@ -49,6 +51,11 @@ class Plan:
                 self.actions[-1]["executed"] = True
             else:
                 self.actions[-1]["executed"] = False
+                
+            if isActionControllable(a[0]):
+                self.actions[-1]["controllable"] = True
+            else:
+                self.actions[-1]["controllable"] = False
         
         for a in self.actions:
             if a["tStart"][0] != "0" and a["tStart"] not in self.stn.getNodeIds():
@@ -124,7 +131,7 @@ class Plan:
                     raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[time], value))
 
                 self.stn.addConstraint(self.stn.getStartId(), self.tpName[time], value, value)
-        
+
         if "unavailable-actions" in d:
             for forbiddenAction in d["unavailable-actions"]:
                 if [a["name"] for a in self.actions if a["name"] == forbiddenAction and not a["executed"]]:

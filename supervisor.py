@@ -41,6 +41,9 @@ class Supervisor(threading.Thread):
             elif "abstract" in a:
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "controllable"]
+            elif a["controllable"]:
+                self.tp[a["tStart"]] = [a["name"], "controllable"]
+                self.tp[a["tEnd"]] =   [a["name"], "controllable"]
             else:
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "uncontrollable"]
@@ -93,7 +96,7 @@ class Supervisor(threading.Thread):
         #Check that the lower bound is before the current time
         if now and self.plan.stn.getBounds(str(tp)).lb > self.getCurrentTime():
             return False
-            
+
         #check that there is no ingoing edge from a non-executed time point
         preconditions = self.plan.stn.getPredecessors(tp)
 
@@ -127,17 +130,24 @@ class Supervisor(threading.Thread):
         if a["tStart"] == tp:
             self.executeAction(a, currentTime)
         elif a["tEnd"] == tp:
-            
-            self.tp[tp][1] = "past"
-            self.executedTp[tp] = currentTime
-            
-            if self.tp[tp][1] == "uncontrollable":
+
+            if self.tp[tp][1] == "controllable":
                 #End of a controllable action
                 self.plan.setTimePoint(tp, currentTime)
                 
                 if not self.plan.stn.isConsistent():
                     logging.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
+
+                if not "abstract" in a and self.isResponsibleForAction(a):
+                    logging.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
+
+                    msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
+                    self.outQueue.put(msg)
+                    
+                
+            self.tp[tp][1] = "past"
+            self.executedTp[tp] = currentTime
                 
         else:
             logging.error("\tError : a timepoint does not match its action %s" % tp)
@@ -149,19 +159,28 @@ class Supervisor(threading.Thread):
             logging.error("Cannot execute %s, the status of its start point is %s." % (action["name"], self.tp[action["tStart"]] ))
             return
 
-        logging.info("Starting %s at time %f." % (action["name"], currentTime/1000))
+        if self.isResponsibleForAction(action):
+            logging.info("Starting %s at time %f." % (action["name"], currentTime/1000))
 
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
         
         self.plan.setTimePoint(action["tStart"], currentTime)
 
-        if self.tp[action["tEnd"]][1] == "uncontrollable":
+        if action["name"] == "dummy end":
+            logging.info("finished the plan")
+            return
+
+        if "abstract" not in action:
             if not self.isResponsibleForAction(action):
                 #This action should not be executed by this robot. Assume someone else will do it
                 self.tp[action["tEnd"]][1] = "future"
-                self.plan.setTimePoint(action["tEnd"], currentTime + int(round(1000 * action["dMin"])))
-                logging.info("Action %s is not for this agent. Assume it will last is minimum duration" % action["name"])
+                if action["controllable"]:
+                    self.plan.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
+                else:
+                    self.plan.setTimePoint(action["tEnd"], currentTime + int(round(1000 * action["dMin"])))
+
+                logging.debug("Action %s is not for this agent. Assume it will last is minimum duration" % action["name"])
             else:
                 #send execution order
                 msg = {"type":"startAction", "action":copy(action), "time":currentTime}
@@ -178,7 +197,14 @@ class Supervisor(threading.Thread):
         tp = action["tEnd"]
         value = msg["time"]
         
-        logging.info("End of the action %s at %s" % (action, value))
+        if action["controllable"]:
+            logging.info("Notified of the end of controllable action %s." % action["name"])
+            if self.tp[tp][1] != "past":
+                logging.error("Notified of the end of controllable action %s." % action["name"])
+                logging.error("But the timepoint is not past : %s" % self.tp[tp][1])
+            return
+        
+        logging.info("End of the action %s at %s" % (action["name"], value))
         
         c = self.plan.stn.getBounds(str(tp))
         
