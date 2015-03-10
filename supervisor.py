@@ -204,6 +204,11 @@ class Supervisor(threading.Thread):
                 logging.error("But the timepoint is not past : %s" % self.tp[tp][1])
             return
         
+        lb = self.plan.stn.getBounds(tp).lb
+        if self.tp[tp][1] == "uncontrollable" and value < lb:
+            logging.warning("Finished %s early : %s. Waiting until %s." % (action["name"], value, lb))
+            value = lb
+            
         logging.info("End of the action %s at %s" % (action["name"], value))
         
         c = self.plan.stn.getBounds(str(tp))
