@@ -31,7 +31,7 @@ class Supervisor(threading.Thread):
         self.tp = {}
         self.beginDate = -1
         
-        for a in self.plan.actions:
+        for a in self.plan.actions.values():
             if a["name"] == "dummy init":
                 self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
             elif a["name"] == "dummy end":
@@ -62,7 +62,7 @@ class Supervisor(threading.Thread):
                 
                 value = int(round(1000*value))
                 
-                action = [a for a in self.plan.actions if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+                action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
                 if action["executed"]:
                     #action was executed, this is a past action
                     self.executedTp[tpName] = value
@@ -119,7 +119,7 @@ class Supervisor(threading.Thread):
     
     def executeTp(self, tp):
         #Retrieve the corresponding action
-        a = [a for a in self.plan.actions if (a["tStart"] == tp or a["tEnd"] == tp)][0]
+        a = [a for a in self.plan.actions.values() if (a["tStart"] == tp or a["tEnd"] == tp)][0]
         
         #If this is a deadline, must use the exact deadline time
         if self.tp[tp][1] == "future":

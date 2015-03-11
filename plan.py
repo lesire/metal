@@ -1,5 +1,6 @@
 from __future__ import division
 
+from copy import copy
 import json
 import logging
 import sys
@@ -34,30 +35,38 @@ class Plan:
         self.tpName[1] = "1-end"
         self.stn.addPoint("1-end")
         
-        self.actions = []
-        for a in d["actions"]:
-            if a[1] not in self.tpName:
-                self.tpName[a[1]] = str(str(a[1]) + "-start-" + a[0])
-            if a[2] not in self.tpName:
-                self.tpName[a[2]] = str(str(a[2]) + "-end-" + a[0])
-            self.actions.append({"name":a[0], "tStart":self.tpName[a[1]], "tEnd":self.tpName[a[2]]})
-            if len(a) > 3 and a[3] != None:
-                self.actions[-1]["dMin"] = abs(-a[3])
-            if len(a) > 4 and a[4] != None:
-                self.actions[-1]["dMax"] = a[4]
-            else:
-                self.actions[-1]["dMax"] = self.actions[-1]["dMin"]
-            if len(a) > 5 and a[5] != None and a[5]:
-                self.actions[-1]["executed"] = True
-            else:
-                self.actions[-1]["executed"] = False
+        self.actions = copy(d["actions"])
+        for index,a in d["actions"].items():
+            tpNumber = a["startTp"]
+            if tpNumber not in self.tpName:
+                self.tpName[tpNumber] = str(tpNumber) + "-start-" + a["name"]
+            a["tStart"] = self.tpName[tpNumber]
+            
+            tpNumber = a["endTp"]
+            if tpNumber not in self.tpName:
+                self.tpName[tpNumber] = str(tpNumber) + "-end-" + a["name"]
+            a["tEnd"] = self.tpName[tpNumber]
                 
-            if isActionControllable(a[0]):
-                self.actions[-1]["controllable"] = True
+            if isActionControllable(a["name"]):
+                a["controllable"] = True
             else:
-                self.actions[-1]["controllable"] = False
+                a["controllable"] = False
+            
+            if "children" in a and a["children"]:
+                a["abstract"] = True
+            else:
+                a["abstract"] = False
+                
+            if not "executed" in a:
+                a["executed"] = False
+            if not "locked" in a:
+                a["locked"] = False
+            a["dMin"] = abs(a["dMin"])
+            
+            self.actions[index] = a
         
-        for a in self.actions:
+        for a in self.actions.values():
+
             if a["tStart"][0] != "0" and a["tStart"] not in self.stn.getNodeIds():
                 self.stn.addPoint(a["tStart"])
                 self.stn.addConstraint(a["tStart"], self.tpName[1], 0)
@@ -67,8 +76,10 @@ class Plan:
             
             if a["tStart"] != a["tEnd"]:
                 if "dMin" in a:
-                    self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(round(timeFactor*a["dMin"])))
+                    self.stn.addConstraint(a["tStart"], a["tEnd"], int(round(timeFactor*a["dMin"])))
 
+                else:
+                    logging.warning("Action %s does not have a dMin ?" % a["name"])
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
@@ -77,48 +88,36 @@ class Plan:
             if node != self.tpName[1]:
                 self.stn.addConstraint(node, self.tpName[1], timeDelta)
 
-        for cl in d["causal-links"]:
-            UNDEFINED = 0
-            ATSTART = 1
-            ATEND = 2
-            OVERALL = 3
-            UNTIMED = 4
-            
-            if cl[2] == ATSTART:
-                start = self.actions[cl[0]]["tStart"]
-            else:
-                start = self.actions[cl[0]]["tEnd"]
-                
-            if cl[3] in [UNDEFINED, ATSTART, OVERALL, UNTIMED]:
-                end = self.actions[cl[1]]["tStart"]
-            else:
-                end = self.actions[cl[1]]["tEnd"]
+        for cl in d["causal-links"]:            
+            start = self.tpName[cl["startTp"]]
+            end = self.tpName[cl["endTp"]]
 
-            if cl[0] == 0:
+            if cl["startTp"] == 0:
                 self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
             else:
                 self.stn.addConstraint(start, end, timeDelta)
                         
         for tl in d["temporal-links"]:
-            if tl[0] == 0:
-                self.stn.addConstraint(self.stn.getStartId(), self.tpName[tl[1]], timeDelta)
+            start = self.tpName[tl["startTp"]]
+            end = self.tpName[tl["endTp"]]
+            
+            if tl["startTp"] == 0:
+                self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
             else:
-                self.stn.addConstraint(self.tpName[tl[0]], self.tpName[tl[1]], timeDelta)
+                self.stn.addConstraint(start, end, timeDelta)
 
-        for am in d["abstract-mapping"]:
-            self.actions[am[0]]["abstract"] = True
-        
-            if not "dummy" in self.actions[am[1]]["name"]:
-                #factor 2 to account for the double causal link ?
-                self.stn.addConstraint(self.actions[am[0]]["tStart"], self.actions[am[1]]["tStart"], 2*timeDelta)
-                self.stn.addConstraint(self.actions[am[1]]["tEnd"], self.actions[am[0]]["tEnd"], 2*timeDelta)
+        for action in d["actions"].values():
+            if "children" in action and action["children"]:
+                for child in action["children"][1:-1]:
+                    self.stn.addConstraint(action["tStart"], self.actions[child]["tStart"], 2*timeDelta)
+                    self.stn.addConstraint(self.actions[child]["tEnd"], action["tEnd"], 2*timeDelta)
                 
-                logging.debug("Adding %s timedelta before %s" % (self.actions[am[1]]["tEnd"], self.actions[am[0]]["tEnd"]))
-                logging.debug("bounds : %s,%s" % (self.stn.getConstraint(self.actions[am[1]]["tEnd"], self.actions[am[0]]["tEnd"]).lb, self.stn.getConstraint(self.actions[am[1]]["tEnd"], self.actions[am[0]]["tEnd"]).ub))
+                    logging.debug("Adding %s timedelta before %s (hierarchy)" % (action["tStart"], self.actions[child]["tStart"]))
+                    logging.debug("Adding %s timedelta before %s (hierarchy)" % (self.actions[child]["tEnd"], action["tEnd"]))
                 
-                if not self.stn.isConsistent():
-                    logging.error("**  Error : invalid STN when importing the abstract links")
-                    raise PlanImportError("invalid STN when importing the abstract links")
+                    if not self.stn.isConsistent():
+                        logging.error("**  Error : invalid STN when importing the abstract links")
+                        raise PlanImportError("invalid STN when importing the abstract links")
 
         if "absolute-time" in d:
             for time, value in d["absolute-time"]:
@@ -135,16 +134,24 @@ class Plan:
         if "unavailable-actions" in d:
             for forbiddenAction in d["unavailable-actions"]:
                 if [a["name"] for a in self.actions if a["name"] == forbiddenAction and not a["executed"]]:
-                    print("** ERROR : a given plan has a forbidden action : %s" % forbiddenAction)
+                    logging.error("** ERROR : a given plan has a forbidden action : %s" % forbiddenAction)
                     raise PlanImportError("** ERROR : a given plan has a forbidden action : %s" % forbiddenAction)
 
         if not self.stn.isConsistent():
             logging.error("**  Error : invalid STN when importing the plan")
             raise PlanImportError("invalid STN when importing the plan")
         
+        
         #remove dummy init/end actions
-        self.actions = [a for a in self.actions if not ("dummy" in a["name"] and a["name"] != "dummy init" and a["name"] != "dummy end")]
-
+        indexToRemove = []
+        for index in self.actions.keys():
+            a = self.actions[index]
+            if a["name"].startswith("dummy") and a["name"] != "dummy init" and a["name"] != "dummy end":
+                indexToRemove.append(index)
+        
+        self.actions = {key: self.actions[key] for key in self.actions if key not in indexToRemove}
+            
+            
     def getLength(self):
         return self.stn.getLength()/timeFactor
 
@@ -157,13 +164,6 @@ class Plan:
         return True
     
     def getJsonDescription(self):
-        #fill the agents name if necessary
-        for a in self.jsonDescr["actions"]:
-            if len(a) == 5:
-                a.append(False) #executed
-            if len(a) == 6:
-                a.append(a[5]) #locked
-
         return self.jsonDescr
     
     #assume value in ms
@@ -178,28 +178,29 @@ class Plan:
         #add this constraint in the STN
         self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
 
-        actions = filter(lambda a: a[1] == int(tpName.split("-")[0]) and a[1]>1 and "dummy" not in a[0], self.jsonDescr["actions"]) #actions that start with this tp
-        for a in actions:
-            if len(a) >= 6:
-                a[5] = True #mark as executed
-                a[6] = True #mark as locked
-            else:
-                a.append(True)
-
-        #update the action lengths
-        actions = filter(lambda a: a[2] == int(tpName.split("-")[0]) and a[2]>1 and "dummy" not in a[0], self.jsonDescr["actions"]) #actions that end with this tp
-        for a in actions:
-            if a[4] is not None:
-                start = self.stn.getConstraint(self.stn.getStartId(), str(a[1]) + "-start-" + str(a[0]))
-                #c = self.stn.getConstraint(str(a[1]) + "-start-" + str(a[0]), str(a[2]) + "-end-" + str(a[0]))
-                if start.ub != start.lb:
-                    print("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
-                    sys.exit(1)
-                    return
+        for index,action in self.jsonDescr["actions"].items():
+            
+            # The action starts with this tp
+            if  int(tpName.split("-")[0]) == action["startTp"] and "dummy" not in action["name"]:
+                action["executed"] = True
+                action["locked"] = True
                 
-                duration = (value - start.lb)/timeFactor
+            if  int(tpName.split("-")[0]) == action["endTp"] and "dummy" not in action["name"]:
 
-                a[4] = max(duration, a[4])
+                #The action ends with this tp : update the action lengths
+                if "dMax" in action:
+                    start = self.stn.getConstraint(self.stn.getStartId(), str(action["tStart"]))
+                    if start.ub != start.lb:
+                        logging.error(tpName)
+                        logging.error("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
+                        sys.exit(1)
+                        return
+                
+                    duration = (value - start.lb)/timeFactor
+
+                    action["dMax"] = max(duration, action["dMax"])
+                
+            self.jsonDescr["actions"][index] = action
 
         #add it in the plan description
         value = float(value)/timeFactor

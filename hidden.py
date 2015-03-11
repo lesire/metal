@@ -100,6 +100,8 @@ def main(argv):
             sys.exit(1)
             
         folder = "/tmp/hidden2"
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         for f in os.listdir(folder):
             os.remove(os.path.join(folder, f))
         ex = DummyMAActionExecutor(args.agentName, folder)
