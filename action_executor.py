@@ -92,6 +92,19 @@ class DummyActionExecutor(AbstractActionExecutor):
             
         self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
 
+class DummyDelay(DummyActionExecutor):
+    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
+        dur = actionJson["dMin"]
+        if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
+            dur = dur + 20
+            logging.warning("Delaying action %s" % actionJson["name"])
+        logging.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
+        
+        currentTime = time.time()
+        self.nextEvents.append( {"time":(currentTime + dur),"cb": cb, "actionJson":actionJson})
+        
+        
+    
 class DummyMAActionExecutor(AbstractActionExecutor):
     def __init__(self, agentName, folder):
         self.folder = folder

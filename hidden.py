@@ -67,7 +67,7 @@ def main(argv):
     parser.add_argument('--logLevel', type=str, default="info")
     parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
     parser.add_argument('--agentName', metavar="agent", type=str)
-    parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma"], default="dummy", metavar="action executor (eg., 'morse')")
+    parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay"], default="dummy", metavar="action executor (eg., 'morse')")
     parser.add_argument('--waitSignal', action="store_true")
     parser.add_argument('planFile', metavar='plan', type=str)
     args = parser.parse_args()
@@ -105,6 +105,8 @@ def main(argv):
         for f in os.listdir(folder):
             os.remove(os.path.join(folder, f))
         ex = DummyMAActionExecutor(args.agentName, folder)
+    elif args.executor == "delay":
+        ex = DummyDelay()
     else:
         ex = None
 

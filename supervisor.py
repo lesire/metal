@@ -8,6 +8,7 @@ except:
     version = 3
 
 from copy import copy
+import json
 import logging
 import threading
 import time
@@ -120,6 +121,7 @@ class Supervisor(threading.Thread):
     def executeTp(self, tp):
         #Retrieve the corresponding action
         a = [a for a in self.plan.actions.values() if (a["tStart"] == tp or a["tEnd"] == tp)][0]
+        logging.debug("Executing tp : %s" % tp)
         
         #If this is a deadline, must use the exact deadline time
         if self.tp[tp][1] == "future":
@@ -161,6 +163,8 @@ class Supervisor(threading.Thread):
 
         if self.isResponsibleForAction(action):
             logging.info("Starting %s at time %f." % (action["name"], currentTime/1000))
+        else:
+            logging.debug("Starting %s at time %f. Not my action." % (action["name"], currentTime/1000))
 
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
@@ -243,12 +247,29 @@ class Supervisor(threading.Thread):
         
         while l:
             logging.debug("Next executable tp : %s" % (str(l)))
+            logging.debug("Current time : %d" % self.getCurrentTime())
+            logging.debug("Bounds : %s" % self.plan.stn.getBounds(l))
             self.executeTp(l)
             l = next(self.getExecutableTps(), False)
                     
         if not self.plan.stn.isConsistent():
             logging.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
+
+    def executionFail(self, e):
+        logging.error("Execution failed")
+        logging.error(str(e))
+        
+        planJson = self.plan.getJsonDescription()
+        planJson["current-time"] = time.time() - self.beginDate
+        
+        for a in planJson["actions"].values():
+            if not self.isResponsibleForAction(a):
+                a["locked"] = True
+        
+        with open("plan-broken.plan", "w") as f:
+            json.dump(planJson, f)
+        #logging.error(self.plan.getJsonDescription())
 
     def run(self):
         logging.info("Supervisor launched")
@@ -261,20 +282,23 @@ class Supervisor(threading.Thread):
         self.outQueue.put({"type":"start", "startTime":self.beginDate})
         #self.outQueue.put({"type":"startAction", "action":{"name" : "move", "dMin" : 1}})
 
-        while not self.isExecuted():
-            if not self.inQueue.empty():
-                msg = self.inQueue.get()
+        try:
+            while not self.isExecuted():
+                if not self.inQueue.empty():
+                    msg = self.inQueue.get()
+    
+                    if type(msg) != dict or "type" not in msg:
+                        logging.error("Supervisor received an ill-formated message : %s" % msg)
+                        continue
+                    
+                    elif msg["type"] == "endAction":
+                        self.endAction(msg)
+                    else:
+                        logging.warning("Supervisor received unknown message %s" % msg)
+                self.update()
+                time.sleep(0.1)
+        except ExecutionFailed as e:
+            self.executionFail(e)
 
-                if type(msg) != dict or "type" not in msg:
-                    logging.error("Supervisor received an ill-formated message : %s" % msg)
-                    continue
-                
-                elif msg["type"] == "endAction":
-                    self.endAction(msg)
-                else:
-                    logging.warning("Supervisor received unknown message %s" % msg)
-            self.update()
-            time.sleep(0.1)
-            
         self.outQueue.put({"type":"stop"})
         logging.info("Supervisor dead")

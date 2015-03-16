@@ -82,6 +82,8 @@ class Executor(threading.Thread):
         while True:
             if not self.inQueue.empty():
                 msg = self.inQueue.get()
+                logging.debug("Executor received message : %s" % msg)
+
                 
                 if type(msg) != dict or "type" not in msg:
                     logging.error("Executor received an ill-formated message : %s" % msg)

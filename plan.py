@@ -1,6 +1,6 @@
 from __future__ import division
 
-from copy import copy
+from copy import copy,deepcopy
 import json
 import logging
 import sys
@@ -26,7 +26,7 @@ class PlanImportError(Exception):
 
 class Plan:
     def __init__(self, planStr):
-        d = json.loads(planStr)
+        d = deepcopy(json.loads(planStr))
         self.jsonDescr = d
 
         self.stn = pystn.STNInt(pystn.StnType.IPPCSTN)
@@ -54,8 +54,8 @@ class Plan:
             
             if "children" in a and a["children"]:
                 a["abstract"] = True
-            else:
-                a["abstract"] = False
+            #else:
+            #    a["abstract"] = False
                 
             if not "executed" in a:
                 a["executed"] = False
@@ -150,7 +150,23 @@ class Plan:
                 indexToRemove.append(index)
         
         self.actions = {key: self.actions[key] for key in self.actions if key not in indexToRemove}
+        
+        tps = []
+        for tp in self.stn.getNodeIds():
+            if tp != "1-end":
+                tps.append((tp, self.stn.getBounds(tp).lb))
+        
+        tps.sort(key = lambda x:x[1])
+        
+        logging.debug("Nominal plan")
+        for tp,time in tps:
+            tpName = tp.split("-")[0]
+            position = tp.split("-")[1]
+            actionName = "-".join(tp.split("-")[2:])
             
+            if position == "start":
+                logging.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
+        
             
     def getLength(self):
         return self.stn.getLength()/timeFactor
@@ -170,6 +186,10 @@ class Plan:
     def setTimePoint(self, tpName, value):
         if not "absolute-time" in self.jsonDescr:
             self.jsonDescr["absolute-time"] = []
+            
+        #add it in the plan description
+        valueSec = float(value)/timeFactor
+        self.jsonDescr["absolute-time"].append([int(tpName.split("-")[0]), valueSec])
 
         if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
             logging.warning("Calling set timepoint for %s at %s" % (tpName, value))
@@ -201,10 +221,6 @@ class Plan:
                     action["dMax"] = max(duration, action["dMax"])
                 
             self.jsonDescr["actions"][index] = action
-
-        #add it in the plan description
-        value = float(value)/timeFactor
-        self.jsonDescr["absolute-time"].append([int(tpName.split("-")[0]), value])
 
         logging.debug("Executing %s at %s" % (tpName, value))
 
