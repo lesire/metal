@@ -218,21 +218,19 @@ class MORSEActionExecutor(AbstractActionExecutor):
         logging.info("MORSE executor initialized")
 
     def __del__(self):
-        del self.morse        
+        del self.morse
+
+    def action_done(self, cb, evt):
+        logging.info("Action done {e}".format(e=evt))
+        cb("ok")
 
     def move_aav(self, who, a, b, cb, **kwargs):
         agent = getattr(self.morse, who)
         # pt_aav_22229_-2588
         coords = re.findall('-?\d+', b)
         logging.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
-        agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 3)
-        # Leave a couple of millisec to the simulator to start the action
-        time.sleep(1)
-        # waits until we reach the target
-        while agent.waypoint.get_status() != "Arrived":
-            time.sleep(5)
-        cb("ok")
-
+        goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 3)
+        goto_action.add_done_callback(partial(self.action_done, cb))
     
 if __name__=="__main__":
     e = DummyMAActionExecutor("ressac1", "/tmp/hidden2")
