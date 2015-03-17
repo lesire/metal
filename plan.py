@@ -29,15 +29,19 @@ class PlanImportError(Exception):
 
 
 class Plan:
-    def __init__(self, planStr):
+    def __init__(self, planStr, agent=None):
         d = deepcopy(json.loads(planStr))
         self.jsonDescr = d
 
-        self.stn = pystn.STNIntMa(pystn.StnType.IPPCSTN)
+        self.agent = agent
+        if agent is None:
+            self.stn = pystn.STNIntMa(pystn.StnType.GraphSTN)
+        else:
+            self.stn = pystn.STNInt(pystn.StnType.GraphSTN, agent)
         
         self.tpName = {}
         self.tpName[1] = "1-end"
-        self.stn.addPoint("1-end")
+        self.stn.addPoint("1-end", self.stn.getAgentName())
         
         self.absTimes = []
         
@@ -79,7 +83,25 @@ class Plan:
                     splittedAction[index][agent] = newIndex
                     self.actions[newIndex] = newA
                 del self.actions[index]
-        
+            elif self.agent is not None:
+                if a["name"] == "dummy init" or a["name"] == "dummy end":
+                    a["agent"] = agent
+                else:
+                    
+                    if a["name"].startswith("dummy "):
+                        n = a["name"].split(" ")[3]
+                    else:
+                        n = a["name"].split(" ")[1]
+                    if not n in agentList:
+                        logging.error("Unknown agent %s for action %s" % (n, a["name"]))
+                        continue
+                    a["agent"] = n
+
+        if self.agent is not None:
+            for a in set(a["agent"] for a in self.actions.values()):
+                if a != self.agent:
+                    self.stn.addAgent(a)
+
         for index,a in self.actions.items():
             tpNumber = a["startTp"]
             if tpNumber not in self.tpName:
@@ -112,10 +134,16 @@ class Plan:
         for a in self.actions.values():
 
             if a["tStart"][0] != "0" and a["tStart"] not in self.stn.getNodeIds():
-                self.stn.addPoint(a["tStart"])
+                if self.agent is not None:
+                    self.stn.addPoint(a["tStart"], a["agent"])
+                else:
+                    self.stn.addPoint(a["tStart"])
                 self.stn.addConstraint(a["tStart"], self.tpName[1], 0)
             if a["tEnd"][0] != "0" and a["tEnd"] not in self.stn.getNodeIds():
-                self.stn.addPoint(a["tEnd"])
+                if self.agent is not None:
+                    self.stn.addPoint(a["tEnd"], a["agent"])
+                else:
+                    self.stn.addPoint(a["tEnd"])
                 self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)
             
             if a["tStart"] != a["tEnd"]:
@@ -220,7 +248,6 @@ class Plan:
             
             if position == "start":
                 logging.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
-
 
     def getLength(self):
         return self.stn.getLength()/timeFactor

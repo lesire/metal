@@ -25,7 +25,10 @@ class Supervisor(threading.Thread):
     def __init__ (self, inQueue, outQueue, planStr, agent = None):
         self.inQueue = inQueue
         self.outQueue = outQueue
-        self.plan = plan.Plan(planStr)
+        if agent is None:
+            self.plan = plan.Plan(planStr)
+        else:
+            self.plan = plan.Plan(planStr, agent)
         self.agent = agent
         
         self.executedTp = {}
