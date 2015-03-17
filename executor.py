@@ -31,7 +31,7 @@ class Executor(threading.Thread):
     def action_callback(self, action):
         currentTime = time.time()
         self.nextEvents.append((currentTime, action))
-        logging.info("Callback of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)))
+        logging.info("Callback of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
 
     #called periodically
     def update(self):
@@ -53,7 +53,7 @@ class Executor(threading.Thread):
         
         action = msg["action"]
         currentTime = time.time()
-        logging.info("Start of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)))
+        logging.info("Start of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
 
         try:
             self.actionExecutor.execute(action, self.action_callback)

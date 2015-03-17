@@ -1,6 +1,8 @@
 from __future__ import division
 
 from copy import copy,deepcopy
+from pprint import pprint
+import itertools
 import json
 import logging
 import sys
@@ -13,6 +15,8 @@ except ImportError:
 
 def isActionControllable(actionName):
     return "communicate" in actionName
+
+agentList = ["ressac", "ressac1", "ressac2", "mana", "minnie", "momo"]
 
 timeDelta = 1
 timeFactor = 1000 # all float duration are multiplied by this and then cast into int
@@ -29,14 +33,54 @@ class Plan:
         d = deepcopy(json.loads(planStr))
         self.jsonDescr = d
 
-        self.stn = pystn.STNInt(pystn.StnType.IPPCSTN)
+        self.stn = pystn.STNIntMa(pystn.StnType.IPPCSTN)
         
         self.tpName = {}
         self.tpName[1] = "1-end"
         self.stn.addPoint("1-end")
         
+        self.absTimes = []
+        
+        #Dictionary. Key is the previous action index. Value is the dictionnary of new index
+        splittedAction = {}
+        splittedTps = {} #Keys are tp
+        
         self.actions = copy(d["actions"])
+        
+        maxTp = max([max(a["startTp"], a["endTp"]) for a in self.actions.values()])
+        
+        #first split coordinating action:
         for index,a in d["actions"].items():
+            if "communicate" in a["name"]:
+                l = a["name"].split(" ")
+                if l[1] not in agentList or l[2] not in agentList:
+                    logging.error("cannot know if %s is a coordination action that should be split in 2" % a["name"])
+                    continue
+                    
+                if len(l) > 3 and l[3] in agentList:
+                    logging.error("Cannot know if %s is a coordination action that should be split in 2. Found 3 agents ?!?")
+                    continue
+                
+                splittedAction[index] = {}
+                splittedTps[a["startTp"]] = {}
+                splittedTps[a["endTp"]] = {}
+                
+                for agent in l[1],l[2]:
+                    newA = deepcopy(a)
+                    
+                    newA["startTp"] = maxTp + 1
+                    newA["endTp"] = maxTp + 2
+                    newA["agent"] = agent
+                    splittedTps[a["startTp"]][agent] = maxTp + 1
+                    splittedTps[a["endTp"]][agent] = maxTp + 2
+                    maxTp += 2
+                    
+                    newIndex = index + "-" + agent
+                    splittedAction[index][agent] = newIndex
+                    self.actions[newIndex] = newA
+                del self.actions[index]
+        
+        for index,a in self.actions.items():
             tpNumber = a["startTp"]
             if tpNumber not in self.tpName:
                 self.tpName[tpNumber] = str(tpNumber) + "-start-" + a["name"]
@@ -64,7 +108,7 @@ class Plan:
             a["dMin"] = abs(a["dMin"])
             
             self.actions[index] = a
-        
+
         for a in self.actions.values():
 
             if a["tStart"][0] != "0" and a["tStart"] not in self.stn.getNodeIds():
@@ -88,23 +132,25 @@ class Plan:
             if node != self.tpName[1]:
                 self.stn.addConstraint(node, self.tpName[1], timeDelta)
 
-        for cl in d["causal-links"]:            
-            start = self.tpName[cl["startTp"]]
-            end = self.tpName[cl["endTp"]]
-
-            if cl["startTp"] == 0:
-                self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
-            else:
-                self.stn.addConstraint(start, end, timeDelta)
-                        
-        for tl in d["temporal-links"]:
-            start = self.tpName[tl["startTp"]]
-            end = self.tpName[tl["endTp"]]
+        for cl in (d["causal-links"] + d["temporal-links"]):
+            starts = []
+            ends = []
             
-            if tl["startTp"] == 0:
-                self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
-            else:
-                self.stn.addConstraint(start, end, timeDelta)
+            for tpKey,tpList in zip(["startTp","endTp"],[starts,ends]):
+                if cl[tpKey] in splittedTps:
+                    # causal link from a split action
+                    for agent in splittedTps[cl[tpKey]]:
+                        newTp = self.tpName[splittedTps[cl[tpKey]][agent]]
+                        tpList.append(newTp)
+                else:
+                    newTp = self.tpName[cl[tpKey]]
+                    tpList.append(newTp)
+
+            for start,end in itertools.product(starts, ends):
+                if start.startswith("0-"):
+                    self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
+                else:
+                    self.stn.addConstraint(start, end, timeDelta)
 
         for action in d["actions"].values():
             if "children" in action and action["children"]:
@@ -121,15 +167,23 @@ class Plan:
 
         if "absolute-time" in d:
             for time, value in d["absolute-time"]:
+                
                 value = int(round(value*timeFactor))
                 
-                logging.debug("Adding %s at exactly %s" % (self.tpName[time], value))
-                logging.debug("Bounds are %s" % self.stn.getBounds(self.tpName[time]))
-                if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[time], value, value):
-                    logging.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[time], value))
-                    raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[time], value))
+                if time in splittedTps:
+                    tps = splittedTps[time].values()
+                else:
+                    tps = [time]
 
-                self.stn.addConstraint(self.stn.getStartId(), self.tpName[time], value, value)
+                for t in tps:
+                    logging.debug("Adding %s at exactly %s" % (self.tpName[t], value))
+                    logging.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
+                    if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
+                        logging.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
+                        raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
+
+                    self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)
+                    self.absTimes.append( (self.tpName[t], value) )
 
         if "unavailable-actions" in d:
             for forbiddenAction in d["unavailable-actions"]:
@@ -166,8 +220,8 @@ class Plan:
             
             if position == "start":
                 logging.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
-        
-            
+
+
     def getLength(self):
         return self.stn.getLength()/timeFactor
 
@@ -180,6 +234,8 @@ class Plan:
         return True
     
     def getJsonDescription(self):
+        logging.error("Export in Json not implemented yet if some actions are splitted")
+        raise Exception("Not Implemented yet")
         return self.jsonDescr
     
     #assume value in ms

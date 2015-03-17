@@ -49,35 +49,22 @@ class Supervisor(threading.Thread):
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "uncontrollable"]
         
-        j = self.plan.getJsonDescription()
-        if "absolute-time" in j and j["absolute-time"]:
-            for tp,value in j["absolute-time"]:
-                
-                #find the timepoint name
-                tpCandidate = filter(lambda x: x.startswith(str(tp) + "-"), self.tp.keys())
-                try:
-                    tpName = next(tpCandidate)
-                except StopIteration:
-                    logging.error("Error : Cannot find an exected tp %s" % tp)
-                    raise ExecutionFailed("Cannot find an exected tp")
-                
-                value = int(round(1000*value))
-                
-                action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
-                if action["executed"]:
-                    #action was executed, this is a past action
-                    self.executedTp[tpName] = value
-                    self.tp[tpName][1] = "past"
-                else:
-                    self.tp[tpName][1] = "future"
+        for tpName,value in self.plan.absTimes:
+            action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+            if action["executed"]:
+                #action was executed, this is a past action
+                self.executedTp[tpName] = value
+                self.tp[tpName][1] = "past"
+            else:
+                self.tp[tpName][1] = "future"
 
-                self.plan.stn.addConstraint(self.plan.stn.getStartId(), tpName, value, value)
-                
-                if not self.plan.stn.isConsistent():
-                    logging.error("Error : Invalid stn when setting the time of an absolute tp : %s" % tpName)
-                    raise ExecutionFailed("Invalid stn when setting the time of an absolute tp : %s" % tpName)
+            self.plan.stn.addConstraint(self.plan.stn.getStartId(), tpName, value, value)
+            
+            if not self.plan.stn.isConsistent():
+                logging.error("Error : Invalid stn when setting the time of an absolute tp : %s" % tpName)
+                raise ExecutionFailed("Invalid stn when setting the time of an absolute tp : %s" % tpName)
 
-                #TODO if this is an action beeing executed, send a message to the executor
+            #TODO if this is an action beeing executed, send a message to the executor
                 
         threading.Thread.__init__ (self, name="Supervisor")
     
@@ -110,9 +97,11 @@ class Supervisor(threading.Thread):
     def isResponsibleForAction(self, action):
         if action["name"] in ["dummy init", "dummy end"]:
             return True
-        
+
         if self.agent is None:
             return True
+        elif "agent" in action:
+            return action["agent"] == self.agent
         elif self.agent in action["name"]:
             return True
         
@@ -213,7 +202,7 @@ class Supervisor(threading.Thread):
             logging.warning("Finished %s early : %s. Waiting until %s." % (action["name"], value, lb))
             value = lb
             
-        logging.info("End of the action %s at %s" % (action["name"], value))
+        logging.info("End of the action %s at %s" % (action["name"], value/1000))
         
         c = self.plan.stn.getBounds(str(tp))
         
