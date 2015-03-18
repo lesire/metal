@@ -91,6 +91,7 @@ def main(argv):
         planString = " ".join(f.readlines())
 
     if args.executor == "morse":
+        from executors.morse_executor import MORSEActionExecutor
         ex = MORSEActionExecutor()
     elif args.executor == "dummy":
         ex = DummyActionExecutor()
