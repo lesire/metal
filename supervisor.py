@@ -10,6 +10,9 @@ except:
 from copy import copy
 import json
 import logging
+import os
+import subprocess
+import sys
 import threading
 import time
 
@@ -25,6 +28,14 @@ class Supervisor(threading.Thread):
     def __init__ (self, inQueue, outQueue, planStr, agent = None):
         self.inQueue = inQueue
         self.outQueue = outQueue
+        
+        self.beginDate = -1
+        
+        self.init(planStr, agent)
+        
+        threading.Thread.__init__ (self, name="Supervisor")
+        
+    def init(self, planStr, agent):
         if agent is None:
             self.plan = plan.Plan(planStr)
         else:
@@ -33,7 +44,6 @@ class Supervisor(threading.Thread):
         
         self.executedTp = {}
         self.tp = {}
-        self.beginDate = -1
         
         for a in self.plan.actions.values():
             if a["name"] == "dummy init":
@@ -68,8 +78,6 @@ class Supervisor(threading.Thread):
                 raise ExecutionFailed("Invalid stn when setting the time of an absolute tp : %s" % tpName)
 
             #TODO if this is an action beeing executed, send a message to the executor
-                
-        threading.Thread.__init__ (self, name="Supervisor")
     
     def getExecutableTps(self, now = True):
         return filter(lambda tp: self.isTpExecutable(tp, now), self.tp.keys())
@@ -248,10 +256,7 @@ class Supervisor(threading.Thread):
             logging.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
 
-    def executionFail(self, e):
-        logging.error("Execution failed")
-        logging.error(str(e))
-        
+    def executionFail(self):
         planJson = self.plan.getJsonDescription()
         planJson["current-time"] = time.time() - self.beginDate
         
@@ -261,7 +266,21 @@ class Supervisor(threading.Thread):
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
-        #logging.error(self.plan.getJsonDescription())
+        
+        if os.access("hipop", os.X_OK):
+            r = subprocess.call("./hipop -L error --timing -H hipop-helper.pddl -I plan-broken.plan -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan hipop-domain.pddl hipop-prb.pddl".split(" "))
+        
+            if(r == 0):
+                with open("plan-repaired.plan") as f:
+                    planStr = " ".join(f.readlines())
+                self.init(planStr, self.agent)
+                self.mainLoop()
+            else:
+                logging.error("During the reparation hipop returned %s. Cannot repair." % r)
+                sys.exit(1)
+        else:
+            logging.error("HiPOP not found. Cannot repair")
+            sys.exit(1)
 
     def run(self):
         logging.info("Supervisor launched")
@@ -279,7 +298,10 @@ class Supervisor(threading.Thread):
         
         self.outQueue.put({"type":"start", "startTime":self.beginDate})
         #self.outQueue.put({"type":"startAction", "action":{"name" : "move", "dMin" : 1}})
+        self.mainLoop()
 
+    def mainLoop(self):
+        hasFailed = False
         try:
             while not self.isExecuted():
                 if not self.inQueue.empty():
@@ -296,7 +318,12 @@ class Supervisor(threading.Thread):
                 self.update()
                 time.sleep(0.1)
         except ExecutionFailed as e:
-            self.executionFail(e)
-
-        self.outQueue.put({"type":"stop"})
-        logging.info("Supervisor dead")
+            hasFailed = True
+            logging.error("Execution failed")
+            logging.error(str(e))
+            
+        if hasFailed:
+            self.executionFail()
+        else:
+            self.outQueue.put({"type":"stop"})
+            logging.info("Supervisor dead")

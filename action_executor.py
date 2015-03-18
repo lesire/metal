@@ -145,19 +145,6 @@ class DummyActionExecutor(AbstractActionExecutor):
             logging.info("calling a callback for %s" % d["actionJson"]["name"])
             
         self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
-
-class DummyDelay(DummyActionExecutor):
-    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
-        dur = actionJson["dMin"]
-        if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
-            dur = dur + 20
-            logging.warning("Delaying action %s" % actionJson["name"])
-        logging.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
-        
-        currentTime = time.time()
-        self.nextEvents.append( {"time":(currentTime + dur),"cb": cb, "actionJson":actionJson})
-        
-        
     
 class DummyMAActionExecutor(DummyActionExecutor):
     def __init__(self, agentName, folder):
@@ -246,9 +233,34 @@ class DummyMAActionExecutor(DummyActionExecutor):
                     logging.error("\t%s was not here" % agents[0])
                 if not result[1]:
                     logging.error("\t%s was not here" % agents[1])
+            else:
+                logging.info("End of com %s : everyone was here" % name)
                 
                     
             del self.inCom[self.inCom.index(name)]
+
+
+class DummyDelay(DummyActionExecutor):
+    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
+        dur = actionJson["dMin"]
+        if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
+            dur = dur + 20
+            logging.warning("Delaying action %s" % actionJson["name"])
+        logging.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
+        
+        currentTime = time.time()
+        self.nextEvents.append( {"time":(currentTime + dur),"cb": cb, "actionJson":actionJson})
+        
+class DummyDelayMA(DummyMAActionExecutor):
+    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
+        dur = actionJson["dMin"]
+        if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
+            dur = dur + 20
+            logging.warning("Delaying action %s" % actionJson["name"])
+        logging.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
+        
+        currentTime = time.time()
+        self.nextEvents.append( {"time":(currentTime + dur),"cb": cb, "actionJson":actionJson})
 
 if __name__=="__main__":
     e = DummyMAActionExecutor("ressac1", "/tmp/hidden2")
