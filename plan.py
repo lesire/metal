@@ -37,7 +37,7 @@ class Plan:
         if agent is None:
             self.stn = pystn.STNIntMa(pystn.StnType.GraphSTN)
         else:
-            self.stn = pystn.STNInt(pystn.StnType.GraphSTN, agent)
+            self.stn = pystn.STNIntMa(pystn.StnType.GraphSTN, agent)
         
         self.tpName = {}
         self.tpName[1] = "1-end"
