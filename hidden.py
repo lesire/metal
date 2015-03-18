@@ -94,7 +94,7 @@ def main(argv):
         from executors.morse_executor import MORSEActionExecutor
         ex = MORSEActionExecutor()
     elif args.executor == "dummy":
-        ex = DummyActionExecutor()
+        ex = DummyActionExecutor(agentName=args.agentName)
     elif args.executor == "dummy-ma":
         if args.agentName is None:
             logging.error("Cannot use executor dummy-ma without an agent name")
@@ -107,7 +107,7 @@ def main(argv):
             os.remove(os.path.join(folder, f))
         ex = DummyMAActionExecutor(args.agentName, folder)
     elif args.executor == "delay":
-        ex = DummyDelay()
+        ex = DummyDelay(agentName=args.agentName)
     else:
         ex = None
 

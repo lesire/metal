@@ -265,8 +265,14 @@ class Supervisor(threading.Thread):
 
     def run(self):
         logging.info("Supervisor launched")
-        self.beginDate = time.time()
         
+        if self.plan.initTime is None:
+            #begining of the plan
+            self.beginDate = time.time()
+        else:
+            logging.info("Executing an half-executed plan. Starting at %s" % self.plan.initTime)
+            self.beginDate = time.time() - self.plan.initTime
+
         #executing start dummy action
         self.executedTp["0"] = 0
         self.tp["0-start-dummy init"] = ["dummy init", "past"]

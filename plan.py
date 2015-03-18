@@ -30,8 +30,8 @@ class PlanImportError(Exception):
 
 class Plan:
     def __init__(self, planStr, agent=None):
-        d = deepcopy(json.loads(planStr))
-        self.jsonDescr = d
+        d = json.loads(planStr)
+        self.jsonDescr = deepcopy(d)
 
         self.agent = agent
         if agent is None:
@@ -46,8 +46,8 @@ class Plan:
         self.absTimes = []
         
         #Dictionary. Key is the previous action index. Value is the dictionnary of new index
-        splittedAction = {}
-        splittedTps = {} #Keys are tp
+        self.splittedAction = {}
+        self.splittedTps = {} #Keys are tp
         
         self.actions = copy(d["actions"])
         
@@ -65,9 +65,9 @@ class Plan:
                     logging.error("Cannot know if %s is a coordination action that should be split in 2. Found 3 agents ?!?")
                     continue
                 
-                splittedAction[index] = {}
-                splittedTps[a["startTp"]] = {}
-                splittedTps[a["endTp"]] = {}
+                self.splittedAction[index] = {}
+                self.splittedTps[a["startTp"]] = {}
+                self.splittedTps[a["endTp"]] = {}
                 
                 for agent in l[1],l[2]:
                     newA = deepcopy(a)
@@ -75,12 +75,12 @@ class Plan:
                     newA["startTp"] = maxTp + 1
                     newA["endTp"] = maxTp + 2
                     newA["agent"] = agent
-                    splittedTps[a["startTp"]][agent] = maxTp + 1
-                    splittedTps[a["endTp"]][agent] = maxTp + 2
+                    self.splittedTps[a["startTp"]][agent] = maxTp + 1
+                    self.splittedTps[a["endTp"]][agent] = maxTp + 2
                     maxTp += 2
                     
                     newIndex = index + "-" + agent
-                    splittedAction[index][agent] = newIndex
+                    self.splittedAction[index][agent] = newIndex
                     self.actions[newIndex] = newA
                 del self.actions[index]
             elif self.agent is not None:
@@ -165,10 +165,10 @@ class Plan:
             ends = []
             
             for tpKey,tpList in zip(["startTp","endTp"],[starts,ends]):
-                if cl[tpKey] in splittedTps:
+                if cl[tpKey] in self.splittedTps:
                     # causal link from a split action
-                    for agent in splittedTps[cl[tpKey]]:
-                        newTp = self.tpName[splittedTps[cl[tpKey]][agent]]
+                    for agent in self.splittedTps[cl[tpKey]]:
+                        newTp = self.tpName[self.splittedTps[cl[tpKey]][agent]]
                         tpList.append(newTp)
                 else:
                     newTp = self.tpName[cl[tpKey]]
@@ -198,8 +198,8 @@ class Plan:
                 
                 value = int(round(value*timeFactor))
                 
-                if time in splittedTps:
-                    tps = splittedTps[time].values()
+                if time in self.splittedTps:
+                    tps = self.splittedTps[time].values()
                 else:
                     tps = [time]
 
@@ -212,6 +212,11 @@ class Plan:
 
                     self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)
                     self.absTimes.append( (self.tpName[t], value) )
+        
+        if "current-time" in d:
+            self.initTime = d["current-time"]
+        else:
+            self.initTime = None
 
         if "unavailable-actions" in d:
             for forbiddenAction in d["unavailable-actions"]:
@@ -260,9 +265,26 @@ class Plan:
             return False
         return True
     
-    def getJsonDescription(self):
-        logging.error("Export in Json not implemented yet if some actions are splitted")
-        raise Exception("Not Implemented yet")
+    def getJsonDescription(self):    
+        originalIndex = {}
+        for oldIndex,d in self.splittedTps.items():
+            for tp in d.values():
+                originalIndex[tp] = oldIndex
+        
+        #must update execution time
+        for action in self.jsonDescr["actions"].values():
+            for tpKey,combineFunc in zip(["startTp", "endTp"], [max, min]):
+                if action[tpKey] in self.splittedTps:
+                    childTps = list(self.splittedTps[action[tpKey]].values())
+                    if any([tp in self.jsonDescr["absolute-time"] for tp in childTps]):
+                        value = combineFunc([self.jsonDescr["absolute-time"][tp] for tp in childTps if tp in self.jsonDescr["absolute-time"]])
+                        self.jsonDescr["absolute-time"][action[tpKey]] = value
+        
+        
+        for index,_ in self.jsonDescr["absolute-time"]:
+            if index in originalIndex.keys():
+                del self.jsonDescr["absolute-time"][index]
+
         return self.jsonDescr
     
     #assume value in ms
@@ -274,25 +296,17 @@ class Plan:
         valueSec = float(value)/timeFactor
         self.jsonDescr["absolute-time"].append([int(tpName.split("-")[0]), valueSec])
 
-        if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
-            logging.warning("Calling set timepoint for %s at %s" % (tpName, value))
-            logging.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
-
-        #add this constraint in the STN
-        self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
-
         for index,action in self.jsonDescr["actions"].items():
-            
+
             # The action starts with this tp
             if  int(tpName.split("-")[0]) == action["startTp"] and "dummy" not in action["name"]:
                 action["executed"] = True
                 action["locked"] = True
                 
+            #The action ends with this tp : update the action lengths
             if  int(tpName.split("-")[0]) == action["endTp"] and "dummy" not in action["name"]:
-
-                #The action ends with this tp : update the action lengths
                 if "dMax" in action:
-                    start = self.stn.getConstraint(self.stn.getStartId(), str(action["tStart"]))
+                    start = self.stn.getConstraint(self.stn.getStartId(), str(self.actions[index]["tStart"]))
                     if start.ub != start.lb:
                         logging.error(tpName)
                         logging.error("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
@@ -305,6 +319,14 @@ class Plan:
                 
             self.jsonDescr["actions"][index] = action
 
+        if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
+            logging.warning("Calling set timepoint for %s at %s" % (tpName, value))
+            logging.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
+
+
+        #add this constraint in the STN
+        self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
+        
         logging.debug("Executing %s at %s" % (tpName, value))
 
     def setActionUnavailable(self, action):
