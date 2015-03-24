@@ -1,4 +1,4 @@
-from action_executor import AbstractActionExecutor
+from .action_executor import AbstractActionExecutor
 
 import logging
 import re
@@ -29,7 +29,7 @@ class MORSEActionExecutor(AbstractActionExecutor):
         agent = getattr(self.morse, who)
         coords = re.findall('-?\d+', b)
         logging.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
-        goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 1, 1)
+        goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 1, 1)
         goto_action.add_done_callback(partial(self.action_done, cb))
 
     # observe-aav ressac2 pt_aav_22229_-2588 pt_obs_22229_-2588

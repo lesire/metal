@@ -17,7 +17,7 @@ except:
 
 import executor
 import supervisor
-from action_executor import *
+from executors.action_executor import *
 
 """
 Messages are dictionnary, with at least the key "type" that can be :
