@@ -9,12 +9,13 @@ except:
 
 from copy import copy
 import json
-import logging
 import os
 import subprocess
 import sys
 import threading
 import time
+
+import logging; logger = logging.getLogger("hidden")
 
 import plan
 
@@ -74,7 +75,7 @@ class Supervisor(threading.Thread):
             self.plan.stn.addConstraint(self.plan.stn.getStartId(), tpName, value, value)
             
             if not self.plan.stn.isConsistent():
-                logging.error("Error : Invalid stn when setting the time of an absolute tp : %s" % tpName)
+                logger.error("Error : Invalid stn when setting the time of an absolute tp : %s" % tpName)
                 raise ExecutionFailed("Invalid stn when setting the time of an absolute tp : %s" % tpName)
 
             #TODO if this is an action beeing executed, send a message to the executor
@@ -84,7 +85,7 @@ class Supervisor(threading.Thread):
     
     def getCurrentTime(self):
         if self.beginDate < 0:
-            logging.error("getCurrentTime called before initialisation")
+            logger.error("getCurrentTime called before initialisation")
 
         return int(round(1000 * (time.time() - self.beginDate)))
 
@@ -121,7 +122,7 @@ class Supervisor(threading.Thread):
     def executeTp(self, tp):
         #Retrieve the corresponding action
         a = [a for a in self.plan.actions.values() if (a["tStart"] == tp or a["tEnd"] == tp)][0]
-        logging.debug("Executing tp : %s" % tp)
+        logger.debug("Executing tp : %s" % tp)
         
         #If this is a deadline, must use the exact deadline time
         if self.tp[tp][1] == "future":
@@ -138,11 +139,11 @@ class Supervisor(threading.Thread):
                 self.plan.setTimePoint(tp, currentTime)
                 
                 if not self.plan.stn.isConsistent():
-                    logging.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
+                    logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
 
                 if not "abstract" in a and self.isResponsibleForAction(a):
-                    logging.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
+                    logger.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
                     self.outQueue.put(msg)
@@ -152,19 +153,19 @@ class Supervisor(threading.Thread):
             self.executedTp[tp] = currentTime
                 
         else:
-            logging.error("\tError : a timepoint does not match its action %s" % tp)
+            logger.error("\tError : a timepoint does not match its action %s" % tp)
             raise ExecutionFailed("\tA timepoint does not match its action %s" % tp)
 
 
     def executeAction(self, action, currentTime):
         if self.tp[action["tStart"]][1] != "controllable" and self.tp[action["tStart"]][1] != "future":
-            logging.error("Cannot execute %s, the status of its start point is %s." % (action["name"], self.tp[action["tStart"]] ))
+            logger.error("Cannot execute %s, the status of its start point is %s." % (action["name"], self.tp[action["tStart"]] ))
             return
 
         if self.isResponsibleForAction(action):
-            logging.info("Starting %s at time %f." % (action["name"], currentTime/1000))
+            logger.info("Starting %s at time %f." % (action["name"], currentTime/1000))
         else:
-            logging.debug("Starting %s at time %f. Not my action." % (action["name"], currentTime/1000))
+            logger.debug("Starting %s at time %f. Not my action." % (action["name"], currentTime/1000))
 
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
@@ -172,7 +173,7 @@ class Supervisor(threading.Thread):
         self.plan.setTimePoint(action["tStart"], currentTime)
 
         if action["name"] == "dummy end":
-            logging.info("finished the plan")
+            logger.info("finished the plan")
             return
 
         if "abstract" not in action:
@@ -184,16 +185,16 @@ class Supervisor(threading.Thread):
                 else:
                     self.plan.setTimePoint(action["tEnd"], currentTime + int(round(1000 * action["dMin"])))
 
-                logging.debug("Action %s is not for this agent. Assume it will last is minimum duration" % action["name"])
+                logger.debug("Action %s is not for this agent. Assume it will last is minimum duration" % action["name"])
             else:
                 #send execution order
                 msg = {"type":"startAction", "action":copy(action), "time":currentTime}
                 
-                logging.debug("Sending message : %s" % msg)
+                logger.debug("Sending message : %s" % msg)
                 self.outQueue.put(msg)
         
         if not self.plan.stn.isConsistent():
-            logging.error("\tError : invalid STN when launching execution of %s" % action["name"])
+            logger.error("\tError : invalid STN when launching execution of %s" % action["name"])
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
     def endAction(self, msg):
@@ -202,29 +203,29 @@ class Supervisor(threading.Thread):
         value = msg["time"]
         
         if action["controllable"]:
-            logging.info("Notified of the end of controllable action %s." % action["name"])
+            logger.info("Notified of the end of controllable action %s." % action["name"])
             if self.tp[tp][1] != "past":
-                logging.error("Notified of the end of controllable action %s." % action["name"])
-                logging.error("But the timepoint is not past : %s" % self.tp[tp][1])
+                logger.error("Notified of the end of controllable action %s." % action["name"])
+                logger.error("But the timepoint is not past : %s" % self.tp[tp][1])
             return
         
         lb = self.plan.stn.getBounds(tp).lb
         if self.tp[tp][1] == "uncontrollable" and value < lb:
-            logging.warning("Finished %s early : %s. Waiting until %s." % (action["name"], value, lb))
+            logger.warning("Finished %s early : %s. Waiting until %s." % (action["name"], value, lb))
             value = lb
             
-        logging.info("End of the action %s at %s" % (action["name"], value/1000))
+        logger.info("End of the action %s at %s" % (action["name"], value/1000))
         
         c = self.plan.stn.getBounds(str(tp))
         
-        logging.debug("Is STN Consistent : %s" % self.plan.stn.isConsistent())
-        logging.debug("Bounds %s" % c)
-        logging.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
+        logger.debug("Is STN Consistent : %s" % self.plan.stn.isConsistent())
+        logger.debug("Bounds %s" % c)
+        logger.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
             
         self.plan.setTimePoint(tp, value)
             
         if not self.plan.stn.isConsistent():
-            logging.error("\tError : invalid STN when finishing execution of tp %s" % tp)
+            logger.error("\tError : invalid STN when finishing execution of tp %s" % tp)
             raise ExecutionFailed("Invalid STN when finishing execution of tp %s" % tp)
 
             
@@ -246,14 +247,14 @@ class Supervisor(threading.Thread):
         l = next(self.getExecutableTps(), False)
         
         while l:
-            logging.debug("Next executable tp : %s" % (str(l)))
-            logging.debug("Current time : %d" % self.getCurrentTime())
-            logging.debug("Bounds : %s" % self.plan.stn.getBounds(l))
+            logger.debug("Next executable tp : %s" % (str(l)))
+            logger.debug("Current time : %d" % self.getCurrentTime())
+            logger.debug("Bounds : %s" % self.plan.stn.getBounds(l))
             self.executeTp(l)
             l = next(self.getExecutableTps(), False)
                     
         if not self.plan.stn.isConsistent():
-            logging.error("Execution of the plan when executing controllable points")
+            logger.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
 
     def executionFail(self):
@@ -276,20 +277,20 @@ class Supervisor(threading.Thread):
                 self.init(planStr, self.agent)
                 self.mainLoop()
             else:
-                logging.error("During the reparation hipop returned %s. Cannot repair." % r)
+                logger.error("During the reparation hipop returned %s. Cannot repair." % r)
                 sys.exit(1)
         else:
-            logging.error("HiPOP not found. Cannot repair")
+            logger.error("HiPOP not found. Cannot repair")
             sys.exit(1)
 
     def run(self):
-        logging.info("Supervisor launched")
+        logger.info("Supervisor launched")
         
         if self.plan.initTime is None:
             #begining of the plan
             self.beginDate = time.time()
         else:
-            logging.info("Executing an half-executed plan. Starting at %s" % self.plan.initTime)
+            logger.info("Executing an half-executed plan. Starting at %s" % self.plan.initTime)
             self.beginDate = time.time() - self.plan.initTime
 
         #executing start dummy action
@@ -308,22 +309,22 @@ class Supervisor(threading.Thread):
                     msg = self.inQueue.get()
     
                     if type(msg) != dict or "type" not in msg:
-                        logging.error("Supervisor received an ill-formated message : %s" % msg)
+                        logger.error("Supervisor received an ill-formated message : %s" % msg)
                         continue
                     
                     elif msg["type"] == "endAction":
                         self.endAction(msg)
                     else:
-                        logging.warning("Supervisor received unknown message %s" % msg)
+                        logger.warning("Supervisor received unknown message %s" % msg)
                 self.update()
                 time.sleep(0.1)
         except ExecutionFailed as e:
             hasFailed = True
-            logging.error("Execution failed")
-            logging.error(str(e))
+            logger.error("Execution failed")
+            logger.error(str(e))
             
         if hasFailed:
             self.executionFail()
         else:
             self.outQueue.put({"type":"stop"})
-            logging.info("Supervisor dead")
+            logger.info("Supervisor dead")

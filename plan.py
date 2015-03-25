@@ -4,8 +4,9 @@ from copy import copy,deepcopy
 from pprint import pprint
 import itertools
 import json
-import logging
 import sys
+
+import logging; logger = logging.getLogger("hidden")
 
 try:
     import pystn
@@ -58,11 +59,11 @@ class Plan:
             if "communicate" in a["name"]:
                 l = a["name"].split(" ")
                 if l[1] not in agentList or l[2] not in agentList:
-                    logging.error("cannot know if %s is a coordination action that should be split in 2" % a["name"])
+                    logger.error("cannot know if %s is a coordination action that should be split in 2" % a["name"])
                     continue
                     
                 if len(l) > 3 and l[3] in agentList:
-                    logging.error("Cannot know if %s is a coordination action that should be split in 2. Found 3 agents ?!?")
+                    logger.error("Cannot know if %s is a coordination action that should be split in 2. Found 3 agents ?!?")
                     continue
                 
                 self.splittedAction[index] = {}
@@ -93,7 +94,7 @@ class Plan:
                     else:
                         n = a["name"].split(" ")[1]
                     if not n in agentList:
-                        logging.error("Unknown agent %s for action %s" % (n, a["name"]))
+                        logger.error("Unknown agent %s for action %s" % (n, a["name"]))
                         continue
                     a["agent"] = n
 
@@ -151,7 +152,7 @@ class Plan:
                     self.stn.addConstraint(a["tStart"], a["tEnd"], int(round(timeFactor*a["dMin"])))
 
                 else:
-                    logging.warning("Action %s does not have a dMin ?" % a["name"])
+                    logger.warning("Action %s does not have a dMin ?" % a["name"])
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
@@ -186,11 +187,11 @@ class Plan:
                     self.stn.addConstraint(action["tStart"], self.actions[child]["tStart"], 2*timeDelta)
                     self.stn.addConstraint(self.actions[child]["tEnd"], action["tEnd"], 2*timeDelta)
                 
-                    logging.debug("Adding %s timedelta before %s (hierarchy)" % (action["tStart"], self.actions[child]["tStart"]))
-                    logging.debug("Adding %s timedelta before %s (hierarchy)" % (self.actions[child]["tEnd"], action["tEnd"]))
+                    logger.debug("Adding %s timedelta before %s (hierarchy)" % (action["tStart"], self.actions[child]["tStart"]))
+                    logger.debug("Adding %s timedelta before %s (hierarchy)" % (self.actions[child]["tEnd"], action["tEnd"]))
                 
                     if not self.stn.isConsistent():
-                        logging.error("**  Error : invalid STN when importing the abstract links")
+                        logger.error("**  Error : invalid STN when importing the abstract links")
                         raise PlanImportError("invalid STN when importing the abstract links")
 
         if "absolute-time" in d:
@@ -204,10 +205,10 @@ class Plan:
                     tps = [time]
 
                 for t in tps:
-                    logging.debug("Adding %s at exactly %s" % (self.tpName[t], value))
-                    logging.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
+                    logger.debug("Adding %s at exactly %s" % (self.tpName[t], value))
+                    logger.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
                     if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
-                        logging.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
+                        logger.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
                         raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
 
                     self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)
@@ -221,11 +222,11 @@ class Plan:
         if "unavailable-actions" in d:
             for forbiddenAction in d["unavailable-actions"]:
                 if [a["name"] for a in self.actions if a["name"] == forbiddenAction and not a["executed"]]:
-                    logging.error("** ERROR : a given plan has a forbidden action : %s" % forbiddenAction)
+                    logger.error("** ERROR : a given plan has a forbidden action : %s" % forbiddenAction)
                     raise PlanImportError("** ERROR : a given plan has a forbidden action : %s" % forbiddenAction)
 
         if not self.stn.isConsistent():
-            logging.error("**  Error : invalid STN when importing the plan")
+            logger.error("**  Error : invalid STN when importing the plan")
             raise PlanImportError("invalid STN when importing the plan")
         
         
@@ -245,14 +246,14 @@ class Plan:
         
         tps.sort(key = lambda x:x[1])
         
-        logging.debug("Nominal plan")
+        logger.debug("Nominal plan")
         for tp,time in tps:
             tpName = tp.split("-")[0]
             position = tp.split("-")[1]
             actionName = "-".join(tp.split("-")[2:])
             
             if position == "start":
-                logging.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
+                logger.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
 
     def getLength(self):
         return self.stn.getLength()/timeFactor
@@ -261,7 +262,7 @@ class Plan:
         self.stn.setHorizon(int(round(deadline*timeFactor)))
         
         if not self.stn.isConsistent():
-            logging.warning("STN not valid after the set up of the deadline")
+            logger.warning("STN not valid after the set up of the deadline")
             return False
         return True
     
@@ -320,14 +321,14 @@ class Plan:
             self.jsonDescr["actions"][index] = action
 
         if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
-            logging.warning("Calling set timepoint for %s at %s" % (tpName, value))
-            logging.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
+            logger.warning("Calling set timepoint for %s at %s" % (tpName, value))
+            logger.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
 
 
         #add this constraint in the STN
         self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
         
-        logging.debug("Executing %s at %s" % (tpName, value))
+        logger.debug("Executing %s at %s" % (tpName, value))
 
     def setActionUnavailable(self, action):
         if not "unavailable-actions" in self.jsonDescr:

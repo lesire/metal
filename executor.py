@@ -7,7 +7,8 @@ except:
     import queue as Queue
     version = 3
 
-import logging
+import logging; logger = logging.getLogger("hidden")
+
 import threading
 import time
 
@@ -31,7 +32,7 @@ class Executor(threading.Thread):
     def action_callback(self, action):
         currentTime = time.time()
         self.nextEvents.append((currentTime, action))
-        logging.info("Callback of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
+        logger.info("Callback of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
 
     #called periodically
     def update(self):
@@ -41,56 +42,56 @@ class Executor(threading.Thread):
         
         for action in [a for t,a in self.nextEvents if t <= currentTime]:
             self.outQueue.put({"type":"endAction", "action":action, "time": self.user_time(currentTime)})
-            logging.info("End of action %s" % action["name"])
-            logging.debug("End of action %s" % action)
+            logger.info("End of action %s" % action["name"])
+            logger.debug("End of action %s" % action)
             
         self.nextEvents = [(t,a) for t,a in self.nextEvents if t > currentTime]
         
     def startAction(self, msg):
         if "action" not in msg or type(msg["action"]) != dict:
-            logging.error("Executor received an ill formated action : %s" % msg)
+            logger.error("Executor received an ill formated action : %s" % msg)
             return
         
         action = msg["action"]
         currentTime = time.time()
-        logging.info("Start of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
+        logger.info("Start of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
 
         try:
             self.actionExecutor.execute(action, self.action_callback)
         except AttributeError:
-            logging.error("Cannot execute %s." % action["name"])
+            logger.error("Cannot execute %s." % action["name"])
             pass
 
     def stopAction(self, msg):
         action = msg["action"]
         currentTime = time.time()
-        logging.info("Stop of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)))
+        logger.info("Stop of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)))
         self.actionExecutor.stop(action)
 
     def startExecutor(self, msg):
-        logging.info("Executor received start message")
+        logger.info("Executor received start message")
         self.isStarted = True
         self.beginDate = msg["startTime"]
         
     def stopExecutor(self, msg):
-        logging.info("Executor received stop message")
+        logger.info("Executor received stop message")
         pass
     
     def run(self):
-        logging.info("Executor launched")
+        logger.info("Executor launched")
         
         while True:
             if not self.inQueue.empty():
                 msg = self.inQueue.get()
-                logging.debug("Executor received message : %s" % msg)
+                logger.debug("Executor received message : %s" % msg)
 
                 
                 if type(msg) != dict or "type" not in msg:
-                    logging.error("Executor received an ill-formated message : %s" % msg)
+                    logger.error("Executor received an ill-formated message : %s" % msg)
                     continue
                 
                 if not self.isStarted and msg["type"] != "start":
-                    logging.error("Executor received a message before its start message. Ignoring it : %s" % msg)
+                    logger.error("Executor received a message before its start message. Ignoring it : %s" % msg)
                     continue
 
                 if msg["type"] == "stop":
@@ -103,9 +104,9 @@ class Executor(threading.Thread):
                 elif msg["type"] == "stopAction":
                     self.stopAction(msg)
                 else:
-                    logging.warning("Executor received unknown message %s" % msg)
+                    logger.warning("Executor received unknown message %s" % msg)
                     
             self.update()
             time.sleep(0.1)
             
-        logging.info("Executor stopped")
+        logger.info("Executor stopped")

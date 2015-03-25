@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import logging
 import os
 import sys
 import threading
@@ -14,6 +13,8 @@ try:
 except:
     import queue as Queue
     version = 3
+
+import logging; logger = logging.getLogger("hidden")
 
 import executor
 import supervisor
@@ -44,15 +45,66 @@ class FileFilter(logging.Filter):
 class Hidden:
     def __init__(self):
         self.threadSupervisor = None
+        #self.logger = logging.getLogger('hidden')
+
+    def init(self):
+        parser = argparse.ArgumentParser(description='Execute a plan')
+        parser.add_argument('--logLevel', type=str, default="info")
+        parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
+        parser.add_argument('--agentName', metavar="agent", type=str)
+        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma"], default="dummy", metavar="action executor (eg., 'morse')")
+        parser.add_argument('--waitSignal', action="store_true")
+        parser.add_argument('planFile', metavar='plan', type=str)
+        args = parser.parse_args()
+
+        #Configure the logger
+        numeric_level = getattr(logging, args.logLevel.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % args.logLevel)
+        sh = logging.StreamHandler()
+        sh.setLevel(numeric_level)
+        sh.setFormatter(logging.Formatter('%(levelname)s(%(filename)s:%(lineno)d):%(message)s'))
+        logger.addHandler(sh)
+
+        if args.logFilter is not None:
+            f = FileFilter(args.logFilter)
+            logger.addFilter(f)
+    
+        #Get the plan
+        if not os.access(args.planFile, os.R_OK):
+            logger.error("Cannot open plan file : %s" % args.planFile)
+            sys.exit(1)
+        
+        with open(args.planFile) as f:
+            planString = " ".join(f.readlines())
+        logger.info("Plan read from file %s" % args.planFile)
+
+        ex = self.createExecutor(args.executor, args.agentName)
+        logger.info("Threads created")
+
+        self.launchAgentArchitecture(ex, planString, args.agentName)
+        logger.info("Execution thread launched")
+    
+        self.started = False
+        if args.waitSignal:
+            self.waitSignal()
+        else:
+            self.startCallback('auto', None)
+
+    def startCallback(self, signum, frame=None):
+        logger.info('Start callback called with signal %s' % signum)
+        if self.started:
+            logger.info("Supervisor already started: doing nothing")
+        elif self.threadSupervisor is not None:
+            logger.info("Starting Supervisor")
+            self.threadSupervisor.start()
+            self.started = True
+        else:
+            logger.error("Supervisor thread not initialized!")
 
     def waitSignal(self):
-        def sigHandler(signum, frame):
-            logging.info('Signal handler called with signal %s' % signum)
-            if self.threadSupervisor is not None:
-                logging.info("Starting supervision")
-                self.threadSupervisor.start()
-        signal.signal(signal.SIGUSR1, sigHandler)
-        logging.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
+        signal.signal(signal.SIGUSR1, self.startCallback)
+        logger.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
       
     def createExecutor(self, name, agentName):
         if name == "morse":
@@ -62,7 +114,7 @@ class Hidden:
             return DummyActionExecutor(agentName=agentName)
         elif name == "dummy-ma" or name == "delay-ma":
             if agentName is None:
-                logging.error("Cannot use executor dummy-ma without an agent name")
+                logger.error("Cannot use executor dummy-ma without an agent name")
                 sys.exit(1)
             folder = "/tmp/hidden2"
             if not os.path.exists(folder):
@@ -88,49 +140,14 @@ class Hidden:
         #threadSupervisor.start()
         self.threadExecutor.start()
     
-    def main(self, argv):
-        parser = argparse.ArgumentParser(description='Execute a plan')
-        parser.add_argument('--logLevel', type=str, default="info")
-        parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
-        parser.add_argument('--agentName', metavar="agent", type=str)
-        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma"], default="dummy", metavar="action executor (eg., 'morse')")
-        parser.add_argument('--waitSignal', action="store_true")
-        parser.add_argument('planFile', metavar='plan', type=str)
-        args = parser.parse_args()
-
-        #Configure the logger
-        numeric_level = getattr(logging, args.logLevel.upper(), None)
-        if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: %s' % args.logLevel)
-        logging.basicConfig(level=numeric_level, format='%(levelname)s(%(filename)s:%(lineno)d):%(message)s')
-
-        if args.logFilter is not None:
-            f = FileFilter(args.logFilter)
-            logging.getLogger().addFilter(f)
-    
-        #Get the plan
-        if not os.access(args.planFile, os.R_OK):
-            logging.error("Cannot open plan file : %s" % args.planFile)
-            sys.exit(1)
-        
-        with open(args.planFile) as f:
-            planString = " ".join(f.readlines())
-
-        ex = self.createExecutor(args.executor, args.agentName)
-
-        self.launchAgentArchitecture(ex, planString, args.agentName)
-    
-        if args.waitSignal:
-            self.waitSignal()
-        else:
-            self.threadSupervisor.start()
-
+    def main(self):
         while threading.active_count() > 1:
             time.sleep(1)
     
 if __name__=="__main__":
     try:
         h = Hidden()
-        h.main(sys.argv)
+        h.init()
+        h.main()
     except KeyboardInterrupt:
         os._exit(1)
