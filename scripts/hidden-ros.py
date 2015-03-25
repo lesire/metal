@@ -8,10 +8,6 @@ import rospy
 from std_msgs.msg import Empty
 import os
 
-#logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-#logging.getLogger().addHandler(rospy.impl.rosout.RosOutHandler())
-#logging.getLogger().addHandler(rosgraph.roslogging.RosStreamHandler())
-
 class HiddenRos(Hidden):
     def __init__(self):
         Hidden.__init__(self)
@@ -26,6 +22,6 @@ class HiddenRos(Hidden):
 
 if __name__ == "__main__":
     h = HiddenRos()
-    h.init()
+    h.init(rospy.myargv()[1:])
     h.main()
 
