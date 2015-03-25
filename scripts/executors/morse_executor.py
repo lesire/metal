@@ -1,6 +1,6 @@
 from .action_executor import AbstractActionExecutor
 
-import logging
+import logging; logger = logging.getLogger("hidden")
 import re
 from functools import partial
 
@@ -8,27 +8,27 @@ class MORSEActionExecutor(AbstractActionExecutor):
     def __init__(self):
         import pymorse
         self.morse = pymorse.Morse()
-        logging.info("MORSE executor initialized")
+        logger.info("MORSE executor initialized")
 
     def __del__(self):
         del self.morse
 
     def action_done(self, cb, evt):
-        logging.debug("Action done {e}".format(e=evt))
+        logger.debug("Action done {e}".format(e=evt))
         cb("ok")
     
     # move-aav ressac2 pt_aav_16239_-6582 pt_aav_22229_-2588
     def move_aav(self, who, a, b, cb, **kwargs):
         agent = getattr(self.morse, who)
         coords = re.findall('-?\d+', b)
-        logging.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
+        logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 3)
         goto_action.add_done_callback(partial(self.action_done, cb))
 
     def move_agv(self, who, a, b, cb, **kwargs):
         agent = getattr(self.morse, who)
         coords = re.findall('-?\d+', b)
-        logging.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
+        logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 1, 1)
         goto_action.add_done_callback(partial(self.action_done, cb))
 

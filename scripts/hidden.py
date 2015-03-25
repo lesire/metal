@@ -47,15 +47,15 @@ class Hidden:
         self.threadSupervisor = None
         #self.logger = logging.getLogger('hidden')
 
-    def init(self):
+    def init(self, argv):
         parser = argparse.ArgumentParser(description='Execute a plan')
         parser.add_argument('--logLevel', type=str, default="info")
         parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
         parser.add_argument('--agentName', metavar="agent", type=str)
-        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma"], default="dummy", metavar="action executor (eg., 'morse')")
+        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros"], default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
         parser.add_argument('planFile', metavar='plan', type=str)
-        args = parser.parse_args()
+        args = parser.parse_args(argv)
 
         #Configure the logger
         numeric_level = getattr(logging, args.logLevel.upper(), None)
@@ -110,6 +110,9 @@ class Hidden:
         if name == "morse":
             from executors.morse_executor import MORSEActionExecutor
             return MORSEActionExecutor()
+        elif name == "ros":
+            from executors.ros_executor import ROSActionExecutor
+            return ROSActionExecutor(agentName=agentName)
         elif name == "dummy":
             return DummyActionExecutor(agentName=agentName)
         elif name == "dummy-ma" or name == "delay-ma":
@@ -147,7 +150,7 @@ class Hidden:
 if __name__=="__main__":
     try:
         h = Hidden()
-        h.init()
+        h.init(sys.argv[:1])
         h.main()
     except KeyboardInterrupt:
         os._exit(1)

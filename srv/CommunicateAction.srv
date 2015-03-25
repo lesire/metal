@@ -1,0 +1,7 @@
+# communicate-aav-aav ressac1 ressac2 pt_aav_10249_-4585 pt_aav_12245_-4585
+string first_robot
+string second_robot
+string first_position
+string second_position
+---
+bool success
