@@ -15,7 +15,7 @@ class HiddenRos(Hidden):
         rospy.on_shutdown(lambda: os._exit(1))
 
     def waitSignal(self):
-        self.sub = rospy.Subscriber("start", Empty, lambda x: self.startCallback(x, x))
+        self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
 
     def main(self):
         rospy.spin()

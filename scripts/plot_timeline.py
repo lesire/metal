@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import re
+import sys
 
 # Transform input PDDL into arrays
 # 0.001: (move-aav ressac1 pt_aav_16239_5397 pt_aav_8252_1404) [41.264]
@@ -9,7 +10,7 @@ actions = {'ressac1': {'move-aav': [], 'observe-aav': [], 'communicate-aav-aav':
     , 'mana': {'move-agv': [], 'observe-agv': [], 'communicate-aav-agv': [], 'has-communicated': []}
     , 'minnie': {'move-agv': [], 'observe-agv': [], 'communicate-aav-agv': [], 'has-communicated': []}}
 
-for l in open("action-V.pddl"):
+for l in open(sys.argv[1]):
     if l[0] == ';':
         continue
     data = re.split('[ \:\(\)\[\]]', l)

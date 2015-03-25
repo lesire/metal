@@ -52,7 +52,7 @@ class Hidden:
         parser.add_argument('--logLevel', type=str, default="info")
         parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
         parser.add_argument('--agentName', metavar="agent", type=str)
-        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros"], default="dummy", metavar="action executor (eg., 'morse')")
+        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros", "morse+ros"], default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
         parser.add_argument('planFile', metavar='plan', type=str)
         args = parser.parse_args(argv)
@@ -63,7 +63,7 @@ class Hidden:
             raise ValueError('Invalid log level: %s' % args.logLevel)
         sh = logging.StreamHandler()
         sh.setLevel(numeric_level)
-        sh.setFormatter(logging.Formatter('%(levelname)s(%(filename)s:%(lineno)d):%(message)s'))
+        sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
         logger.addHandler(sh)
 
         if args.logFilter is not None:
@@ -107,7 +107,10 @@ class Hidden:
         logger.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
       
     def createExecutor(self, name, agentName):
-        if name == "morse":
+        if name == "morse+ros":
+            from executors.morse_ros_executor import MORSEROSActionExecutor
+            return MORSEROSActionExecutor(agentName=agentName)
+        elif name == "morse":
             from executors.morse_executor import MORSEActionExecutor
             return MORSEActionExecutor()
         elif name == "ros":

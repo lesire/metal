@@ -6,7 +6,7 @@ class Ressac(RMax):
         gps = GPS()
         self.append(gps)
         waypoint = Waypoint()
-        waypoint.properties(FreeZ=True, Speed=3.0)
+        waypoint.properties(FreeZ=True, Speed=3.0, ControlType="Position")
         self.append(waypoint)
         gps.add_interface('socket')
         waypoint.add_interface('socket')

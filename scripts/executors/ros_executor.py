@@ -3,35 +3,46 @@ from .action_executor import AbstractActionExecutor
 import logging; logger = logging.getLogger("hidden")
 
 import rospy
-from hidden.srv import *
+from roshidden.srv import *
 
 class ROSActionExecutor(AbstractActionExecutor):
     def __init__(self, agentName):
         self.name = agentName
         self._in_com = False
+        self._out_com = False
         rospy.Service('communicate', CommunicateAction, self.communicate)
         logger.info("ROS executor initialized")
 
+    def _stop(self, action):
+        if "communicate" in action["name"]:
+            self._in_com = False
+            self._out_com = False
+
     def _in_communication(self, com):
-        if self._in_com:
-            return com.first_robot == self._com.first_robot \
-                and com.second_robot == self._com.second_robot \
-                and com.first_position == self._com.first_position \
-                and com.second_position == self._com.second_position
+        if self._out_com:
+            return com.first_robot == self._com_request.first_robot \
+                and com.second_robot == self._com_request.second_robot \
+                and com.first_position == self._com_request.first_position \
+                and com.second_position == self._com_request.second_position
         else:
             return False
 
     def communicate(self, req):
-        return CommunicateActionResponse(self._in_communication(req))
+        logger.info("Received communication request " + str(req))
+        if self._in_communication(req):
+            self._out_com = self._in_com
+            return CommunicateActionResponse(True)
+        else:
+            return CommunicateActionResponse(False)
 
     def update(self):
         if self._in_com:
-            com = rospy.ServiceProxy(teammate + "/communicate", CommunicateAction)
             try:
-                ack = com(self._com)
+                ack = self._com_proxy(self._com_request)
                 if ack.success:
-                    self._in_com = False
+                    logger.info("Communication success")
                     self._com_cb(ack.success)
+                    self._in_com = False
             except:
                 pass
 
@@ -60,6 +71,10 @@ class ROSActionExecutor(AbstractActionExecutor):
         else:
             teammate = first_robot
 
-        self._in_com = True
-        self._com = CommunicateActionRequest(first_robot, second_robot, first_point, second_point)
+        self._com_request = CommunicateActionRequest(first_robot, second_robot, first_point, second_point)
         self._com_cb = cb
+        self._com_proxy = rospy.ServiceProxy("/" + teammate + "/communicate", CommunicateAction)
+        logger.info("Waiting communication  with /" + teammate + "/communicate")
+        self._in_com = True
+        self._out_com = True
+
