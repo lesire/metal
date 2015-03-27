@@ -9,6 +9,7 @@ class MORSEROSActionExecutor(MORSEActionExecutor, ROSActionExecutor):
         ROSActionExecutor.__init__(self, agentName)
 
     def update(self):
+        MORSEActionExecutor.update(self)
         ROSActionExecutor.update(self)
 
     # move-aav ressac2 pt_aav_16239_-6582 pt_aav_22229_-2588

@@ -6,9 +6,18 @@ from functools import partial
 
 class MORSEActionExecutor(AbstractActionExecutor):
     def __init__(self):
-        import pymorse
-        self.morse = pymorse.Morse()
+        self._connected = False
         logger.info("MORSE executor initialized")
+
+    def update(self):
+        try:
+            if not self._connected:
+                import pymorse
+                self.morse = pymorse.Morse()
+                logger.info("Connected to MORSE")
+                self._connected = True
+        except:
+            pass
 
     def __del__(self):
         del self.morse

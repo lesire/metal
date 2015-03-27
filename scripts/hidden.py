@@ -52,7 +52,7 @@ class Hidden:
         parser.add_argument('--logLevel', type=str, default="info")
         parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
         parser.add_argument('--agentName', metavar="agent", type=str)
-        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros", "morse+ros"], default="dummy", metavar="action executor (eg., 'morse')")
+        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros", "morse+ros", "hyper"], default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
         parser.add_argument('planFile', metavar='plan', type=str)
         args = parser.parse_args(argv)
@@ -116,6 +116,9 @@ class Hidden:
         elif name == "ros":
             from executors.ros_executor import ROSActionExecutor
             return ROSActionExecutor(agentName=agentName)
+        if name == "hyper":
+            from executors.hyper_executor import HyperActionExecutor
+            return HyperActionExecutor(agentName=agentName)
         elif name == "dummy":
             return DummyActionExecutor(agentName=agentName)
         elif name == "dummy-ma" or name == "delay-ma":
