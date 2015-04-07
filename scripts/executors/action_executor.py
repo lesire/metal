@@ -43,7 +43,7 @@ class DummyActionExecutor(AbstractActionExecutor):
         self.agent = agentName
         self.pos = {}
         
-    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
+    def move(self, who, a, b, cb, actionJson, **kwargs):
         if(self.agent is not None and self.agent != who):
             logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
 
@@ -53,12 +53,12 @@ class DummyActionExecutor(AbstractActionExecutor):
         self.pos[who] = b
 
         dur = actionJson["dMin"]
-        logger.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
+        logger.info("moving {w} from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
         
         currentTime = time.time()
         self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
         
-    def observe_agv(self, who, a, b, cb, actionJson, **kwargs):
+    def observe(self, who, a, b, cb, actionJson, **kwargs):
         if(self.agent is not None and self.agent != who):
             logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
 
@@ -70,36 +70,8 @@ class DummyActionExecutor(AbstractActionExecutor):
         
         currentTime = time.time()
         self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
-        
-    def move_agv(self, who, a, b, cb, actionJson, **kwargs):
-        if(self.agent is not None and self.agent != who):
-            logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
 
-        if(who in self.pos and self.pos[who] != a):
-            logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who], a))
-
-        self.pos[who] = b
-        
-        dur = actionJson["dMin"]
-        logger.info("moving {w}(agv) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
-        
-        currentTime = time.time()
-        self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
-        
-    def observe_aav(self, who, a, b, cb, actionJson, **kwargs):
-        if(self.agent is not None and self.agent != who):
-            logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
-
-        if(who in self.pos and self.pos[who] != a):
-            logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who], a))
-
-        dur = actionJson["dMin"]
-        logger.info("{w} observe from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
-        
-        currentTime = time.time()
-        self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
-        
-    def communicate_aav_agv(self, who1, who2, a, b, cb, actionJson, **kwargs):
+    def communicate(self, who1, who2, a, b, cb, actionJson, **kwargs):
         if(self.agent is not None and self.agent != who1 and self.agent != who2):
             logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
 
@@ -112,29 +84,11 @@ class DummyActionExecutor(AbstractActionExecutor):
             logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who2], b))
 
         dur = actionJson["dMin"]
-        logger.info("Com between {w1}(aav) at {a} with {w2}(agv) at {b} in {d}".format(w1=who1,w2=who2,a=a,b=b,d=dur))
+        logger.info("Com between {w1} at {a} with {w2} at {b} in {d}".format(w1=who1,w2=who2,a=a,b=b,d=dur))
         
         #currentTime = time.time()
         #self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
-        
-    def communicate_aav_aav(self, who1, who2, a, b, cb, actionJson, **kwargs):
-        if(self.agent is not None and self.agent != who1 and self.agent != who2):
-            logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
 
-        if(self.agent is not None and "agent" in actionJson and self.agent != actionJson["agent"]):
-            logger.warning("Executor for %s ask to execute the split communicate action %s for %s" % (self.agent, actionJson["name"], actionJson["agent"]))
-
-        if(who1 in self.pos and self.pos[who1] != a):
-            logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who1], a))
-        if(who2 in self.pos and self.pos[who2] != b):
-            logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who2], b))
-
-        dur = actionJson["dMin"]
-        logger.info("Com between {w1}(aav) at {a} with {w2}(aav) at {b} in {d}".format(w1=who1,w2=who2,a=a,b=b,d=dur))
-        
-        #currentTime = time.time()
-        #self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
-    
     def has_communicated(self, *args, **kwargs):
         pass
         
@@ -171,41 +125,17 @@ class DummyMAActionExecutor(DummyActionExecutor):
             logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who2], b))
 
         dur = actionJson["dMin"]
-        logger.info("Com between {w1}(aav) at {a} with {w2}(agv) at {b} in {d}".format(w1=who1,w2=who2,a=a,b=b,d=dur))
+        logger.info("Com between {w1} at {a} with {w2} at {b} in {d}".format(w1=who1,w2=who2,a=a,b=b,d=dur))
         
-        filename = os.path.join(self.folder, "communicate-aav-agv_{w1}_{w2}_{a}_{b}_{agent}".format(w1=who1,w2=who2,a=a,b=b,agent=self.agent))
+        filename = os.path.join(self.folder, "communicate_{w1}_{w2}_{a}_{b}_{agent}".format(w1=who1,w2=who2,a=a,b=b,agent=self.agent))
         if os.access(filename, os.R_OK):
             logger.error("Synchronisation file already created ?!? : %s" % filename)
         else:
             fd = os.open(filename, os.O_CREAT | os.O_EXCL | os.O_RDWR)
             os.close(fd)
             
-        self.inCom.append("communicate-aav-agv {w1} {w2} {a} {b}".format(w1=who1,w2=who2,a=a,b=b))
+        self.inCom.append("communicate {w1} {w2} {a} {b}".format(w1=who1,w2=who2,a=a,b=b))
 
-    def communicate_aav_aav(self, who1, who2, a, b, cb, actionJson, **kwargs):
-        if(self.agent is not None and self.agent != who1 and self.agent != who2):
-            logger.warning("Executor for %s ask to execute action %s" % (self.agent, actionJson["name"]))
-
-        if(self.agent is not None and "agent" in actionJson and self.agent != actionJson["agent"]):
-            logger.warning("Executor for %s ask to execute the split communicate action %s for %s" % (self.agent, actionJson["name"], actionJson["agent"]))
-
-        if(who1 in self.pos and self.pos[who1] != a):
-            logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who1], a))
-        if(who2 in self.pos and self.pos[who2] != b):
-            logger.warning("Lauching a move action from %s but the last recorded pos is %s" %(self.pos[who2], b))
-
-        dur = actionJson["dMin"]
-        logger.info("Com between {w1}(aav) at {a} with {w2}(aav) at {b} in {d}".format(w1=who1,w2=who2,a=a,b=b,d=dur))
-        
-        filename = os.path.join(self.folder, "communicate-aav-aav_{w1}_{w2}_{a}_{b}_{agent}".format(w1=who1,w2=who2,a=a,b=b,agent=self.agent))
-        if os.access(filename, os.R_OK):
-            logger.error("Synchronisation file already created ?!? : %s" % filename)
-        else:
-            fd = os.open(filename, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            os.close(fd)
-            
-        self.inCom.append("communicate-aav-aav {w1} {w2} {a} {b}".format(w1=who1,w2=who2,a=a,b=b))
-        
     def has_communicated(self, *args, **kwargs):
         pass
     
@@ -242,7 +172,7 @@ class DummyMAActionExecutor(DummyActionExecutor):
 
 
 class DummyDelay(DummyActionExecutor):
-    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
+    def move(self, who, a, b, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
         if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
             dur = dur + 20
@@ -253,7 +183,7 @@ class DummyDelay(DummyActionExecutor):
         self.nextEvents.append( {"time":(currentTime + dur),"cb": cb, "actionJson":actionJson})
         
 class DummyDelayMA(DummyMAActionExecutor):
-    def move_aav(self, who, a, b, cb, actionJson, **kwargs):
+    def move(self, who, a, b, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
         if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
             dur = dur + 20

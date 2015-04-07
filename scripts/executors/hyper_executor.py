@@ -17,12 +17,7 @@ class HyperActionExecutor(ROSActionExecutor):
         self.output_port.close()
         self.input_port.close()
 
-    # move-aav mana pt_agv_16239_-6582 pt_agv_22229_-2588
-    def move_aav(self, who, a, b, cb, **kwargs):
-        logger.error("Action 'move_aav' not implemented for Hyper")
-        pass
-
-    def move_agv(self, who, a, b, cb, **kwargs):
+    def move(self, who, a, b, cb, **kwargs):
         import json
         coords = re.findall('-?\d+', b)
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
@@ -35,10 +30,7 @@ class HyperActionExecutor(ROSActionExecutor):
         self._cb = cb
 
     # observe-aav mana pt_agv_22229_-2588 pt_obs_22229_-2588
-    def observe_agv(self, who, point, observation, cb, **kwargs):
-        cb("ok")
-
-    def observe_aav(self, who, point, observation, cb, **kwargs):
+    def observe(self, who, point, observation, cb, **kwargs):
         cb("ok")
 
     def update(self):

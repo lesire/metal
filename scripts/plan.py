@@ -28,6 +28,16 @@ class PlanImportError(Exception):
     def __str__(self):
         return self.msg
 
+def getAgentFromAction(l):
+    if len(l) == 1 or l[1] not in agentList:
+        n = l[0].split("_")[1]
+    else:
+        n = l[1]
+        
+    if not n in agentList:
+        logger.error("Unknown agent %s for action %s" % (n, " ".join(l)))
+
+    return n
 
 class Plan:
     def __init__(self, planStr, agent=None):
@@ -88,11 +98,10 @@ class Plan:
                 if a["name"] == "dummy init" or a["name"] == "dummy end":
                     a["agent"] = agent
                 else:
-                    
                     if a["name"].startswith("dummy "):
-                        n = a["name"].split(" ")[3]
+                        n = getAgentFromAction(a["name"].split(" ")[2:])
                     else:
-                        n = a["name"].split(" ")[1]
+                        n = getAgentFromAction(a["name"].split(" "))
                     if not n in agentList:
                         logger.error("Unknown agent %s for action %s" % (n, a["name"]))
                         continue

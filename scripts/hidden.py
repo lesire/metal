@@ -62,7 +62,7 @@ class Hidden:
         if not isinstance(numeric_level, int):
             raise ValueError('Invalid log level: %s' % args.logLevel)
         sh = logging.StreamHandler()
-        sh.setLevel(numeric_level)
+        logger.setLevel(numeric_level)
         sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
         logger.addHandler(sh)
 
@@ -74,7 +74,7 @@ class Hidden:
         if not os.access(args.planFile, os.R_OK):
             logger.error("Cannot open plan file : %s" % args.planFile)
             sys.exit(1)
-        
+
         with open(args.planFile) as f:
             planString = " ".join(f.readlines())
         logger.info("Plan read from file %s" % args.planFile)
@@ -156,7 +156,7 @@ class Hidden:
 if __name__=="__main__":
     try:
         h = Hidden()
-        h.init(sys.argv[:1])
+        h.init(sys.argv[1:])
         h.main()
     except KeyboardInterrupt:
         os._exit(1)
