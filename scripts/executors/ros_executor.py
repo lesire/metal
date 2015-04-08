@@ -52,7 +52,7 @@ class ROSActionExecutor(AbstractActionExecutor):
     def observe(self, who, point, observation, cb, **kwargs):
         cb("ok")
 
-    # communicate-aav-aav ressac1 ressac2 pt_aav_10249_-4585 pt_aav_12245_-4585
+    # communicate ressac1 ressac2 pt_aav_10249_-4585 pt_aav_12245_-4585
     def communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
         if self.name == first_robot:
             teammate = second_robot

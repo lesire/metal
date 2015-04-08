@@ -17,9 +17,10 @@ class HyperActionExecutor(ROSActionExecutor):
         self.output_port.close()
         self.input_port.close()
 
+    # move mana agv_pt_-726_2375 agv_pt_3323_175
     def move(self, who, a, b, cb, **kwargs):
         import json
-        coords = re.findall('-?\d+', b)
+        coords = b.split("_")[-2:]
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         action = {'action': 'goto', 'waypoint': {'x': int(coords[0])/100, 'y': int(coords[1])/100}}
         b = self.output_port.prepare()
@@ -29,7 +30,7 @@ class HyperActionExecutor(ROSActionExecutor):
         logger.info("Request action " + json.dumps(action))
         self._cb = cb
 
-    # observe-aav mana pt_agv_22229_-2588 pt_obs_22229_-2588
+    # observe mana pt_agv_22229_-2588 pt_obs_22229_-2588
     def observe(self, who, point, observation, cb, **kwargs):
         cb("ok")
 
