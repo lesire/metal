@@ -23,3 +23,5 @@ class MORSEROSActionExecutor(MORSEActionExecutor, ROSActionExecutor):
     def communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
         ROSActionExecutor.communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs)
 
+    def has_communicated(self, first_robot, second_robot, cb, **kwargs):
+        ROSActionExecutor.has_communicated(self, first_robot, second_robot, cb, **kwargs)
