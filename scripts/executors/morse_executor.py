@@ -38,3 +38,6 @@ class MORSEActionExecutor(AbstractActionExecutor):
 
     def communicate(self, dude, sweet, point_dude, point_sweet, cb, **kwargs):
         cb("ok")
+
+    def has_communicated(self, **kwargs):
+        cb("ok")

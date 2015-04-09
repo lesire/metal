@@ -10,6 +10,7 @@ class ROSActionExecutor(AbstractActionExecutor):
         self.name = agentName
         self._in_com = False
         self._out_com = False
+        self._has_com = False
         rospy.Service('communicate', CommunicateAction, self._communicate)
         logger.info("ROS executor initialized")
 
@@ -43,6 +44,7 @@ class ROSActionExecutor(AbstractActionExecutor):
                     logger.info("Communication success")
                     self._com_cb(ack.success)
                     self._in_com = False
+                    self._has_com = True
             except:
                 pass
 
@@ -51,6 +53,9 @@ class ROSActionExecutor(AbstractActionExecutor):
 
     def observe(self, who, point, observation, cb, **kwargs):
         cb("ok")
+
+    def has_communicated(self, first_robot, second_robot, cb, **kwargs):
+        cb(self._has_com)
 
     # communicate ressac1 ressac2 pt_aav_10249_-4585 pt_aav_12245_-4585
     def communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
@@ -65,4 +70,5 @@ class ROSActionExecutor(AbstractActionExecutor):
         logger.info("Waiting communication  with /" + teammate + "/communicate")
         self._in_com = True
         self._out_com = True
+        self._has_com = False
 
