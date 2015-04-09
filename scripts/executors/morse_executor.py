@@ -28,7 +28,7 @@ class MORSEActionExecutor(AbstractActionExecutor):
     
     def move(self, who, a, b, cb, **kwargs):
         agent = getattr(self.morse, who)
-        coords = b.split("_")[-2:]
+        coords = b.split("_")[1:]
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 3)
         goto_action.add_done_callback(partial(self.action_done, cb))

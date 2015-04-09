@@ -20,7 +20,7 @@ class HyperActionExecutor(ROSActionExecutor):
     # move mana agv_pt_-726_2375 agv_pt_3323_175
     def move(self, who, a, b, cb, **kwargs):
         import json
-        coords = b.split("_")[-2:]
+        coords = b.split("_")[1:]
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         action = {'action': 'goto', 'waypoint': {'x': int(coords[0])/100, 'y': int(coords[1])/100}}
         b = self.output_port.prepare()

@@ -1,6 +1,5 @@
 import logging; logger = logging.getLogger("hidden")
 
-import re
 import time
 from functools import partial
 import os

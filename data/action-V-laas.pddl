@@ -1,68 +1,42 @@
 ; Plan generated
 ; 0.000: (dummy init) [0.000]
-0.001: (move ressac1 ressac1_pt_423_-2174 ressac1_pt_-726_2375) [18.772]; 18.772
-0.001: (move ressac2 ressac2_pt_3723_-6424 ressac2_pt_1373_-3474) [15.086]; 15.086
-0.001: (move minnie agv_pt_-726_2375 agv_pt_3323_175) [55.763]; 55.763
-0.001: (move mana agv_pt_-726_2375 agv_pt_3323_175) [55.763]; 55.763
-; 55.765: (patrol_mana__agv_pt_3323_175__agv_pt_423_-2174) [158.766]
-; 55.765: (dummy init patrol_mana__agv_pt_3323_175__agv_pt_423_-2174 patrol_mana__agv_pt_3323_175__agv_pt_423_-2174_i_2) [0.000]
-; 55.765: (dummy init patrol_minnie__agv_pt_3323_175__agv_pt_3723_-6424 patrol_minnie__agv_pt_3323_175__agv_pt_3723_-6424_d_3) [0.000]
-; 55.765: (patrol_minnie__agv_pt_3323_175__agv_pt_3723_-6424) [82.102]
-55.766: (observe minnie agv_pt_3323_175 pt_obs_3323_175) [1.000]
-55.766: (observe mana agv_pt_3323_175 pt_obs_3323_175) [1.000]
-56.767: (move minnie agv_pt_3323_175 agv_pt_4523_-1474) [25.278]; 25.278
-56.767: (move mana agv_pt_3323_175 agv_pt_4123_2325) [25.985]; 25.985
-82.046: (observe minnie agv_pt_4523_-1474 pt_obs_4523_-1474) [1.000]
-82.753: (observe mana agv_pt_4123_2325 pt_obs_4123_2325) [1.000]
-83.047: (move minnie agv_pt_4523_-1474 agv_pt_4173_-3874) [25.450]; 25.450
-83.754: (move mana agv_pt_4123_2325 agv_pt_2373_4825) [32.249]; 32.249
-108.498: (observe minnie agv_pt_4173_-3874 pt_obs_4173_-3874) [1.000]
-109.499: (move minnie agv_pt_4173_-3874 agv_pt_3723_-6424) [27.364]; 27.364
-116.004: (observe mana agv_pt_2373_4825 pt_obs_2373_4825) [1.000]
-117.005: (move mana agv_pt_2373_4825 agv_pt_-726_2375) [41.148]; 41.148
-136.864: (observe minnie agv_pt_3723_-6424 pt_obs_2273_-7624) [1.000]
-136.864: (observe minnie agv_pt_3723_-6424 pt_obs_3723_-6424) [1.000]
-; 137.867: (dummy end patrol_minnie__agv_pt_3323_175__agv_pt_3723_-6424) [0.000]
-; 137.868: (patrol_minnie__agv_pt_3723_-6424__agv_pt_423_-2174) [59.178]
-; 137.868: (dummy init patrol_minnie__agv_pt_3723_-6424__agv_pt_423_-2174 patrol_minnie__agv_pt_3723_-6424__agv_pt_423_-2174_i_4) [0.000]
-137.869: (observe minnie agv_pt_3723_-6424 pt_obs_3723_-6424) [1.000]
-137.869: (observe minnie agv_pt_3723_-6424 pt_obs_2273_-7624) [1.000]
-138.870: (move minnie agv_pt_3723_-6424 agv_pt_2373_-4924) [20.592]; 20.592
-158.154: (observe mana agv_pt_-726_2375 pt_obs_-726_2375) [1.000]
-159.155: (move mana agv_pt_-726_2375 agv_pt_123_-74) [28.021]; 28.021
-159.463: (observe minnie agv_pt_2373_-4924 pt_obs_1373_-3474) [1.000]
-159.463: (observe minnie agv_pt_2373_-4924 pt_obs_2373_-4924) [1.000]
-160.464: (move minnie agv_pt_2373_-4924 agv_pt_1373_-3474) [18.642]; 18.642
-179.107: (move minnie agv_pt_1373_-3474 agv_pt_423_-2174) [16.935]; 16.935
-187.177: (observe mana agv_pt_123_-74 pt_obs_123_-74) [1.000]
-188.178: (move mana agv_pt_123_-74 agv_pt_423_-2174) [25.349]; 25.349
-196.043: (observe minnie agv_pt_423_-2174 pt_obs_-876_-3024) [1.000]
-196.043: (observe minnie agv_pt_423_-2174 pt_obs_423_-2174) [1.000]
-; 197.046: (dummy end patrol_minnie__agv_pt_3723_-6424__agv_pt_423_-2174) [0.000]
-213.528: (observe mana agv_pt_423_-2174 pt_obs_1373_-3474) [1.000]
-213.528: (observe mana agv_pt_423_-2174 pt_obs_423_-2174) [1.000]
-213.528: (observe mana agv_pt_423_-2174 pt_obs_-876_-3024) [1.000]
-; 214.531: (dummy end patrol_mana__agv_pt_3323_175__agv_pt_423_-2174) [0.000]
-214.532: (move mana agv_pt_423_-2174 agv_pt_-726_2375) [52.335]; 52.335
-249.001: (communicate minnie ressac2 agv_pt_423_-2174 ressac2_pt_1373_-3474) [1.000]
+0.001: (move ressac1 ressac1_423_-2174_0 ressac1_-266_-243_0) [20.496]; 20.496
+0.001: (move minnie agv_0_0_0 agv_1533_445_0) [16.864]; 16.864
+; 16.866: (dummy init patrol_minnie__agv_1533_445_0__agv_3713_-6384_0 patrol_minnie__agv_1533_445_0__agv_3713_-6384_0_i_1) [0.000]
+; 16.866: (patrol_minnie__agv_1533_445_0__agv_3713_-6384_0) [100.551]
+16.867: (move minnie agv_1533_445_0 agv_4004_286_0) [25.475]; 25.475
+42.343: (move minnie agv_4004_286_0 agv_4623_-863_0) [13.839]; 13.839
+56.183: (observe minnie agv_4623_-863_0 pt_obs_4563_-1193) [1.000]
+57.184: (move minnie agv_4623_-863_0 agv_4183_-3793_0) [31.364]; 31.364
+88.549: (observe minnie agv_4183_-3793_0 pt_obs_4154_-4043) [1.000]
+89.550: (move minnie agv_4183_-3793_0 agv_3713_-6384_0) [27.864]; 27.864
+; 117.417: (dummy end patrol_minnie__agv_1533_445_0__agv_3713_-6384_0) [0.000]
+249.001: (communicate minnie ressac2 agv_3713_-6384_0 ressac2_3723_-6424_0) [1.000]
 250.000: (has-communicated minnie ressac2) [1.000]
-250.002: (move minnie agv_pt_423_-2174 agv_pt_-876_-3024) [16.521]; 16.521
-; 266.524: (patrol_minnie__agv_pt_-876_-3024__agv_pt_2273_-7624) [101.584]
-; 266.524: (dummy init patrol_minnie__agv_pt_-876_-3024__agv_pt_2273_-7624 patrol_minnie__agv_pt_-876_-3024__agv_pt_2273_-7624_d_0) [0.000]
-266.525: (observe minnie agv_pt_-876_-3024 pt_obs_423_-2174) [1.000]
-267.526: (move minnie agv_pt_-876_-3024 agv_pt_-2426_-3974) [19.435]; 19.435
-286.962: (observe minnie agv_pt_-2426_-3974 pt_obs_-1326_-5074) [1.000]
-286.962: (observe minnie agv_pt_-2426_-3974 pt_obs_-2426_-3974) [1.000]
-286.962: (observe minnie agv_pt_-2426_-3974 pt_obs_-876_-3024) [1.000]
-287.963: (move minnie agv_pt_-2426_-3974 agv_pt_1023_-8674) [61.290]; 61.290
-299.001: (communicate mana ressac1 agv_pt_-726_2375 ressac1_pt_-726_2375) [1.000]
+250.002: (move minnie agv_3713_-6384_0 agv_2733_-7504_0) [15.142]; 15.142
+; 265.145: (patrol_minnie__agv_2733_-7504_0__agv_1763_-8654_0) [150.586]
+; 265.145: (dummy init patrol_minnie__agv_2733_-7504_0__agv_1763_-8654_0 patrol_minnie__agv_2733_-7504_0__agv_1763_-8654_0_i_3) [0.000]
+265.146: (move minnie agv_2733_-7504_0 agv_713_-5404_0) [31.042]; 31.042
+296.189: (move minnie agv_713_-5404_0 agv_-876_-3163_0) [29.127]; 29.127
+299.001: (communicate mana ressac1 agv_0_0_0 ressac1_-266_-243_0) [1.000]
 300.000: (has-communicated mana ressac1) [1.000]
-300.002: (move ressac1 ressac1_pt_-726_2375 ressac1_pt_423_-2174) [18.772]; 18.772
-349.001: (communicate ressac1 ressac2 ressac1_pt_423_-2174 ressac2_pt_1373_-3474) [1.000]
-349.254: (observe minnie agv_pt_1023_-8674 pt_obs_2273_-7624) [1.000]
-349.254: (observe minnie agv_pt_1023_-8674 pt_obs_1023_-8674) [1.000]
-350.000: (has-communicated ressac1 ressac2) [1.000]
-350.255: (move minnie agv_pt_1023_-8674 agv_pt_2273_-7624) [16.849]; 16.849
-367.105: (observe minnie agv_pt_2273_-7624 pt_obs_3723_-6424) [1.000]
-; 368.108: (dummy end patrol_minnie__agv_pt_-876_-3024__agv_pt_2273_-7624) [0.000]
-; 368.109: (dummy end) [0.000]
+300.002: (move mana agv_0_0_0 agv_-26_-163_0) [1.707]; 1.707
+; 301.710: (patrol_mana__agv_-26_-163_0__agv_-26_-163_0) [1.004]
+; 301.710: (dummy init patrol_mana__agv_-26_-163_0__agv_-26_-163_0 patrol_mana__agv_-26_-163_0__agv_-26_-163_0_d_7) [0.000]
+301.711: (observe mana agv_-26_-163_0 pt_obs_-606_-223) [1.000]
+; 302.714: (dummy end patrol_mana__agv_-26_-163_0__agv_-26_-163_0) [0.000]
+302.715: (move mana agv_-26_-163_0 agv_3043_-173_0) [33.132]; 33.132
+325.317: (observe minnie agv_-876_-3163_0 pt_obs_-1486_-3573) [1.000]
+326.318: (move minnie agv_-876_-3163_0 agv_-2186_-4073_0) [17.374]; 17.374
+; 335.848: (dummy init patrol_mana__agv_3043_-173_0__agv_1323_-3473_0 patrol_mana__agv_3043_-173_0__agv_1323_-3473_0_i_2) [0.000]
+; 335.848: (patrol_mana__agv_3043_-173_0__agv_1323_-3473_0) [51.422]
+335.849: (move mana agv_3043_-173_0 agv_533_-1973_0) [32.456]; 32.456
+343.693: (move minnie agv_-2186_-4073_0 agv_-806_-6304_0) [27.945]; 27.945
+368.306: (move mana agv_533_-1973_0 agv_1323_-3473_0) [17.960]; 17.960
+371.639: (move minnie agv_-806_-6304_0 agv_1763_-8654_0) [43.088]; 43.088
+386.267: (observe mana agv_1323_-3473_0 pt_obs_1593_-3273) [1.000]
+; 387.270: (dummy end patrol_mana__agv_3043_-173_0__agv_1323_-3473_0) [0.000]
+414.728: (observe minnie agv_1763_-8654_0 pt_obs_2054_-7404) [1.000]
+414.728: (observe minnie agv_1763_-8654_0 pt_obs_613_-8154) [1.000]
+; 415.731: (dummy end patrol_minnie__agv_2733_-7504_0__agv_1763_-8654_0) [0.000]
+; 415.732: (dummy end) [0.000]
