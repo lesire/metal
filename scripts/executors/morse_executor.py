@@ -39,5 +39,5 @@ class MORSEActionExecutor(AbstractActionExecutor):
     def communicate(self, dude, sweet, point_dude, point_sweet, cb, **kwargs):
         cb("ok")
 
-    def has_communicated(self, **kwargs):
+    def has_communicated(self, first_robot, second_robot, cb, **kwargs):
         cb("ok")
