@@ -92,7 +92,7 @@ class Supervisor(threading.Thread):
     def isTpExecutable(self, tp, now = True):
         if self.tp[tp][1] != "controllable" and self.tp[tp][1] != "future":
             return False
-
+        
         #Check that the lower bound is before the current time
         if now and self.plan.stn.getBounds(str(tp)).lb > self.getCurrentTime():
             return False
@@ -124,8 +124,12 @@ class Supervisor(threading.Thread):
         a = [a for a in self.plan.actions.values() if (a["tStart"] == tp or a["tEnd"] == tp)][0]
         logger.debug("Executing tp : %s" % tp)
         
-        #If this is a deadline, must use the exact deadline time
+        
         if self.tp[tp][1] == "future":
+            #If this is a deadline, must use the exact deadline time
+            currentTime = self.plan.stn.getBounds(tp).lb
+        elif a["tEnd"] == tp and self.tp[tp][1] == "controllable":
+            #If this is the end of a action with strict duration
             currentTime = self.plan.stn.getBounds(tp).lb
         else:
             currentTime = self.getCurrentTime()
@@ -245,7 +249,7 @@ class Supervisor(threading.Thread):
 
     def update(self):
         l = next(self.getExecutableTps(), False)
-        
+
         while l:
             logger.debug("Next executable tp : %s" % (str(l)))
             logger.debug("Current time : %d" % self.getCurrentTime())

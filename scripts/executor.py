@@ -61,6 +61,7 @@ class Executor(threading.Thread):
         except AttributeError as e:
             logger.error("Cannot execute %s." % action["name"])
             logger.error(e)
+            self.action_callback(msg["action"])
             pass
 
     def stopAction(self, msg):

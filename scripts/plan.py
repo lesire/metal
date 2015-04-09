@@ -159,9 +159,12 @@ class Plan:
             if a["tStart"] != a["tEnd"]:
                 if "dMin" in a:
                     self.stn.addConstraint(a["tStart"], a["tEnd"], int(round(timeFactor*a["dMin"])))
-
                 else:
                     logger.warning("Action %s does not have a dMin ?" % a["name"])
+                    
+                if isActionControllable(a["name"]):
+                    self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
+
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
