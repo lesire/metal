@@ -176,6 +176,9 @@ class DummyDelay(DummyActionExecutor):
         if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
             dur = dur + 20
             logger.warning("Delaying action %s" % actionJson["name"])
+        if who == "mana":
+            dur = dur + 30
+            logger.warning("Delaying action %s" % actionJson["name"])
         logger.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
         
         currentTime = time.time()

@@ -294,9 +294,7 @@ class Plan:
                         self.jsonDescr["absolute-time"][action[tpKey]] = value
         
         
-        for index,_ in self.jsonDescr["absolute-time"]:
-            if index in originalIndex.keys():
-                del self.jsonDescr["absolute-time"][index]
+        self.jsonDescr["absolute-time"] = [[index,value] for index,value in self.jsonDescr["absolute-time"] if index not in originalIndex.keys()]
 
         return self.jsonDescr
     
