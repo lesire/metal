@@ -54,6 +54,7 @@ class Hidden:
         parser.add_argument('--agentName', metavar="agent", type=str)
         parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros", "morse+ros", "hyper"], default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
+        parser.add_argument('--repairRos', action="store_true")
         parser.add_argument('planFile', metavar='plan', type=str)
         args = parser.parse_args(argv)
 
@@ -79,10 +80,24 @@ class Hidden:
             planString = " ".join(f.readlines())
         logger.info("Plan read from file %s" % args.planFile)
 
+        d = os.path.dirname(os.path.abspath(args.planFile))
+        prefix = os.path.basename(args.planFile).split(".")[0]
+        domain = os.path.join(d, prefix + "-domain.pddl")
+        prb = os.path.join(d, prefix + "-prb.pddl")
+        prbHelper = os.path.join(d, prefix + "-prb-helper.pddl")
+        if not os.access(domain, os.R_OK) or \
+           not os.access(prb, os.R_OK) or \
+           not os.access(prbHelper, os.R_OK):
+            logger.warning("Cannot find the pddl file. Will not be able to repair.")
+            logger.warning("Looking for %s %s %s" % (domain, prb, prbHelper))
+            pddlFiles = None
+        else:
+            pddlFiles = {"domain" : domain, "prb" : prb, "helper" : prbHelper}
+        
         ex = self.createExecutor(args.executor, args.agentName)
         logger.info("Threads created")
 
-        self.launchAgentArchitecture(ex, planString, args.agentName)
+        self.launchAgentArchitecture(ex, planString, args.agentName, pddlFiles=pddlFiles, repairRos=args.repairRos)
         logger.info("Execution thread launched")
     
         self.started = False
@@ -139,11 +154,11 @@ class Hidden:
         else:
             return None
 
-    def launchAgentArchitecture(self, ex, planString, agentName):
+    def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False):
         self.q1 = Queue.Queue() 
         self.q2 = Queue.Queue() 
     
-        self.threadSupervisor = supervisor.Supervisor(self.q1, self.q2, planString, agent=agentName)
+        self.threadSupervisor = supervisor.Supervisor(self.q1, self.q2, planString, agent=agentName, pddlFiles=pddlFiles, repairRos=repairRos)
         self.threadExecutor = executor.Executor(self.q2, self.q1, ex)
     
         #threadSupervisor.start()

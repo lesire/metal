@@ -26,11 +26,25 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, planStr, agent = None):
+    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None, repairRos = False):
         self.inQueue = inQueue
         self.outQueue = outQueue
+        self.pddlFiles = pddlFiles
         
         self.beginDate = -1
+        
+        self.repairRos = repairRos
+        if repairRos:
+            if agent is None:
+                logging.error("Cannot repair with ROS without an agent name")
+                sys.exit(1)
+            
+            import rospy
+            from std_msgs.msg import Empty,String
+            rospy.init_node("%s_repair" % agent)
+            self.subRepair = rospy.Subscriber("/hidden/repair", String, lambda x: self.repairCallback(x))
+            self.pubRepair = rospy.Publisher('/hidden/repair', String, queue_size=10)
+
         
         self.init(planStr, agent)
         
@@ -261,31 +275,112 @@ class Supervisor(threading.Thread):
             logger.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
 
+    #msg is a string
+    def sendRepairMessage(self, msg):
+        if self.repairRos:
+            import rospy
+            from std_msgs.msg import String
+        
+            logger.info("Sending repair msg : %s" %  msg)
+
+            self.pubRepair.publish(msg)
+            
+    
+    def repairCallback(self, msg):
+        logger.info(msg)
+        logger.info(type(msg))
+        logger.info(dir(msg))
+        try:
+            data = json.loads(msg.data)
+        except TypeError:
+            logger.error("Receive a repair message that is not a json string : %s" % msg.data)
+            return
+        logger.info("Received : %s" % data)
+        
+        if data["type"] == "repairRequest":
+            msg = {"agent":self.agent, "type":"repairResponse", "plan":self.plan.getJsonDescription()}
+            logger.info("Received a repair request")
+
+        elif data["type"] == "repairResponse":
+            if data["agent"] not in self.repairResponse:
+                self.repairResponse[data["agent"]] = data["plan"]
+                logger.info("Receive a repair response from %s " % data["agent"])
+            else:
+                logger.error("Received several response from %s. Keeping only the first one" % data["agent"])
+        else:
+            logger.warning("Received unsupported message of type %s : %s" % (data["type"], msg))
+
+
     def executionFail(self):
         planJson = self.plan.getJsonDescription()
         planJson["current-time"] = time.time() - self.beginDate
         
-        for a in planJson["actions"].values():
-            if not self.isResponsibleForAction(a):
-                a["locked"] = True
+        if self.repairRos:
+            self.repairResponse = {}
+            msg = {"agent":self.agent, "type":"repairRequest"}
+            msg = json.dumps(msg)
+            self.sendRepairMessage(msg)
+            
+            time.sleep(5)
+            
+            logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
+            
+            for agent,plan in self.repairResponse:
+                for k,a in plan["actions"].items():
+                    if "locked" in a and a["locked"]:
+                        if k in planJson["actions"] and a["name"] == planJson["actions"][k]["name"]:
+                            planJson["actions"][k]["locked"] = True
+                        else:
+                            #locked action that I did not know about
+                            logger.warning("%s has a locked action that I did not know about %s %s: " % (agent,k,a["name"]))
+                            logger.warning("%s" % str(a))
+                            if k in planJson["actions"]:
+                                logger.warning(planJson["actions"][k])
+            
+        else:
+            """
+            for a in planJson["actions"].values():
+                if not self.isResponsibleForAction(a):
+                    a["locked"] = True
+            """
+            pass
+        
+        #remove all deadlines for the reparation
+        logger.info("Removing all deadlines from the plan")
+        planJson["absolute-time"] = list(filter(lambda d: d[1] <= planJson["current-time"], planJson["absolute-time"]))
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
         
-        if os.access("hipop", os.X_OK):
-            r = subprocess.call("./hipop -L error --timing -H hipop-helper.pddl -I plan-broken.plan -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan hipop-domain.pddl hipop-prb.pddl".split(" "))
+        if self.pddlFiles is None:
+            logger.error("No provided PDDL files. Cannot repair")
+            sys.exit(1)
         
-            if(r == 0):
-                with open("plan-repaired.plan") as f:
-                    planStr = " ".join(f.readlines())
-                self.init(planStr, self.agent)
-                self.mainLoop()
+        command = "hipop -L error --timing -H {helper} -I plan-broken.plan -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(**self.pddlFiles)
+        logger.info("Launching hipop with %s" % command)
+        try:
+            r = subprocess.call(command.split(" "))
+        except OSError as e:
+            if e.errno == os.errno.ENOENT:
+                # handle file not found error.
+                logger.error("Hipop is not found. Install it to repair.")
+                sys.exit(1)
             else:
+                # Something else went wrong while trying to run the command
                 logger.error("During the reparation hipop returned %s. Cannot repair." % r)
                 sys.exit(1)
+        
+        if(r == 0):
+            with open("plan-repaired.plan") as f:
+                planStr = " ".join(f.readlines())
+            self.init(planStr, self.agent)
+            self.mainLoop()
         else:
-            logger.error("HiPOP not found. Cannot repair")
+            logger.error("During the reparation hipop returned %s. Cannot repair." % r)
+            if r == 1:
+                logger.error("No solution was found by hipop")
             sys.exit(1)
+                
 
     def run(self):
         logger.info("Supervisor launched")

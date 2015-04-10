@@ -319,8 +319,8 @@ class Plan:
                 if "dMax" in action:
                     start = self.stn.getConstraint(self.stn.getStartId(), str(self.actions[index]["tStart"]))
                     if start.ub != start.lb:
-                        logging.error(tpName)
-                        logging.error("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
+                        logger.error(tpName)
+                        logger.error("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
                         sys.exit(1)
                         return
                 
