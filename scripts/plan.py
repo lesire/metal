@@ -17,7 +17,7 @@ except ImportError:
 def isActionControllable(actionName):
     return "communicate" in actionName
 
-agentList = ["ressac", "ressac1", "ressac2", "mana", "minnie", "momo"]
+agentList = ["ressac", "ressac1", "ressac2", "mana", "minnie", "momo", "r1", "r2"]
 
 timeDelta = 1
 timeFactor = 1000 # all float duration are multiplied by this and then cast into int

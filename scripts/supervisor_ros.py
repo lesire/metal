@@ -1,6 +1,7 @@
 import logging; logger = logging.getLogger("hidden")
 
 import rospy
+import json
 from std_msgs.msg import Empty,String
 from supervisor import Supervisor
 
@@ -13,7 +14,14 @@ class SupervisorRos(Supervisor):
         self.repair_sub = rospy.Subscriber("/hidden/repair", String, self.repairCallback)
         self.repair_pub = rospy.Publisher('/hidden/repair', String, queue_size=10)
 
-    #msg is a string
+    def init(self, plan, agent):
+        Supervisor.init(self, plan, agent)
+        stn = open(str(self.agent) + "_STN.json", "w")
+        stn.write(self.plan.stn.export())
+        '''self.plan.stn.toMacroSTN()
+        macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
+        macro_stn.write(self.plan.stn.export())'''
+
     def sendRepairMessage(self, msg):
         logger.info("Sending repair msg : %s" %  msg)
         self.repair_pub.publish(msg)
