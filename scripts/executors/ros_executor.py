@@ -6,7 +6,9 @@ import rospy
 from roshidden.srv import *
 
 class ROSActionExecutor(AbstractActionExecutor):
-    def __init__(self, agentName):
+    _name = "ros"
+
+    def __init__(self, agentName, **kwargs):
         self.name = agentName
         self._in_com = False
         self._out_com = False

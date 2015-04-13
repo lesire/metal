@@ -5,8 +5,15 @@ from functools import partial
 import os
 
 class AbstractActionExecutor:
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         pass
+
+    def create_or_clean(self, folder):
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        for f in os.listdir(folder):
+            os.remove(os.path.join(folder, f))
 
     def execute(self, action, cb):
         a, *args = action["name"].split(" ")
@@ -35,7 +42,9 @@ class AbstractActionExecutor:
         pass
 
 class DummyActionExecutor(AbstractActionExecutor):
-    def __init__(self, agentName=None):
+    _name = "dummy"
+
+    def __init__(self, agentName=None, **kwargs):
         logger.info("Using dummy executor")
         self.nextEvents = [] # list of dictionnary with time/callback to call
         
@@ -101,8 +110,11 @@ class DummyActionExecutor(AbstractActionExecutor):
         self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
     
 class DummyMAActionExecutor(DummyActionExecutor):
-    def __init__(self, agentName, folder):
+    _name = "dummy-ma"
+
+    def __init__(self, agentName, folder, **kwargs):
         self.folder = folder
+        self.create_or_clean(folder)
         self.agent = agentName
         self.pos = {}
         
@@ -171,6 +183,8 @@ class DummyMAActionExecutor(DummyActionExecutor):
 
 
 class DummyDelay(DummyActionExecutor):
+    _name = "delay"
+
     def move(self, who, a, b, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
         if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":
@@ -185,6 +199,8 @@ class DummyDelay(DummyActionExecutor):
         self.nextEvents.append( {"time":(currentTime + dur),"cb": cb, "actionJson":actionJson})
         
 class DummyDelayMA(DummyMAActionExecutor):
+    _name = "delay-ma"
+
     def move(self, who, a, b, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
         if who == "ressac2" and a == "pt_aav_22229_-592" and b == "pt_aav_18235_-6582":

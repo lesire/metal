@@ -18,7 +18,7 @@ import logging; logger = logging.getLogger("hidden")
 
 import executor
 import supervisor
-from executors.action_executor import *
+from executors import create_executor, executors
 
 """
 Messages are dictionnary, with at least the key "type" that can be :
@@ -52,7 +52,7 @@ class Hidden:
         parser.add_argument('--logLevel', type=str, default="info")
         parser.add_argument('--logFilter', type=str, nargs="*", choices=["hidden", "supervisor", "executor", "action_executor"], metavar="filename")
         parser.add_argument('--agentName', metavar="agent", type=str)
-        parser.add_argument('--executor', type=str, choices=["morse", "dummy", "dummy-ma", "delay", "delay-ma", "ros", "morse+ros", "hyper"], default="dummy", metavar="action executor (eg., 'morse')")
+        parser.add_argument('--executor', type=str, choices=executors(), default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
         parser.add_argument('--repairRos', action="store_true")
         parser.add_argument('planFile', metavar='plan', type=str)
@@ -94,7 +94,8 @@ class Hidden:
         else:
             pddlFiles = {"domain" : domain, "prb" : prb, "helper" : prbHelper}
         
-        ex = self.createExecutor(args.executor, args.agentName)
+        ex = create_executor(args.executor, agentName=args.agentName, folder='/tmp/hidden2')
+        #self.createExecutor(args.executor, args.agentName)
         logger.info("Threads created")
 
         self.launchAgentArchitecture(ex, planString, args.agentName, pddlFiles=pddlFiles, repairRos=args.repairRos)
@@ -120,39 +121,6 @@ class Hidden:
     def waitSignal(self):
         signal.signal(signal.SIGUSR1, self.startCallback)
         logger.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
-      
-    def createExecutor(self, name, agentName):
-        if name == "morse+ros":
-            from executors.morse_ros_executor import MORSEROSActionExecutor
-            return MORSEROSActionExecutor(agentName=agentName)
-        elif name == "morse":
-            from executors.morse_executor import MORSEActionExecutor
-            return MORSEActionExecutor()
-        elif name == "ros":
-            from executors.ros_executor import ROSActionExecutor
-            return ROSActionExecutor(agentName=agentName)
-        if name == "hyper":
-            from executors.hyper_executor import HyperActionExecutor
-            return HyperActionExecutor(agentName=agentName)
-        elif name == "dummy":
-            return DummyActionExecutor(agentName=agentName)
-        elif name == "dummy-ma" or name == "delay-ma":
-            if agentName is None:
-                logger.error("Cannot use executor dummy-ma without an agent name")
-                sys.exit(1)
-            folder = "/tmp/hidden2"
-            if not os.path.exists(folder):
-                os.makedirs(folder)
-            for f in os.listdir(folder):
-                os.remove(os.path.join(folder, f))
-            if name == "dummy-ma":
-                return DummyMAActionExecutor(agentName, folder)
-            else:
-                return DummyDelayMA(agentName, folder)
-        elif name == "delay":
-            return DummyDelay(agentName=agentName)
-        else:
-            return None
 
     def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False):
         self.q1 = Queue.Queue() 

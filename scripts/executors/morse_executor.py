@@ -5,7 +5,9 @@ import re
 from functools import partial
 
 class MORSEActionExecutor(AbstractActionExecutor):
-    def __init__(self):
+    _name = "morse"
+
+    def __init__(self, **kwargs):
         self._connected = False
         logger.info("MORSE executor initialized")
 

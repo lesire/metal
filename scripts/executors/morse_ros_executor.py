@@ -4,7 +4,9 @@ from .morse_executor import MORSEActionExecutor
 import logging; logger = logging.getLogger("hidden")
 
 class MORSEROSActionExecutor(MORSEActionExecutor, ROSActionExecutor):
-    def __init__(self, agentName):
+    _name = "morse+ros"
+
+    def __init__(self, agentName, **kwargs):
         MORSEActionExecutor.__init__(self)
         ROSActionExecutor.__init__(self, agentName)
 

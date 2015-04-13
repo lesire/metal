@@ -4,7 +4,9 @@ import logging; logger = logging.getLogger("hidden")
 import re
 
 class HyperActionExecutor(ROSActionExecutor):
-    def __init__(self, agentName):
+    _name = "hyper"
+
+    def __init__(self, agentName, **kwargs):
         import yarp
         yarp.Network.init()
         self.output_port = yarp.BufferedPortBottle()
