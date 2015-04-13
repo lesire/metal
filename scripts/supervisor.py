@@ -26,26 +26,14 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None, repairRos = False):
+    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None):
         self.inQueue = inQueue
         self.outQueue = outQueue
         self.pddlFiles = pddlFiles
         
         self.beginDate = -1
-        
-        self.repairRos = repairRos
-        if repairRos:
-            if agent is None:
-                logging.error("Cannot repair with ROS without an agent name")
-                sys.exit(1)
-            
-            import rospy
-            from std_msgs.msg import Empty,String
-            rospy.init_node("%s_repair" % agent)
-            self.subRepair = rospy.Subscriber("/hidden/repair", String, lambda x: self.repairCallback(x))
-            self.pubRepair = rospy.Publisher('/hidden/repair', String, queue_size=10)
+        self.repairRos = True
 
-        
         self.init(planStr, agent)
         
         threading.Thread.__init__ (self, name="Supervisor")
@@ -275,41 +263,11 @@ class Supervisor(threading.Thread):
             logger.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
 
-    #msg is a string
     def sendRepairMessage(self, msg):
-        if self.repairRos:
-            import rospy
-            from std_msgs.msg import String
-        
-            logger.info("Sending repair msg : %s" %  msg)
-
-            self.pubRepair.publish(msg)
-            
+        pass
     
     def repairCallback(self, msg):
-        logger.info(msg)
-        logger.info(type(msg))
-        logger.info(dir(msg))
-        try:
-            data = json.loads(msg.data)
-        except TypeError:
-            logger.error("Receive a repair message that is not a json string : %s" % msg.data)
-            return
-        logger.info("Received : %s" % data)
-        
-        if data["type"] == "repairRequest":
-            msg = {"agent":self.agent, "type":"repairResponse", "plan":self.plan.getJsonDescription()}
-            logger.info("Received a repair request")
-
-        elif data["type"] == "repairResponse":
-            if data["agent"] not in self.repairResponse:
-                self.repairResponse[data["agent"]] = data["plan"]
-                logger.info("Receive a repair response from %s " % data["agent"])
-            else:
-                logger.error("Received several response from %s. Keeping only the first one" % data["agent"])
-        else:
-            logger.warning("Received unsupported message of type %s : %s" % (data["type"], msg))
-
+        pass
 
     def executionFail(self):
         planJson = self.plan.getJsonDescription()

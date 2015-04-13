@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from hidden import Hidden
+from supervisor_ros import SupervisorRos
 
 import threading
 import logging
@@ -16,6 +17,9 @@ class HiddenRos(Hidden):
 
     def waitSignal(self):
         self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
+
+    def createSupervisor(self, plan, agent, pddlFiles):
+        return SupervisorRos(self.q1, self.q2, plan, agent=agent, pddlFiles=pddlFiles)
 
     def main(self):
         rospy.spin()
