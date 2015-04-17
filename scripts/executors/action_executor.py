@@ -193,6 +193,9 @@ class DummyDelay(DummyActionExecutor):
         if who == "mana":
             dur = dur + 30
             logger.warning("Delaying action %s" % actionJson["name"])
+        if who == "r1":
+            dur = dur + 1
+            logger.warning("Delaying action %s" % actionJson["name"])
         logger.info("moving {w}(aav) from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
         
         currentTime = time.time()
