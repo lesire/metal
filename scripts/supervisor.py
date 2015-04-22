@@ -161,7 +161,8 @@ class Supervisor(threading.Thread):
         else:
             logger.error("\tError : a timepoint does not match its action %s" % tp)
             raise ExecutionFailed("\tA timepoint does not match its action %s" % tp)
-
+        
+        self.stnUpdated()
 
     def executeAction(self, action, currentTime):
         if self.tp[action["tStart"]][1] != "controllable" and self.tp[action["tStart"]][1] != "future":
@@ -262,6 +263,10 @@ class Supervisor(threading.Thread):
         if not self.plan.stn.isConsistent():
             logger.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
+
+    # Called when the STN is updated. Used to send data back to the mission center
+    def stnUpdated(self):
+        pass
 
     def sendRepairMessage(self, msg):
         pass

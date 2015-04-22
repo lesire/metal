@@ -1,0 +1,13 @@
+<launch>
+
+    <node name="r1" pkg="roshidden" type="hidden-ros.py" ns="r1"
+        args="$(find roshidden)/data/action-V-simple.plan --executor=dummy --agentName=r1 --waitSignal" />
+
+    <node name="r2" pkg="roshidden" type="hidden-ros.py" ns="r2"
+        args="$(find roshidden)/data/action-V-simple.plan --executor=dummy --agentName=r2 --waitSignal" />
+
+    <node name="visu" pkg="roshidden" type="onlineTimeline.py" ns="visu"
+        args="$(find roshidden)/data/action-V-simple.plan" />
+
+
+</launch>
