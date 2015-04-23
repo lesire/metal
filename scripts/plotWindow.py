@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 class PlotWindow(QMainWindow):
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
-        self.setWindowTitle('Sliding histogramm')
+        self.setWindowTitle('Online plot')
         self.create_main_frame()
         self.on_draw()
 

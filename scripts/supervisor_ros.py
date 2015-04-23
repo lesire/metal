@@ -5,7 +5,7 @@ from copy import copy
 import rospy
 import json
 from std_msgs.msg import Empty,String
-from roshidden.msg import StnVisu
+from roshidden.msg import StnVisu, ActionVisu
 from supervisor import Supervisor
 
 #from mastn_execution.srv import StnVisu
@@ -58,17 +58,25 @@ class SupervisorRos(Supervisor):
             logger.warning("Received unsupported message of type %s : %s" % (data["type"], msg))
 
     def stnUpdated(self):
-        data = {}
+        data = []
+        j = self.plan.getJsonDescription()
         for k,a in self.plan.actions.items():
             if "dummy" in a["name"]:
                 continue
             if self.isResponsibleForAction(a):
-                data[k] = copy(a)
-                data[k]["timeStart"] = [self.plan.stn.getBounds(data[k]["tStart"]).lb, self.plan.stn.getBounds(data[k]["tStart"]).ub]
-                data[k]["timeEnd"] = [self.plan.stn.getBounds(data[k]["tEnd"]).lb, self.plan.stn.getBounds(data[k]["tEnd"]).ub]
+                executed = (self.tp[a["tEnd"]][1] == "past")
+                executing = (self.tp[a["tStart"]][1] == "past")
+                
+                if k in j["actions"] and "children" in j["actions"][k] and len(j["actions"][k]["children"])>0:
+                  hierarchical = True
+                else:
+                  hierarchical = False
+                
+                timeStart = self.plan.stn.getBounds(a["tStart"])
+                timeEnd = self.plan.stn.getBounds(a["tEnd"])
+
+                m = ActionVisu(a["name"], timeStart.lb, timeStart.ub, timeEnd.lb, timeEnd.ub, executed, executing, hierarchical)
+                data.append(m)
         
-        #self.stnvisu_pub.publish("toto", 12.6, "[tata]")
-        self.stnvisu_pub.publish(self.agent, self.getCurrentTime(), json.dumps(data))
-        
-        #logger.error(data)
-            
+        self.stnvisu_pub.publish(self.agent, self.getCurrentTime(), data)
+

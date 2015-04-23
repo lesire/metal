@@ -317,12 +317,10 @@ class Plan:
             #The action ends with this tp : update the action lengths
             if  int(tpName.split("-")[0]) == action["endTp"] and "dummy" not in action["name"]:
                 if "dMax" in action:
-                    start = self.stn.getConstraint(self.stn.getStartId(), str(self.actions[index]["tStart"]))
+                    start = self.stn.getBounds(str(self.actions[index]["tStart"]))
                     if start.ub != start.lb:
                         logger.error(tpName)
                         logger.error("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
-                        sys.exit(1)
-                        return
                 
                     duration = (value - start.lb)/timeFactor
 
