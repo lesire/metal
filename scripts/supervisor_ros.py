@@ -23,11 +23,11 @@ class SupervisorRos(Supervisor):
 
     def init(self, plan, agent):
         Supervisor.init(self, plan, agent)
-        stn = open(str(self.agent) + "_STN.json", "w")
-        stn.write(self.plan.stn.export())
-        self.plan.stn.toMacroSTN()
-        macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
-        macro_stn.write(self.plan.stn.export())
+        #stn = open(str(self.agent) + "_STN.json", "w")
+        #stn.write(self.plan.stn.export())
+        #self.plan.stn.toMacroSTN()
+        #macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
+        #macro_stn.write(self.plan.stn.export())
 
     def sendRepairMessage(self, msg):
         logger.info("Sending repair msg : %s" %  msg)

@@ -64,7 +64,7 @@ class Hidden:
             raise ValueError('Invalid log level: %s' % args.logLevel)
         sh = logging.StreamHandler()
         logger.setLevel(numeric_level)
-        sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
+        sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s %(process)d (%(filename)s:%(lineno)d): %(message)s'))
         logger.addHandler(sh)
 
         if args.logFilter is not None:

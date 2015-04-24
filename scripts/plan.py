@@ -300,6 +300,8 @@ class Plan:
     
     #assume value in ms
     def setTimePoint(self, tpName, value):
+        logger.debug("plan.setTimpoint %s %s" % (tpName, value))
+    
         if not "absolute-time" in self.jsonDescr:
             self.jsonDescr["absolute-time"] = []
             
@@ -335,7 +337,7 @@ class Plan:
 
         #add this constraint in the STN
         self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
-        
+
         logger.debug("Executing %s at %s" % (tpName, value))
 
     def setActionUnavailable(self, action):
