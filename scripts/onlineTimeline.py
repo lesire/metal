@@ -15,6 +15,7 @@ import itertools
 import json
 import time
 import sys, random
+import os
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -126,6 +127,11 @@ class OnlineTimeline(PlotWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    iconePath = os.path.expandvars("$ACTION_HOME/ressources/images/icone_action.png")
+    if os.access(iconePath, os.R_OK):
+        app.setWindowIcon(QIcon(iconePath))
+
     window = OnlineTimeline()
     window.show()
     
