@@ -38,7 +38,7 @@ class OnlineTimeline(PlotWindow):
 
         self.subscriber = rospy.Subscriber("/hidden/start", Empty, self.start, queue_size = 1 )
         
-        rospy.logwarn("Init done for onlineTimeline")
+        logger.info("Init done for onlineTimeline")
 
     def start(self, m):
         self.beginDate = time.time()
@@ -51,9 +51,13 @@ class OnlineTimeline(PlotWindow):
     
     def getPrintName(self, name):
         if "move" in name:
-            locs = name.split(" ")[2:]
+            locs = []
+            for l in name.split(" ")[2:]:
+                pt = []
+                for p in l.split("_")[1:3]:
+                    pt.append(str(int(float(p)/100)))
+                locs.append("_".join(pt))
             #rospy.logwarn(locs)
-            locs = map(lambda x: "_".join(x.split("_")[1:3]), locs)
             return "->".join(locs)
         elif "communicate" in name:
             return " ".join(name.split(" ")[1:3])
@@ -69,7 +73,7 @@ class OnlineTimeline(PlotWindow):
             for m in data.actions:
                 self.data[data.agent]["actions"].append({"name":m.name, "timeStart": m.timeStartLb,  "timeEnd": m.timeEndLb, "executed":m.executed, "executing":m.executing, "hierarchical":m.hierarchical})
 
-            rospy.logwarn("received message from %s" % data.agent)
+            logger.info("Received message from %s" % data.agent)
 
         while not self.mutex:
             rospy.sleep(0.1)
@@ -128,6 +132,10 @@ class OnlineTimeline(PlotWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
+    sh = logging.StreamHandler()
+    sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s %(process)d (%(filename)s:%(lineno)d): %(message)s'))
+    logger.addHandler(sh)
+        
     iconePath = os.path.expandvars("$ACTION_HOME/ressources/images/icone_action.png")
     if os.access(iconePath, os.R_OK):
         app.setWindowIcon(QIcon(iconePath))
