@@ -2,7 +2,7 @@
 (define (domain action)
   (:requirements :strips :typing :durative-actions :equality)
   (:types robot - object
-    minnie ressac mana - robot
+    ressac mana minnie - robot
     loc - object
     loc-wp loc-obs - loc)
   (:predicates (explored ?z - loc-obs)
