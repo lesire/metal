@@ -3,6 +3,7 @@ from .morse_executor import *
 from .ros_executor import *
 from .morse_ros_executor import *
 from .hyper_executor import *
+from .libRessac_executor import *
 
 def all_subclasses(classname):
     direct_subclasses = eval(classname).__subclasses__()
