@@ -4,22 +4,29 @@ import re
 import sys
 
 # Transform input PDDL into arrays
-# 0.001: (move-aav ressac1 pt_aav_16239_5397 pt_aav_8252_1404) [41.264]
-actions = {'ressac1': {'move-aav': [], 'observe-aav': [], 'communicate-aav-aav': [], 'communicate-aav-agv': [], 'has-communicated': []}
-    , 'ressac2': {'move-aav': [], 'observe-aav': [], 'communicate-aav-aav': [], 'communicate-aav-agv': [], 'has-communicated': []}
-    , 'mana': {'move-agv': [], 'observe-agv': [], 'communicate-aav-agv': [], 'has-communicated': []}
-    , 'minnie': {'move-agv': [], 'observe-agv': [], 'communicate-aav-agv': [], 'has-communicated': []}}
+# 0.001: (move ressac1 ptAav_16239_5397 ptAav_8252_1404) [41.264]
+actions = {'ressac1': {'move': [], 'observe': [], 'communicate': [], 'communicate': [], 'has-communicated': []}
+    , 'ressac2': {'move': [], 'observe': [], 'communicate': [], 'communicate': [], 'has-communicated': []}
+    , 'mana': {'init':[], 'move': [], 'observe': [], 'communicate': [], 'has-communicated': []}
+    , 'minnie': {'init':[], 'move': [], 'observe': [], 'communicate': [], 'has-communicated': []}}
 
 for l in open(sys.argv[1]):
-    if l[0] == ';':
-        continue
-    data = re.split('[ \:\(\)\[\]]', l)
-    if "communicate" in data[3]:
-        actions[data[4]][data[3]] += [(float(data[0]), float(data[-2]))]
-        actions[data[5]][data[3]] += [(float(data[0]), float(data[-2]))]
-    else:
-        actions[data[4]][data[3]] += [(float(data[0]), float(data[-2]))]
-    print(actions)
+    m = re.match("^(\d*(?:.\d*)?)\s*:\s*\((.*)\)\s*\[(\d*(?:.\d*)?)\]", l)
+    if m:
+        tStart, actionName, dur = m.groups()
+
+        if "communicate" in actionName:
+            a,r1,r2,wp1,wp2 = actionName.split(" ")
+            actions[r1][a] += [(float(tStart), float(dur))]
+            actions[r2][a] += [(float(tStart), float(dur))]
+        elif "init" in actionName:
+            a,r1,wp1 = actionName.split(" ")
+            actions[r1][a] += [(float(tStart), float(dur))]
+        else:
+            print actionName
+            a,r1,wp1,wp2 = actionName.split(" ")
+            actions[r1][a] += [(float(tStart), float(dur))]
+        print(actions)
 
 # Plot function
 def timelines(y, xstart, xstop, color='b'):
