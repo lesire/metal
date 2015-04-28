@@ -82,6 +82,23 @@ class Supervisor(threading.Thread):
 
             #TODO if this is an action beeing executed, send a message to the executor
     
+        for tpName,value in self.plan.absTimes:
+            action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+                
+            if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
+                self.tp[action["tEnd"]][1] = "future"
+                if "abstract" in action:
+                    pass
+                elif action["controllable"]:
+                    self.plan.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
+                else:
+                    #logger.info("Setting the end to %s" % int(value + round(1000 * (action["dMin"]))))
+                    self.plan.setTimePoint(action["tEnd"], int(value + round(1000 * (action["dMin"]))))
+                    
+            if not self.plan.stn.isConsistent():
+                logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
+                raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
+    
     def getExecutableTps(self, now = True):
         return filter(lambda tp: self.isTpExecutable(tp, now), self.tp.keys())
     
@@ -310,13 +327,11 @@ class Supervisor(threading.Thread):
                                 logger.warning(planJson["actions"][k])
             
         else:
-            """
+            
             for a in planJson["actions"].values():
                 if not self.isResponsibleForAction(a):
                     a["locked"] = True
-            """
-            pass
-        
+            
         #remove all deadlines for the reparation
         logger.info("Removing all deadlines from the plan")
         planJson["absolute-time"] = list(filter(lambda d: d[1] <= planJson["current-time"], planJson["absolute-time"]))
@@ -346,6 +361,7 @@ class Supervisor(threading.Thread):
             with open("plan-repaired.plan") as f:
                 planStr = " ".join(f.readlines())
             self.init(planStr, self.agent)
+            logger.info("Finished repairation : restarting the main loop")
             self.mainLoop()
         else:
             logger.error("During the reparation hipop returned %s. Cannot repair." % r)
