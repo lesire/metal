@@ -130,7 +130,7 @@ class Hidden:
         self.q2 = Queue.Queue() 
     
         self.threadSupervisor = self.createSupervisor(planString, agentName, pddlFiles)
-        self.threadExecutor = executor.Executor(self.q2, self.q1, ex)
+        self.threadExecutor = executor.Executor(self.q2, self.q1, ex, agent=agentName)
     
         #threadSupervisor.start()
         self.threadExecutor.start()

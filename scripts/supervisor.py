@@ -32,11 +32,11 @@ class Supervisor(threading.Thread):
         self.pddlFiles = pddlFiles
         
         self.beginDate = -1
-        self.repairRos = True
+        self.repairRos = False
 
         self.init(planStr, agent)
         
-        threading.Thread.__init__ (self, name="Supervisor")
+        threading.Thread.__init__ (self, name="Supervisor %s" % agent)
         
     def init(self, planStr, agent):
         if agent is None:
@@ -208,7 +208,16 @@ class Supervisor(threading.Thread):
         action = msg["action"]
         tp = action["tEnd"]
         value = msg["time"]
-        
+
+        report = msg.get("report", None)
+
+        if report is None:
+            logger.warning("End of action %s without report" % action["name"])
+        elif report == "ok":
+            logger.info("End of action %s ok" % action["name"])
+        else:
+            logger.warning("End of action %s with status" % (action["name"], report))
+
         if action["controllable"]:
             logger.info("Notified of the end of controllable action %s." % action["name"])
             if self.tp[tp][1] != "past":

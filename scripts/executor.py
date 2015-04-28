@@ -13,25 +13,25 @@ import threading
 import time
 
 class Executor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, actionExecutor=None):
+    def __init__ (self, inQueue, outQueue, actionExecutor=None, agent=None):
         self.inQueue = inQueue
         self.outQueue = outQueue
         
         self.actionExecutor = actionExecutor
 
         self.isStarted = False
-        self.nextEvents = [] #list of tuple (time, action)
+        self.nextEvents = [] #list of dicts (time, action, report (opt))
         self.beginDate = -1
-        threading.Thread.__init__ (self, name="Executor")
+        threading.Thread.__init__ (self, name="Executor %s" % agent)
 
     # get readable time
     def user_time(self, t):
         return int(round(1000*(t-self.beginDate)))
 
     # end action callback
-    def action_callback(self, action):
+    def action_callback(self, action, report=None):
         currentTime = time.time()
-        self.nextEvents.append((currentTime, action))
+        self.nextEvents.append({"time":currentTime, "action":action})
         logger.info("Callback of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
 
     #called periodically
@@ -40,12 +40,12 @@ class Executor(threading.Thread):
         
         self.actionExecutor.update()
         
-        for action in [a for t,a in self.nextEvents if t <= currentTime]:
-            self.outQueue.put({"type":"endAction", "action":action, "time": self.user_time(currentTime)})
-            logger.info("End of action %s" % action["name"])
+        for action,report in [(d["action"],d.get("report", None)) for d in self.nextEvents if d["time"] <= currentTime]:
+            self.outQueue.put({"type":"endAction", "action":action, "time": self.user_time(currentTime), "report":report})
+            logger.info("End of action %s with report %s" % (action["name"], report))
             logger.debug("End of action %s" % action)
             
-        self.nextEvents = [(t,a) for t,a in self.nextEvents if t > currentTime]
+        self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
         
     def startAction(self, msg):
         if "action" not in msg or type(msg["action"]) != dict:
