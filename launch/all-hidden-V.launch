@@ -1,15 +1,15 @@
 <launch>
 
     <node name="ressac1" pkg="roshidden" type="hidden-ros.py" ns="ressac1"
-        args="$(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=ressac1 --waitSignal" />
+        args="--plan $(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=ressac1 --waitSignal" />
 
     <node name="ressac2" pkg="roshidden" type="hidden-ros.py" ns="ressac2"
-        args="$(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=ressac2 --waitSignal" />
+        args="--plan $(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=ressac2 --waitSignal" />
 
     <node name="mana" pkg="roshidden" type="hidden-ros.py" ns="mana"
-        args="$(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=mana --waitSignal" />
+        args="--plan $(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=mana --waitSignal" />
 
     <node name="minnie" pkg="roshidden" type="hidden-ros.py" ns="minnie"
-        args="$(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=minnie --waitSignal" />
+        args="--plan $(find roshidden)/data/action-V.plan --executor=morse+ros --agentName=minnie --waitSignal" />
 
 </launch>
