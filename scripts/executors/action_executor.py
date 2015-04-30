@@ -35,7 +35,7 @@ class AbstractActionExecutor:
 
     def report(self, action, cb, report):
         logger.info("Reporting for action {a}: {r}".format(a=action["name"],r=report))
-        cb(action)
+        cb(action, report=report)
         
     #called periodically
     def update(self):

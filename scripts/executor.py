@@ -31,8 +31,8 @@ class Executor(threading.Thread):
     # end action callback
     def action_callback(self, action, report=None):
         currentTime = time.time()
-        self.nextEvents.append({"time":currentTime, "action":action})
-        logger.info("Callback of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
+        self.nextEvents.append({"time":currentTime, "action":action, "report":report})
+        logger.info("Callback of action {a} at time {t} with report {r}".format(a=action["name"],t=self.user_time(currentTime)/1000, r=report))
 
     #called periodically
     def update(self):
