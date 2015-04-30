@@ -34,6 +34,7 @@ class Supervisor(threading.Thread):
         
         self.beginDate = -1
         self.repairRos = False
+        self.inReparation = False
 
         self.init(planStr, agent)
         
@@ -278,6 +279,9 @@ class Supervisor(threading.Thread):
             print("{: <70} ({}) : [{}, {}]".format(*i))
 
     def update(self):
+        if self.inReparation:
+            return # do not execute the plan if a repair is under way
+
         l = next(self.getExecutableTps(), False)
 
         while l:
@@ -295,27 +299,28 @@ class Supervisor(threading.Thread):
     def stnUpdated(self):
         pass
 
-    def sendRepairMessage(self, msg):
+    #if data = None : repair request
+    #if data is a str : assume this is a new repaired plan
+    def sendRepairMessage(self, data = None):
         pass
     
-    def repairCallback(self, msg):
+    def repairCallback(self, type, time, sender, msg):
         pass
 
     def executionFail(self):
         planJson = self.plan.getJsonDescription()
         planJson["current-time"] = time.time() - self.beginDate
         
+        self.repairResponse = {}
+        
         if self.repairRos:
-            self.repairResponse = {}
-            msg = {"agent":self.agent, "type":"repairRequest"}
-            msg = json.dumps(msg)
-            self.sendRepairMessage(msg)
+            self.sendRepairMessage()
             
             time.sleep(5)
             
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
             
-            for agent,plan in self.repairResponse:
+            for agent,plan in self.repairResponse.items():
                 for k,a in plan["actions"].items():
                     if "locked" in a and a["locked"]:
                         if k in planJson["actions"] and a["name"] == planJson["actions"][k]["name"]:
@@ -339,6 +344,8 @@ class Supervisor(threading.Thread):
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
+        
+        del self.repairResponse
         
         if self.pddlFiles is None:
             logger.error("No provided PDDL files. Cannot repair")
@@ -374,6 +381,10 @@ class Supervisor(threading.Thread):
         if(r == 0):
             with open("plan-repaired.plan") as f:
                 planStr = " ".join(f.readlines())
+            
+            #We have a new plan
+            self.sendRepairMessage(planStr)
+            
             self.init(planStr, self.agent)
             logger.info("Finished repairation : restarting the main loop")
             self.mainLoop()

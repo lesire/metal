@@ -7,7 +7,7 @@ import rospy
 import json
 import sys
 from std_msgs.msg import Empty,String
-from roshidden.msg import StnVisu, ActionVisu
+from roshidden.msg import StnVisu, ActionVisu, RepairMsg
 from supervisor import Supervisor
 
 #from mastn_execution.srv import StnVisu
@@ -18,10 +18,12 @@ class SupervisorRos(Supervisor):
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
-        self.repair_sub = rospy.Subscriber("/hidden/repair", String, self.repairCallback)
-        self.repair_pub = rospy.Publisher('/hidden/repair', String, queue_size=10)
+        self.repair_sub = rospy.Subscriber("/hidden/repair", RepairMsg, self.repairCallback)
+        self.repair_pub = rospy.Publisher("/hidden/repair", RepairMsg, queue_size=10)
         
         self.stnvisu_pub = rospy.Publisher('/hidden/stnvisu', StnVisu, queue_size=10)
+
+        self.repairRos = True
 
     def init(self, plan, agent):
         Supervisor.init(self, plan, agent)
@@ -31,33 +33,55 @@ class SupervisorRos(Supervisor):
         #macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
         #macro_stn.write(self.plan.stn.export())
 
-    def sendRepairMessage(self, msg):
-        logger.info("Sending repair msg : %s" %  msg)
-        self.repair_pub.publish(msg)
+    def sendRepairMessage(self, data = None):
+        if data is None:
+            logger.info("Sending repair request")
+            self.repair_pub.publish(self.agent, "repairRequest", self.getCurrentTime(), "{}")
 
-    def repairCallback(self, msg):
-        logger.info(msg)
-        logger.info(type(msg))
-        logger.info(dir(msg))
-        try:
-            data = json.loads(msg.data)
-        except TypeError:
-            logger.error("Receive a repair message that is not a json string : %s" % msg.data)
-            return
-        logger.info("Received : %s" % data)
-        
-        if data["type"] == "repairRequest":
-            msg = {"agent":self.agent, "type":"repairResponse", "plan":self.plan.getJsonDescription()}
-            logger.info("Received a repair request")
-
-        elif data["type"] == "repairResponse":
-            if data["agent"] not in self.repairResponse:
-                self.repairResponse[data["agent"]] = data["plan"]
-                logger.info("Receive a repair response from %s " % data["agent"])
-            else:
-                logger.error("Received several response from %s. Keeping only the first one" % data["agent"])
+        elif type(data) == str:
+            logger.info("Sending a new plan repaired")
+            self.repair_pub.publish(self.agent, "repairDone", self.getCurrentTime(), data)
         else:
-            logger.warning("Received unsupported message of type %s : %s" % (data["type"], msg))
+            logger.error("Invalid call to sendRepairMessage. Type : %s" % type(data))
+
+    def repairCallback(self, data):
+        type = data.type
+        time = data.time
+        sender = data.sender
+        msg = data.data
+
+        if self.agent == sender:
+            return
+        
+        if type == "repairRequest":
+            logger.info("Received a repair request. Pausing the execution")
+            self.inReparation = True
+
+            msg = RepairMsg(self.agent, "repairResponse", self.getCurrentTime(), json.dumps(self.plan.getJsonDescription()))
+            self.repair_pub.publish(msg)
+
+        elif type == "repairResponse":
+            try:
+                plan = json.loads(msg)
+            except TypeError:
+                logger.error("Receive a repair message with msg not a json string : %s" % msg)
+                return
+            
+            if "repairResponse" not in dir(self):
+                return #I'm not currently repairing
+
+            if sender not in self.repairResponse:
+                self.repairResponse[sender] = plan
+                logger.info("Receive a repair response from %s " % sender)
+            else:
+                logger.error("Received several response from %s. Keeping only the first one" % sender)
+        elif type == "repairDone":
+            logger.info("Receiving a new plan to execute from %s" % sender)
+            planStr = msg
+            self.init(planStr, self.agent)
+            self.inReparation = False
+        else:
+            logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
     def stnUpdated(self):
         data = []
