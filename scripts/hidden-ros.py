@@ -15,6 +15,18 @@ class HiddenRos(Hidden):
         rospy.init_node("hidden", log_level=rospy.INFO)
         rospy.on_shutdown(lambda: os._exit(1))
 
+    def getDefaultPDDL(self):
+        if rospy.has_param('/hidden/plan'):
+            pddlFiles = {"plan":rospy.get_param('/hidden/plan')}
+            if rospy.has_param("/hidden/pddl"):
+                d = rospy.get_param('/hidden/pddl')
+                pddlFiles.update(d)
+              
+            return pddlFiles
+        
+        logger.error("Ros Parameter server has no /hidden/plan")
+        return None
+        
     def waitSignal(self):
         self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
 

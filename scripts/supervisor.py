@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -343,7 +344,20 @@ class Supervisor(threading.Thread):
             logger.error("No provided PDDL files. Cannot repair")
             sys.exit(1)
         
-        command = "hipop -L error --timing -H {helper} -I plan-broken.plan -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(**self.pddlFiles)
+        #Write the content of the pddl file to disk since hipop can only read files
+        domainFile = tempfile.NamedTemporaryFile("w")
+        domainFile.write(self.pddlFiles["domain"])
+        domainFile.flush()
+        
+        prbFile = tempfile.NamedTemporaryFile("w")
+        prbFile.write(self.pddlFiles["prb"])
+        prbFile.flush()
+        
+        helperFile = tempfile.NamedTemporaryFile("w")
+        helperFile.write(self.pddlFiles["helper"])
+        helperFile.flush()
+        
+        command = "hipop -L error --timing -H {helper} -I plan-broken.plan -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name)
         logger.info("Launching hipop with %s" % command)
         try:
             r = subprocess.call(command.split(" "))

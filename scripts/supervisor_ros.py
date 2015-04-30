@@ -2,6 +2,7 @@ import logging; logger = logging.getLogger("hidden")
 
 from copy import copy
 
+#import sys
 import rospy
 import json
 from std_msgs.msg import Empty,String
@@ -14,7 +15,7 @@ class SupervisorRos(Supervisor):
     def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None):
         Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles)
         if agent is None:
-            logging.error("Cannot repair with ROS without an agent name")
+            logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
         self.repair_sub = rospy.Subscriber("/hidden/repair", String, self.repairCallback)
         self.repair_pub = rospy.Publisher('/hidden/repair', String, queue_size=10)

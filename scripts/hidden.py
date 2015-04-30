@@ -47,6 +47,9 @@ class Hidden:
         self.threadSupervisor = None
         #self.logger = logging.getLogger('hidden')
 
+    def getDefaultPDDL(self):
+        return None
+
     def init(self, argv):
         parser = argparse.ArgumentParser(description='Execute a plan')
         parser.add_argument('--logLevel', type=str, default="info")
@@ -55,7 +58,7 @@ class Hidden:
         parser.add_argument('--executor', type=str, choices=executors(), default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
         #parser.add_argument('--repairRos', action="store_true")
-        parser.add_argument('planFile', metavar='plan', type=str)
+        parser.add_argument('--planFile', metavar='plan', type=str)
         args = parser.parse_args(argv)
 
         #Configure the logger
@@ -71,34 +74,44 @@ class Hidden:
             f = FileFilter(args.logFilter)
             logger.addFilter(f)
     
-        #Get the plan
-        if not os.access(args.planFile, os.R_OK):
+        #Get the plan and the associated PDDL files
+        if args.planFile is None:
+            pddlFiles = self.getDefaultPDDL()
+            if pddlFiles is None or "plan" not in pddlFiles:
+                logger.error("No plan to execute : nothing read from the command line or any other means")
+                sys.exit(1)
+        elif not os.access(args.planFile, os.R_OK):
             logger.error("Cannot open plan file : %s" % args.planFile)
             sys.exit(1)
-
-        with open(args.planFile) as f:
-            planString = " ".join(f.readlines())
-        logger.info("Plan read from file %s" % args.planFile)
-
-        d = os.path.dirname(os.path.abspath(args.planFile))
-        prefix = os.path.basename(args.planFile).split(".")[0]
-        domain = os.path.join(d, prefix + "-domain.pddl")
-        prb = os.path.join(d, prefix + "-prb.pddl")
-        prbHelper = os.path.join(d, prefix + "-prb-helper.pddl")
-        if not os.access(domain, os.R_OK) or \
-           not os.access(prb, os.R_OK) or \
-           not os.access(prbHelper, os.R_OK):
-            logger.warning("Cannot find the pddl file. Will not be able to repair.")
-            logger.warning("Looking for %s %s %s" % (domain, prb, prbHelper))
-            pddlFiles = None
         else:
-            pddlFiles = {"domain" : domain, "prb" : prb, "helper" : prbHelper}
+            with open(args.planFile) as f:
+                planString = " ".join(f.readlines())
+            logger.info("Plan read from file %s" % args.planFile)
+            pddlFiles = {"plan" : planString}
+
+            d = os.path.dirname(os.path.abspath(args.planFile))
+            prefix = os.path.basename(args.planFile).split(".")[0]
+            domain = os.path.join(d, prefix + "-domain.pddl")
+            prb = os.path.join(d, prefix + "-prb.pddl")
+            prbHelper = os.path.join(d, prefix + "-prb-helper.pddl")
+            if not os.access(domain, os.R_OK) or \
+               not os.access(prb, os.R_OK) or \
+               not os.access(prbHelper, os.R_OK):
+                logger.warning("Cannot find the pddl file. Will not be able to repair.")
+                logger.warning("Looking for %s %s %s" % (domain, prb, prbHelper))
+            else:
+                with open(domain) as f:
+                    pddlFiles["domain"] = f.read()
+                with open(prb) as f:
+                    pddlFiles["prb"] = f.read()
+                with open(prbHelper) as f:
+                    pddlFiles["helper"] = f.read()
         
         ex = create_executor(args.executor, agentName=args.agentName, folder='/tmp/hidden2')
         #self.createExecutor(args.executor, args.agentName)
         logger.info("Threads created")
 
-        self.launchAgentArchitecture(ex, planString, args.agentName, pddlFiles=pddlFiles)
+        self.launchAgentArchitecture(ex, pddlFiles["plan"], args.agentName, pddlFiles=pddlFiles)
         logger.info("Execution thread launched")
     
         self.started = False
