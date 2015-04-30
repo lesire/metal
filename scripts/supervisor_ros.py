@@ -5,6 +5,7 @@ from copy import copy
 #import sys
 import rospy
 import json
+import sys
 from std_msgs.msg import Empty,String
 from roshidden.msg import StnVisu, ActionVisu
 from supervisor import Supervisor

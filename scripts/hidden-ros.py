@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import logging; logger = logging.getLogger("hidden")
+
 from hidden import Hidden
 from supervisor_ros import SupervisorRos
 
