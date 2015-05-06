@@ -94,9 +94,9 @@ class SupervisorRos(Supervisor):
                 executing = (self.tp[a["tStart"]][1] == "past")
                 
                 if k in j["actions"] and "children" in j["actions"][k] and len(j["actions"][k]["children"])>0:
-                  hierarchical = True
+                    hierarchical = True
                 else:
-                  hierarchical = False
+                    hierarchical = False
                 
                 timeStart = self.plan.stn.getBounds(a["tStart"])
                 timeEnd = self.plan.stn.getBounds(a["tEnd"])

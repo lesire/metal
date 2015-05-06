@@ -9,10 +9,10 @@ import signal
 
 try:
     import Queue
-    version = 2
+    #version = 2
 except:
     import queue as Queue
-    version = 3
+    #version = 3
 
 import logging; logger = logging.getLogger("hidden")
 

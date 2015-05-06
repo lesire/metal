@@ -1,11 +1,5 @@
 from __future__ import division
 
-try:
-    import Queue
-    version = 2
-except:
-    import queue as Queue
-    version = 3
 
 from copy import copy
 import json
@@ -417,7 +411,7 @@ class Supervisor(threading.Thread):
         hasFailed = False
         try:
             while not self.isExecuted():
-                if not self.inQueue.empty():
+                while not self.inQueue.empty():
                     msg = self.inQueue.get()
     
                     if type(msg) != dict or "type" not in msg:

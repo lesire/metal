@@ -51,14 +51,17 @@ class OnlineTimeline(PlotWindow):
     
     def getPrintName(self, name):
         if "move" in name:
-            locs = []
-            for l in name.split(" ")[2:]:
-                pt = []
-                for p in l.split("_")[1:3]:
-                    pt.append(str(int(float(p)/100)))
-                locs.append("_".join(pt))
-            #rospy.logwarn(locs)
-            return "->".join(locs)
+            try:
+                locs = []
+                for l in name.split(" ")[2:]:
+                    pt = []
+                    for p in l.split("_")[1:3]:
+                        pt.append(str(int(float(p)/100)))
+                    locs.append("_".join(pt))
+                #rospy.logwarn(locs)
+                return "->".join(locs)
+            except ValueError:
+                return name
         elif "communicate" in name:
             return " ".join(name.split(" ")[1:3])
         else:
