@@ -32,7 +32,11 @@ class MORSEActionExecutor(AbstractActionExecutor):
         agent = getattr(self.morse, who)
         coords = b.split("_")[1:]
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
-        goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 3)
+        if "ressac" in who:
+            goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 2.5)
+        else:
+            goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 3, 0.5)
+
         goto_action.add_done_callback(partial(self.action_done, cb))
 
     def observe(self, who, point, observation, cb, **kwargs):
