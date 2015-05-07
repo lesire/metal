@@ -93,6 +93,7 @@ class OnlineTimeline(PlotWindow):
         
         captions = [" " for _ in range(len(self.data)+2)]
         for robot in sorted(self.data.keys()):
+            index = None
             posCycle = itertools.cycle([0.1,0.2,0.3,0.4,0.5])
             for action in sorted(self.data[robot]["actions"], key=lambda x: x["timeStart"]):
 
@@ -121,7 +122,8 @@ class OnlineTimeline(PlotWindow):
                 self.axes.vlines((xstart + xstop)/2, index, index + offset - 0.05)
                 self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, facecolor=color, edgecolor="k", lw=1, ls="solid", alpha=alpha)
                 
-            captions[index] = robot
+            if index is not None:
+                captions[index] = robot
 
         self.axes.set_yticks(range(len(captions)))
         self.axes.set_yticklabels(captions)

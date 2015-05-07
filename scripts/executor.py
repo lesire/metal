@@ -15,7 +15,7 @@ class Executor(threading.Thread):
         self.isStarted = False
         self.nextEvents = [] #list of dicts (time, action, report (opt))
         self.beginDate = -1
-        threading.Thread.__init__ (self, name="Executor %s" % agent)
+        threading.Thread.__init__ (self, name="%s-exec" % agent)
 
     # get readable time
     def user_time(self, t):

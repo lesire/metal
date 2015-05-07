@@ -67,7 +67,7 @@ class Hidden:
             raise ValueError('Invalid log level: %s' % args.logLevel)
         sh = logging.StreamHandler()
         logger.setLevel(numeric_level)
-        sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s %(process)d (%(filename)s:%(lineno)d): %(message)s'))
+        sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s %(threadName)s %(process)d (%(filename)s:%(lineno)d): %(message)s'))
         logger.addHandler(sh)
 
         if args.logFilter is not None:
@@ -106,6 +106,9 @@ class Hidden:
                     pddlFiles["prb"] = f.read()
                 with open(prbHelper) as f:
                     pddlFiles["helper"] = f.read()
+                    
+        if args.agentName is not None:
+            threading.main_thread().setName("%s-main" % args.agentName)
         
         ex = create_executor(args.executor, agentName=args.agentName, folder='/tmp/hidden2')
         #self.createExecutor(args.executor, args.agentName)

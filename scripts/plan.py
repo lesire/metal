@@ -345,3 +345,40 @@ class Plan:
             self.jsonDescr["unavailable-actions"] = []
             
         self.jsonDescr["unavailable-actions"].append(action["name"])
+
+    # Returns the plan with only actions for which the given agent is responsible 
+    def getLocalJsonPlan(self, agent):
+        data = self.getJsonDescription()
+        
+        keysToDelete = set()
+        
+        for k in list(data["actions"].keys()):
+            if k in ["0", "1"]:
+                continue #dummy init and dummy end
+            
+            action = data["actions"][k]
+            
+            if "agent" in action:
+                actionAgent = action["agent"]
+            else:
+                if action["name"].startswith("dummy"):
+                    actionAgent = getAgentFromAction(action["name"].split(" ")[2:])
+                else:
+                    actionAgent = getAgentFromAction(action["name"].split(" "))
+            if actionAgent != agent:
+                #Remove this action from the plan
+                keysToDelete.add(k)
+                if "children" in action:
+                    for c in action["children"]:
+                        keysToDelete.add(c)
+        
+        
+        for k in keysToDelete:
+            action = data["actions"][k]
+            data["causal-links"] =   [cl for cl in data["causal-links"]   if cl["startAction"] != k and cl["endAction"] != k]
+            data["temporal-links"] = [tl for tl in data["temporal-links"] if tl["startTp"] != action["startTp"] and tl["endTp"] != action["endTp"]]
+            data["absolute-time"] =  [pair for pair in data["absolute-time"] if pair[0] != action["startTp"] and pair[0] !=action["endTp"]]
+            del data["actions"][k]
+
+        logger.info("local plan : %s" %data)
+        return data

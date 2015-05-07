@@ -28,11 +28,15 @@ class Supervisor(threading.Thread):
         
         self.beginDate = -1
         self.repairRos = False
+        
+        self.isDead = False #if true, multi will not respond to anything. Simulate a lost robot
         self.inReparation = False
+
+        self.agentsDead = []
 
         self.init(planStr, agent)
         
-        threading.Thread.__init__ (self, name="Supervisor %s" % agent)
+        threading.Thread.__init__ (self, name="%s-sup" % agent)
         
     def init(self, planStr, agent):
         if agent is None:
@@ -76,12 +80,13 @@ class Supervisor(threading.Thread):
                 logger.error("Error : Invalid stn when setting the time of an absolute tp : %s" % tpName)
                 raise ExecutionFailed("Invalid stn when setting the time of an absolute tp : %s" % tpName)
 
-            #TODO if this is an action beeing executed, send a message to the executor
+            #TODO if this is an action being executed, send a message to the executor
     
         for tpName,value in self.plan.absTimes:
             action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
                 
             if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
+                logger.info("When importing, setting the end time of %s" % action["name"])
                 self.tp[action["tEnd"]][1] = "future"
                 if "abstract" in action:
                     pass
@@ -94,6 +99,8 @@ class Supervisor(threading.Thread):
             if not self.plan.stn.isConsistent():
                 logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
                 raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
+    
+        self.stnUpdated()
     
     def getExecutableTps(self, now = True):
         return filter(lambda tp: self.isTpExecutable(tp, now), self.tp.keys())
@@ -238,6 +245,8 @@ class Supervisor(threading.Thread):
                 logger.error("But the timepoint is not past : %s" % self.tp[tp][1])
             return
         
+        logger.info("End of action %s at %s. Status of the tp : %s" % (action["name"], value, self.tp[tp][1]))
+        
         lb = self.plan.stn.getBounds(tp).lb
         if self.tp[tp][1] == "uncontrollable" and value < lb:
             logger.warning("Finished %s early : %s. Waiting until %s." % (action["name"], value, lb))
@@ -289,8 +298,29 @@ class Supervisor(threading.Thread):
             logger.error("Execution of the plan when executing controllable points")
             raise ExecutionFailed("Execution of the plan when executing controllable points")
 
+    #Called when an alea is received
+    def dealAlea(self, aleaType, data):
+        if aleaType == "robotDead":
+            if "robot" not in data:
+                logger.error("Missing field robot in an alea of type robotDead")
+                return
+            
+            if data["robot"] == self.agent:
+                logger.warning("Received a robotDead for myself. Deactivating")
+                self.isDead = True
+                self.stnUpdated(onlyPast=True)
+                return
+            else:
+                logger.warning("Dealing with the death of %s" % data["robot"])
+                self.agentsDead.append(data["robot"])
+                raise ExecutionFailed("Received an alea of type robotDead")
+        else:
+            logger.error("Cannot deal with an alea of unknown type : %s" % aleaType)
+            return
+
+
     # Called when the STN is updated. Used to send data back to the mission center
-    def stnUpdated(self):
+    def stnUpdated(self, onlyPast = False):
         pass
 
     #if data = None : repair request
@@ -305,15 +335,25 @@ class Supervisor(threading.Thread):
         planJson = self.plan.getJsonDescription()
         planJson["current-time"] = time.time() - self.beginDate
         
+        #only keep my local absolute time
+        #j = self.plan.getLocalJsonPlan(self.agent)
+        #planJson["absolute-time"] = j["absolute-time"]
+        
         self.repairResponse = {}
         
         if self.repairRos:
             self.sendRepairMessage()
             
-            time.sleep(5)
+            time.sleep(2)
             
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
             
+            for agent in self.agentsDead:
+                if agent in self.repairResponse:
+                    logging.warning("Received a repair response from %s. Ignoring it since he is lost" % agent)
+                    del self.repairResponse[agent]
+                    
+            #TODO : lock all actions from other agents that did not respond
             for agent,plan in self.repairResponse.items():
                 for k,a in plan["actions"].items():
                     if "locked" in a and a["locked"]:
@@ -333,18 +373,27 @@ class Supervisor(threading.Thread):
                     a["locked"] = True
             
         #remove all deadlines for the reparation
-        logger.info("Removing all deadlines from the plan")
-        planJson["absolute-time"] = list(filter(lambda d: d[1] <= planJson["current-time"], planJson["absolute-time"]))
+        #logger.info("Removing all deadlines from the plan")
+        #planJson["absolute-time"] = list(filter(lambda d: d[1] <= planJson["current-time"], planJson["absolute-time"]))
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
         
-        del self.repairResponse
-        
         if self.pddlFiles is None:
             logger.error("No provided PDDL files. Cannot repair")
             sys.exit(1)
+            
+        #compute the list of available agents
+        agents = set(self.repairResponse.keys())
+        agents.add(self.agent)
         
+        if len(self.agentsDead) > 0 :
+            for a in self.agentsDead:
+                if a in agents:
+                    agents.remove(a)
+        
+        del self.repairResponse
+                
         #Write the content of the pddl file to disk since hipop can only read files
         domainFile = tempfile.NamedTemporaryFile("w")
         domainFile.write(self.pddlFiles["domain"])
@@ -358,7 +407,7 @@ class Supervisor(threading.Thread):
         helperFile.write(self.pddlFiles["helper"])
         helperFile.flush()
         
-        command = "hipop -L error --timing -H {helper} -I plan-broken.plan -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name)
+        command = "hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
             r = subprocess.call(command.split(" "))
@@ -410,7 +459,7 @@ class Supervisor(threading.Thread):
     def mainLoop(self):
         hasFailed = False
         try:
-            while not self.isExecuted():
+            while not self.isExecuted() and not self.isDead:
                 while not self.inQueue.empty():
                     msg = self.inQueue.get()
     
@@ -420,14 +469,17 @@ class Supervisor(threading.Thread):
                     
                     elif msg["type"] == "endAction":
                         self.endAction(msg)
+                    elif msg["type"] == "alea":
+                        self.dealAlea(msg.get("aleaType"), msg)
                     else:
                         logger.warning("Supervisor received unknown message %s" % msg)
-                self.update()
+                        
+                if not self.isDead:
+                    self.update()
                 time.sleep(0.1)
         except ExecutionFailed as e:
             hasFailed = True
-            logger.error("Execution failed")
-            logger.error(str(e))
+            logger.error("Execution failed : %s" % str(e))
             
         if hasFailed:
             self.executionFail()

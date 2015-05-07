@@ -8,13 +8,13 @@ import json
 import sys
 from std_msgs.msg import Empty,String
 from roshidden.msg import StnVisu, ActionVisu, RepairMsg
+from roshidden.srv import AleaAction
 from supervisor import Supervisor
 
 #from mastn_execution.srv import StnVisu
 
 class SupervisorRos(Supervisor):
     def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None):
-        Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles)
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
@@ -22,8 +22,31 @@ class SupervisorRos(Supervisor):
         self.repair_pub = rospy.Publisher("/hidden/repair", RepairMsg, queue_size=10)
         
         self.stnvisu_pub = rospy.Publisher('/hidden/stnvisu', StnVisu, queue_size=10)
+        
+        self.alea_srv = rospy.Service("/%s/alea" % agent, AleaAction, self.aleaReceived)
+        
+        Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles)
+
 
         self.repairRos = True
+
+    def aleaReceived(self,msg):
+        #logger.warning(msg)
+        try:
+            data = json.loads(msg.data)
+            
+            if type(data) != dict:
+                logger.error("Received an ill formated AleaAction service call. Data should be a dict : %s" % data)
+                return False
+        except ValueError:
+            logger.error("Received an AleaAction service call but the filed data is not json-encoded : %s " % msg.data)
+            return False
+        
+        logger.info("Injecting an alea from ROS into the queue")
+        data["type"] = "alea"
+        data["aleaType"] = msg.aleaType
+        self.inQueue.put(data)
+        return True
 
     def init(self, plan, agent):
         Supervisor.init(self, plan, agent)
@@ -52,12 +75,15 @@ class SupervisorRos(Supervisor):
 
         if self.agent == sender:
             return
+    
+        if self.isDead:
+            return
         
         if type == "repairRequest":
             logger.info("Received a repair request. Pausing the execution")
             self.inReparation = True
 
-            msg = RepairMsg(self.agent, "repairResponse", self.getCurrentTime(), json.dumps(self.plan.getJsonDescription()))
+            msg = RepairMsg(self.agent, "repairResponse", self.getCurrentTime(), json.dumps(self.plan.getLocalJsonPlan(self.agent)))
             self.repair_pub.publish(msg)
 
         elif type == "repairResponse":
@@ -83,15 +109,19 @@ class SupervisorRos(Supervisor):
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
-    def stnUpdated(self):
+    def stnUpdated(self, onlyPast = False):
         data = []
         j = self.plan.getJsonDescription()
         for k,a in self.plan.actions.items():
             if "dummy" in a["name"]:
                 continue
             if self.isResponsibleForAction(a):
+                
                 executed = (self.tp[a["tEnd"]][1] == "past")
                 executing = (self.tp[a["tStart"]][1] == "past")
+                
+                if onlyPast and not executed and not executing:
+                    continue
                 
                 if k in j["actions"] and "children" in j["actions"][k] and len(j["actions"][k]["children"])>0:
                     hierarchical = True
@@ -104,5 +134,8 @@ class SupervisorRos(Supervisor):
                 m = ActionVisu(a["name"], timeStart.lb, timeStart.ub, timeEnd.lb, timeEnd.ub, executed, executing, hierarchical)
                 data.append(m)
         
-        self.stnvisu_pub.publish(self.agent, self.getCurrentTime(), data)
+        currentTime = 0
+        if self.beginDate >= 0:
+            currentTime = self.getCurrentTime()
+        self.stnvisu_pub.publish(self.agent, currentTime, data)
 

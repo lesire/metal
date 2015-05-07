@@ -53,6 +53,7 @@ add_message_files(
 add_service_files(
   FILES
   CommunicateAction.srv
+  AleaAction.srv
 )
 
 ## Generate actions in the 'action' folder
