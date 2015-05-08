@@ -56,6 +56,9 @@ class Plan:
         
         self.absTimes = []
         
+        self.actions = copy(d["actions"])
+        
+        """
         #Dictionary. Key is the previous action index. Value is the dictionnary of new index
         self.splittedAction = {}
         self.splittedTps = {} #Keys are tp
@@ -106,7 +109,13 @@ class Plan:
                         logger.error("Unknown agent %s for action %s" % (n, a["name"]))
                         continue
                     a["agent"] = n
-
+        """
+        
+        #TODO deal with meta actions
+        for a in self.actions.values():
+            if "agent" not in a:
+                a["agent"] = "meta"
+        
         if self.agent is not None:
             for a in set(a["agent"] for a in self.actions.values()):
                 if a != self.agent:
@@ -174,6 +183,7 @@ class Plan:
                 self.stn.addConstraint(node, self.tpName[1], timeDelta)
 
         for cl in (d["causal-links"] + d["temporal-links"]):
+            """
             starts = []
             ends = []
             
@@ -192,6 +202,14 @@ class Plan:
                     self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
                 else:
                     self.stn.addConstraint(start, end, timeDelta)
+            """
+            start = self.tpName[cl["startTp"]]
+            end = self.tpName[cl["endTp"]]
+            
+            if start.startswith("0-"):
+                self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
+            else:
+                self.stn.addConstraint(start, end, timeDelta)
 
         for action in d["actions"].values():
             if "children" in action and action["children"]:
@@ -209,22 +227,25 @@ class Plan:
         if "absolute-time" in d:
             for time, value in d["absolute-time"]:
                 
+                t = time
                 value = int(round(value*timeFactor))
                 
+                """
                 if time in self.splittedTps:
                     tps = self.splittedTps[time].values()
                 else:
                     tps = [time]
 
                 for t in tps:
-                    logger.debug("Adding %s at exactly %s" % (self.tpName[t], value))
-                    logger.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
-                    if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
-                        logger.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
-                        raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
+                """
+                logger.debug("Adding %s at exactly %s" % (self.tpName[t], value))
+                logger.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
+                if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
+                    logger.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
+                    raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
 
-                    self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)
-                    self.absTimes.append( (self.tpName[t], value) )
+                self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)
+                self.absTimes.append( (self.tpName[t], value) )
         
         if "current-time" in d:
             self.initTime = d["current-time"]
@@ -278,7 +299,9 @@ class Plan:
             return False
         return True
     
-    def getJsonDescription(self):    
+    def getJsonDescription(self):
+        
+        """
         originalIndex = {}
         for oldIndex,d in self.splittedTps.items():
             for tp in d.values():
@@ -295,7 +318,8 @@ class Plan:
         
         
         self.jsonDescr["absolute-time"] = [[index,value] for index,value in self.jsonDescr["absolute-time"] if index not in originalIndex.keys()]
-
+        """
+        
         return self.jsonDescr
     
     #assume value in ms
@@ -361,6 +385,7 @@ class Plan:
             if "agent" in action:
                 actionAgent = action["agent"]
             else:
+                logger.warning("Agent not defined for action %s" % action["name"])
                 if action["name"].startswith("dummy"):
                     actionAgent = getAgentFromAction(action["name"].split(" ")[2:])
                 else:
@@ -382,3 +407,64 @@ class Plan:
 
         logger.info("local plan : %s" %data)
         return data
+
+    # get a dictionnary of plan with agent as a key.
+    def mergeJsonPlans(data):
+        logger.info("Merging plans of %s" % " ".join(data.keys()))
+        result = {}
+        
+        result["actions"] = {"0" : {"name":"dummy init", "dMax": 0.0, "dMin": 0.0, "endTp": 0,"startTp": 0},
+                             "1" : {"name":"dummy end", "dMax": 0.0, "dMin": 0.0, "endTp": 1,"startTp": 1},
+                            }
+        result["causal-links"] = []
+        result["temporal-links"] = []
+        result["absolute-time"] = []
+
+        #keep a mapping, for each agent, of action index and timepoints
+        # for actions : agent-index
+        # for timepoints : use the mapping
+        nextTp = 2
+        tpMapping = {}
+        for agent,plan in data.items():
+            tpMapping[(agent,"0")] = "0"
+            tpMapping[(agent,"1")] = "1"
+        
+            for action in plan["actions"]:
+                k = (agent, action["startTp"])
+                if k not in tpMapping:
+                    tpMapping[k] = nextTp
+                    nextTp = nextTp + 1
+                    
+                k = (agent, action["endTp"])
+                if k not in tpMapping:
+                    tpMapping[k] = nextTp
+                    nextTp = nextTp + 1
+                    
+        for agent,plan in data.items():
+            for key,action in plan["actions"].items():
+                if key in ["0", "1"]:
+                    continue
+            
+                a = copy(action)
+                a["startTp"] = tpMapping[(agent, a["startTp"])]
+                a["endTp"]   = tpMapping[(agent, a["endTp"])]
+                result["actions"]["%s-%s" % (agent,key)] = a
+                
+            for clink in plan["causal-links"]:
+                cl = copy(clink)
+                cl["startTp"] = tpMapping[(agent, cl["startTp"])]
+                cl["endTp"]   = tpMapping[(agent, cl["endTp"])]
+                cl["startAction"] = "%s-%s" % (agent, cl["startAction"])
+                cl["endAction"]   = "%s-%s" % (agent, cl["endAction"])
+                result["causal-links"].append(cl)
+                
+            for tlink in plan["temporal-links"]:
+                tl = copy(tlink)
+                tl["startTp"] = tpMapping[(agent, tl["startTp"])]
+                tl["endTp"]   = tpMapping[(agent, tl["endTp"])]
+                result["temporal-links"].append(tl)
+                
+            for tp,value in plan["absolute-time"]:
+                result["absolute-time"].append([tpMapping[(agent, tp)],value])
+        
+        return result
