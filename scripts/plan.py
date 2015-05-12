@@ -373,6 +373,7 @@ class Plan:
                     actionAgent = getAgentFromAction(action["name"].split(" ")[2:])
                 else:
                     actionAgent = getAgentFromAction(action["name"].split(" "))
+            
             if actionAgent != agent:
                 #Remove this action from the plan
                 keysToDelete.add(k)
@@ -380,19 +381,69 @@ class Plan:
                     for c in action["children"]:
                         keysToDelete.add(c)
         
+        logger.warning("For %s, deleting %s" %(agent, keysToDelete))
         
+        foreignTps = set([data["actions"][k]["startTp"] for k in keysToDelete]).union(set([data["actions"][k]["endTp"] for k in keysToDelete]))
+        localTps = set([data["actions"][k]["startTp"] for k in data["actions"].keys() if k not in keysToDelete]).union(set([data["actions"][k]["endTp"] for k in data["actions"].keys() if k not in keysToDelete]))
+        absTps = set([p[0] for p in data["absolute-time"]])
+        absTimeToKeep = set() #foreign tps that I need
+        
+        if(len(foreignTps.intersection(localTps)) > 0):
+            logger.error("I got timepoints that are both foreign and local ?")
+            logger.error(foreignTps.intersection(localTps))
+        
+        #deal together with both data
+        for listKey in ["causal-links", "temporal-links"]:
+            for i in reversed(range(len(data[listKey]))):
+                tl = data[listKey][i]
+                if tl["startTp"] in foreignTps and tl["endTp"] in foreignTps:
+                    del data[listKey][i]
+                elif tl["startTp"] in localTps and tl["endTp"] in localTps:
+                    pass #keep it
+                else:
+                    #tricky : interaction between my action and another action
+                    #only allowed if the foreign tp is in absoluteTime
+                    if tl["startTp"] in foreignTps:
+                        fTp,lTp = tl["startTp"],tl["endTp"]
+                    else:
+                        fTp,lTp = tl["endTp"],tl["startTp"]
+                    
+                    if lTp in [0,1]:
+                        del data[listKey][i] # link with dummy init or dummy end
+                    elif fTp in absTps:
+                        absTimeToKeep.add(fTp)
+                        #transform it in temporal link if necessary
+                        if listKey == "causal-links":
+                            data["temporal-links"].append({"startTp":tl["startTp"], "endTp":tl["endTp"], })
+                            del data[listKey][i]
+                            
+                    elif lTp in absTps:
+                        #cl for the other agent
+                        del data[listKey][i]
+                    else:
+                        logger.error("I have a link between a local tp and a foreign, non absolute, tp. Ignoring it")
+                        logger.error(tl)
+                        del data[listKey][i]
+
+        for i in reversed(range(len(data["absolute-time"]))):
+            t = data["absolute-time"][i][0]
+            if t in foreignTps and t not in absTimeToKeep:
+                del data["absolute-time"][i]
+
         for k in keysToDelete:
-            action = data["actions"][k]
-            data["causal-links"] =   [cl for cl in data["causal-links"]   if cl["startAction"] != k and cl["endAction"] != k]
-            data["temporal-links"] = [tl for tl in data["temporal-links"] if tl["startTp"] != action["startTp"] and tl["endTp"] != action["endTp"]]
-            data["absolute-time"] =  [pair for pair in data["absolute-time"] if pair[0] != action["startTp"] and pair[0] !=action["endTp"]]
+            #action = data["actions"][k]
+            #data["causal-links"] =   [cl for cl in data["causal-links"]   if cl["startAction"] != k and cl["endAction"] != k]
+            #data["temporal-links"] = [tl for tl in data["temporal-links"] if tl["startTp"] != action["startTp"] and tl["endTp"] != action["startTp"] and tl["endTp"] != action["startTp"] and tl["endTp"] != action["endTp"]]
+            #data["absolute-time"] =  [pair for pair in data["absolute-time"] if pair[0] != action["startTp"] and pair[0] !=action["endTp"]]
             del data["actions"][k]
 
-        logger.info("local plan : %s" %data)
+        #logger.info("local plan for %s : %s" % (agent,data))
         return data
 
     # get a dictionnary of plan with agent as a key.
+    @staticmethod
     def mergeJsonPlans(data):
+        logger.warning(data)
         logger.info("Merging plans of %s" % " ".join(data.keys()))
         result = {}
         
@@ -409,10 +460,10 @@ class Plan:
         nextTp = 2
         tpMapping = {}
         for agent,plan in data.items():
-            tpMapping[(agent,"0")] = "0"
-            tpMapping[(agent,"1")] = "1"
+            tpMapping[(agent,0)] = 0
+            tpMapping[(agent,1)] = 1
         
-            for action in plan["actions"]:
+            for action in plan["actions"].values():
                 k = (agent, action["startTp"])
                 if k not in tpMapping:
                     tpMapping[k] = nextTp
@@ -422,6 +473,13 @@ class Plan:
                 if k not in tpMapping:
                     tpMapping[k] = nextTp
                     nextTp = nextTp + 1
+                    
+            #also need to check if some absolute are not comming from another agent
+            for t,_ in plan["absolute-time"]:
+                k = (agent, t)
+                if k not in tpMapping:
+                    tpMapping[k] = nextTp
+                    nextTp = nextTp + 1 
                     
         for agent,plan in data.items():
             for key,action in plan["actions"].items():

@@ -355,14 +355,14 @@ class Supervisor(threading.Thread):
         pass
 
     def executionFail(self):
-        planJson = self.plan.getJsonDescription()
-        planJson["current-time"] = time.time() - self.beginDate
+        #planJson = self.plan.getJsonDescription()
+        #planJson["current-time"] = time.time() - self.beginDate
         
         #only keep my local absolute time
         #j = self.plan.getLocalJsonPlan(self.agent)
         #planJson["absolute-time"] = j["absolute-time"]
         
-        self.repairResponse = {}
+        self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
         if self.repairRos:
             self.sendRepairMessage()
@@ -373,28 +373,25 @@ class Supervisor(threading.Thread):
             
             for agent in self.agentsDead:
                 if agent in self.repairResponse:
-                    logging.warning("Received a repair response from %s. Ignoring it since he is lost" % agent)
+                    logging.warning("Received a repair response from %s. Ignoring it since he is dead" % agent)
                     del self.repairResponse[agent]
-                    
-            #TODO : lock all actions from other agents that did not respond
-            for agent,plan in self.repairResponse.items():
-                for k,a in plan["actions"].items():
-                    if "locked" in a and a["locked"]:
-                        if k in planJson["actions"] and a["name"] == planJson["actions"][k]["name"]:
-                            planJson["actions"][k]["locked"] = True
-                        else:
-                            #locked action that I did not know about
-                            logger.warning("%s has a locked action that I did not know about %s %s: " % (agent,k,a["name"]))
-                            logger.warning("%s" % str(a))
-                            if k in planJson["actions"]:
-                                logger.warning(planJson["actions"][k])
-            
         else:
+            pass
+        
+        #lock all the steps of agents that did not respond
+        allAgents = set([a["agent"] for a in self.plan.actions if "agent" in a])
+        for agent in allAgents:
+            if agent in self.repairResponse:
+                continue #
             
-            for a in planJson["actions"].values():
-                if not self.isResponsibleForAction(a):
-                    a["locked"] = True
-            
+            localPlan = self.plan.getLocalJsonPlan(agent)
+            for a in localPlan["actions"]:
+                a["locked"] = True
+            self.repairResponse[agent] = copy(localPlan)
+        
+        planJson = plan.Plan.mergeJsonPlans(self.repairResponse)
+        planJson["current-time"] = time.time() - self.beginDate
+        
         #remove all deadlines for the reparation
         #logger.info("Removing all deadlines from the plan")
         #planJson["absolute-time"] = list(filter(lambda d: d[1] <= planJson["current-time"], planJson["absolute-time"]))
