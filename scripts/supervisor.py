@@ -2,6 +2,7 @@ from __future__ import division
 
 
 from copy import copy
+from math import floor
 import json
 import os
 import subprocess
@@ -260,6 +261,14 @@ class Supervisor(threading.Thread):
             return
         
         logger.info("End of action %s at %s. Status of the tp : %s" % (action["name"], value, self.tp[tp][1]))
+        
+        #check the scheduled duration of the action
+        startTime = self.plan.stn.getBounds(action["tStart"]).lb
+        dReal = value - startTime
+        dMin = action["dMin"]*plan.timeFactor
+        if dReal < dMin:
+            logger.warning("An action finished early : %.2f instead of %.2f. Updating its dMin." % (dReal/1000, dMin/1000))
+            self.plan.stn.setConstraint(action["tStart"], tp, int(floor(dReal)))
         
         lb = self.plan.stn.getBounds(tp).lb
         if self.tp[tp][1] == "uncontrollable" and value < lb:

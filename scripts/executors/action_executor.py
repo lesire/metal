@@ -71,7 +71,7 @@ class DummyActionExecutor(AbstractActionExecutor):
         logger.info("moving {w} from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
         
         currentTime = time.time()
-        self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
+        self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]/2),"cb": cb, "actionJson":actionJson})
         
     def observe(self, who, a, b, cb, actionJson, **kwargs):
         if(self.agent is not None and self.agent != who):

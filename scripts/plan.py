@@ -1,7 +1,6 @@
 from __future__ import division
 
 from copy import copy,deepcopy
-from pprint import pprint
 import itertools
 import json
 import sys
@@ -60,8 +59,8 @@ class Plan:
         
         """
         #Dictionary. Key is the previous action index. Value is the dictionnary of new index
-        self.splittedAction = {}
-        self.splittedTps = {} #Keys are tp
+        #self.splittedAction = {}
+        #self.splittedTps = {} #Keys are tp
         
         self.actions = copy(d["actions"])
         
@@ -110,14 +109,8 @@ class Plan:
                         continue
                     a["agent"] = n
         """
-        
-        #TODO deal with meta actions
-        for a in self.actions.values():
-            if "agent" not in a:
-                a["agent"] = "meta"
-        
         if self.agent is not None:
-            for a in set(a["agent"] for a in self.actions.values()):
+            for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
                 if a != self.agent:
                     self.stn.addAgent(a)
 
@@ -229,15 +222,7 @@ class Plan:
                 
                 t = time
                 value = int(round(value*timeFactor))
-                
-                """
-                if time in self.splittedTps:
-                    tps = self.splittedTps[time].values()
-                else:
-                    tps = [time]
 
-                for t in tps:
-                """
                 logger.debug("Adding %s at exactly %s" % (self.tpName[t], value))
                 logger.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
                 if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
@@ -300,7 +285,6 @@ class Plan:
         return True
     
     def getJsonDescription(self):
-        
         """
         originalIndex = {}
         for oldIndex,d in self.splittedTps.items():
@@ -319,8 +303,7 @@ class Plan:
         
         self.jsonDescr["absolute-time"] = [[index,value] for index,value in self.jsonDescr["absolute-time"] if index not in originalIndex.keys()]
         """
-        
-        return self.jsonDescr
+        return deepcopy(self.jsonDescr)
     
     #assume value in ms
     def setTimePoint(self, tpName, value):
