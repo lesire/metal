@@ -460,8 +460,8 @@ class Plan:
         nextTp = 2
         tpMapping = {}
         for agent,plan in data.items():
-            tpMapping[(agent,0)] = 0
-            tpMapping[(agent,1)] = 1
+            tpMapping[(agent,0)] = 0 #same dummy init for everyone
+            tpMapping[(agent,1)] = 1 #same dummy end for everyone
         
             for action in plan["actions"].values():
                 k = (agent, action["startTp"])
@@ -473,7 +473,7 @@ class Plan:
                 if k not in tpMapping:
                     tpMapping[k] = nextTp
                     nextTp = nextTp + 1
-                    
+
             #also need to check if some absolute are not comming from another agent
             for t,_ in plan["absolute-time"]:
                 k = (agent, t)
@@ -495,8 +495,8 @@ class Plan:
                 cl = copy(clink)
                 cl["startTp"] = tpMapping[(agent, cl["startTp"])]
                 cl["endTp"]   = tpMapping[(agent, cl["endTp"])]
-                cl["startAction"] = "%s-%s" % (agent, cl["startAction"])
-                cl["endAction"]   = "%s-%s" % (agent, cl["endAction"])
+                cl["startAction"] = "%s-%s" % (agent, cl["startAction"]) if cl["startAction"] not in ["0", "1"] else cl["startAction"]
+                cl["endAction"]   = "%s-%s" % (agent, cl["endAction"]) if cl["endAction"] not in ["0", "1"] else cl["endAction"]
                 result["causal-links"].append(cl)
                 
             for tlink in plan["temporal-links"]:
