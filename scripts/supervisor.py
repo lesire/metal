@@ -21,13 +21,14 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None):
+    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None, useMaSTN = False):
         self.inQueue = inQueue
         self.outQueue = outQueue
         self.pddlFiles = pddlFiles
         
         self.beginDate = -1
         self.repairRos = False
+        self.useMaSTN = useMaSTN
         
         self.isDead = False #if true, multi will not respond to anything. Simulate a lost robot
         self.inReparation = False
@@ -48,6 +49,14 @@ class Supervisor(threading.Thread):
         self.executedTp = {}
         self.tp = {}
         
+        if self.useMaSTN:
+            logger.info("Using MaSTN")
+            stn = open(str(self.agent) + "_STN.json", "w")
+            stn.write(self.plan.stn.export())
+            self.plan.stn.toMacroSTN()
+            macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
+            macro_stn.write(self.plan.stn.export())
+
         for a in self.plan.actions.values():
             if a["name"] == "dummy init":
                 self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
@@ -55,6 +64,11 @@ class Supervisor(threading.Thread):
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
             elif ("dummy" in a["name"]):
                 pass
+            elif self.useMaSTN and a["agent"] != self.agent:
+                if a["tStart"] in self.plan.stn.getNodeIds():
+                    self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
+                if a["tEnd"] in self.plan.stn.getNodeIds():
+                    self.tp[a["tEnd"]] = [a["name"], "uncontrollable"]
             elif "abstract" in a:
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "controllable"]

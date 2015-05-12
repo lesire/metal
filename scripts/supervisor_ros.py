@@ -14,7 +14,7 @@ from supervisor import Supervisor
 #from mastn_execution.srv import StnVisu
 
 class SupervisorRos(Supervisor):
-    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None):
+    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None, useMaSTN=False):
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
@@ -25,9 +25,8 @@ class SupervisorRos(Supervisor):
         
         self.alea_srv = rospy.Service("/%s/alea" % agent, AleaAction, self.aleaReceived)
         
-        Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles)
-
-
+        Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles, useMaSTN)
+        
         self.repairRos = True
 
     def aleaReceived(self,msg):
@@ -50,11 +49,6 @@ class SupervisorRos(Supervisor):
 
     def init(self, plan, agent):
         Supervisor.init(self, plan, agent)
-        #stn = open(str(self.agent) + "_STN.json", "w")
-        #stn.write(self.plan.stn.export())
-        #self.plan.stn.toMacroSTN()
-        #macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
-        #macro_stn.write(self.plan.stn.export())
 
     def sendRepairMessage(self, data = None):
         if data is None:
