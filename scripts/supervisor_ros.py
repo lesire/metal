@@ -18,8 +18,8 @@ class SupervisorRos(Supervisor):
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
-        self.repair_sub = rospy.Subscriber("/hidden/repair", RepairMsg, self.repairCallback)
-        self.repair_pub = rospy.Publisher("/hidden/repair", RepairMsg, queue_size=10)
+        self.repair_sub = rospy.Subscriber("hidden/repair/in", RepairMsg, self.repairCallback)
+        self.repair_pub = rospy.Publisher("hidden/repair/out", RepairMsg, queue_size=10)
         
         self.stnvisu_pub = rospy.Publisher('/hidden/stnvisu', StnVisu, queue_size=10)
         
