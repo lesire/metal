@@ -358,12 +358,6 @@ class Supervisor(threading.Thread):
         pass
 
     def executionFail(self):
-        #planJson = self.plan.getJsonDescription()
-        #planJson["current-time"] = time.time() - self.beginDate
-        
-        #only keep my local absolute time
-        #j = self.plan.getLocalJsonPlan(self.agent)
-        #planJson["absolute-time"] = j["absolute-time"]
         
         self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
@@ -373,31 +367,60 @@ class Supervisor(threading.Thread):
             time.sleep(2)
             
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
-            
+            logger.info("Dead agents : %s" % self.agentsDead)
             for agent in self.agentsDead:
+                logger.info("%s %s %s" % (agent in self.repairResponse, "mana" in self.repairResponse, agent))
                 if agent in self.repairResponse:
-                    logging.warning("Received a repair response from %s. Ignoring it since he is dead" % agent)
+                    logger.warning("Received a repair response from %s. Ignoring it since he is dead" % agent)
                     del self.repairResponse[agent]
         else:
             pass
         
         #lock all the steps of agents that did not respond
-        allAgents = set([a["agent"] for a in self.plan.actions if "agent" in a])
+        allAgents = set([a["agent"] for a in self.plan.actions.values() if "agent" in a])
+        logger.info("All agents : %s" % allAgents)
+        
         for agent in allAgents:
             if agent in self.repairResponse:
                 continue #
             
+            logger.info("Locally adding plan for %s" % agent)
+            
             localPlan = self.plan.getLocalJsonPlan(agent)
-            for a in localPlan["actions"]:
-                a["locked"] = True
+            
+            if agent not in self.agentsDead:
+                for a in localPlan["actions"].values():
+                    a["locked"] = True
             self.repairResponse[agent] = copy(localPlan)
+        
         
         planJson = plan.Plan.mergeJsonPlans(self.repairResponse)
         planJson["current-time"] = time.time() - self.beginDate
         
-        #remove all deadlines for the reparation
-        #logger.info("Removing all deadlines from the plan")
-        #planJson["absolute-time"] = list(filter(lambda d: d[1] <= planJson["current-time"], planJson["absolute-time"]))
+        #Remove some actions from the plan
+        deletedActionKeys = set()
+        deletedTps = set()
+        
+        for k,a in planJson["actions"].items():
+            if "communicate" in a["name"] and a["agent"] in self.agentsDead:
+                deletedActionKeys.add(k)
+                deletedTps.add(a["startTp"])
+                deletedTps.add(a["endTp"])
+
+        for k in deletedActionKeys:
+            logger.info("Removing action %s" % planJson["actions"][k]["name"])
+            del planJson["actions"][k]
+        for i in reversed(range(len(planJson["causal-links"]))):
+            cl = planJson["causal-links"][i]
+            if cl["startTp"] in deletedTps or cl["endTp"] in deletedTps:
+                del planJson["causal-links"][i]
+        for i in reversed(range(len(planJson["temporal-links"]))):
+            cl = planJson["temporal-links"][i]
+            if cl["startTp"] in deletedTps or cl["endTp"] in deletedTps:
+                del planJson["temporal-links"][i]
+        for i in reversed(range(len(planJson["absolute-time"]))):
+            if planJson["absolute-time"][i][0] in deletedTps:
+                del planJson["absolute-time"][i]
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
@@ -430,7 +453,7 @@ class Supervisor(threading.Thread):
         helperFile.write(self.pddlFiles["helper"])
         helperFile.flush()
         
-        command = "hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
+        command = "/home/pbechon/workspace_planner/planner/build/hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
             r = subprocess.call(command.split(" "))
@@ -483,19 +506,20 @@ class Supervisor(threading.Thread):
         hasFailed = False
         try:
             while not self.isExecuted() and not self.isDead:
-                while not self.inQueue.empty():
-                    msg = self.inQueue.get()
-    
-                    if type(msg) != dict or "type" not in msg:
-                        logger.error("Supervisor received an ill-formated message : %s" % msg)
-                        continue
-                    
-                    elif msg["type"] == "endAction":
-                        self.endAction(msg)
-                    elif msg["type"] == "alea":
-                        self.dealAlea(msg.get("aleaType"), msg)
-                    else:
-                        logger.warning("Supervisor received unknown message %s" % msg)
+                if not self.inReparation:
+                    while not self.inQueue.empty():
+                        msg = self.inQueue.get()
+        
+                        if type(msg) != dict or "type" not in msg:
+                            logger.error("Supervisor received an ill-formated message : %s" % msg)
+                            continue
+                        
+                        elif msg["type"] == "endAction":
+                            self.endAction(msg)
+                        elif msg["type"] == "alea":
+                            self.dealAlea(msg.get("aleaType"), msg)
+                        else:
+                            logger.warning("Supervisor received unknown message %s" % msg)
                         
                 if not self.isDead:
                     self.update()

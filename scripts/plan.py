@@ -57,58 +57,6 @@ class Plan:
         
         self.actions = copy(d["actions"])
         
-        """
-        #Dictionary. Key is the previous action index. Value is the dictionnary of new index
-        #self.splittedAction = {}
-        #self.splittedTps = {} #Keys are tp
-        
-        self.actions = copy(d["actions"])
-        
-        maxTp = max([max(a["startTp"], a["endTp"]) for a in self.actions.values()])
-        
-        #first split coordinating action:
-        for index,a in d["actions"].items():
-            if "communicate" in a["name"]:
-                l = a["name"].split(" ")
-                if l[1] not in agentList or l[2] not in agentList:
-                    logger.error("cannot know if %s is a coordination action that should be split in 2" % a["name"])
-                    continue
-                    
-                if len(l) > 3 and l[3] in agentList:
-                    logger.error("Cannot know if %s is a coordination action that should be split in 2. Found 3 agents ?!?")
-                    continue
-                
-                self.splittedAction[index] = {}
-                self.splittedTps[a["startTp"]] = {}
-                self.splittedTps[a["endTp"]] = {}
-                
-                for agent in l[1],l[2]:
-                    newA = deepcopy(a)
-                    
-                    newA["startTp"] = maxTp + 1
-                    newA["endTp"] = maxTp + 2
-                    newA["agent"] = agent
-                    self.splittedTps[a["startTp"]][agent] = maxTp + 1
-                    self.splittedTps[a["endTp"]][agent] = maxTp + 2
-                    maxTp += 2
-                    
-                    newIndex = index + "-" + agent
-                    self.splittedAction[index][agent] = newIndex
-                    self.actions[newIndex] = newA
-                del self.actions[index]
-            elif self.agent is not None:
-                if a["name"] == "dummy init" or a["name"] == "dummy end":
-                    a["agent"] = agent
-                else:
-                    if a["name"].startswith("dummy "):
-                        n = getAgentFromAction(a["name"].split(" ")[2:])
-                    else:
-                        n = getAgentFromAction(a["name"].split(" "))
-                    if not n in agentList:
-                        logger.error("Unknown agent %s for action %s" % (n, a["name"]))
-                        continue
-                    a["agent"] = n
-        """
         if self.agent is not None:
             for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
                 if a != self.agent:
@@ -285,24 +233,6 @@ class Plan:
         return True
     
     def getJsonDescription(self):
-        """
-        originalIndex = {}
-        for oldIndex,d in self.splittedTps.items():
-            for tp in d.values():
-                originalIndex[tp] = oldIndex
-        
-        #must update execution time
-        for action in self.jsonDescr["actions"].values():
-            for tpKey,combineFunc in zip(["startTp", "endTp"], [max, min]):
-                if action[tpKey] in self.splittedTps:
-                    childTps = list(self.splittedTps[action[tpKey]].values())
-                    if any([tp in self.jsonDescr["absolute-time"] for tp in childTps]):
-                        value = combineFunc([self.jsonDescr["absolute-time"][tp] for tp in childTps if tp in self.jsonDescr["absolute-time"]])
-                        self.jsonDescr["absolute-time"][action[tpKey]] = value
-        
-        
-        self.jsonDescr["absolute-time"] = [[index,value] for index,value in self.jsonDescr["absolute-time"] if index not in originalIndex.keys()]
-        """
         return deepcopy(self.jsonDescr)
     
     #assume value in ms
@@ -382,12 +312,10 @@ class Plan:
                     for c in action["children"]:
                         keysToDelete.add(c)
         
-        logger.warning("For %s, deleting %s" %(agent, keysToDelete))
+        logger.info("For %s, deleting %s" %(agent, keysToDelete))
         
         foreignTps = set([data["actions"][k]["startTp"] for k in keysToDelete]).union(set([data["actions"][k]["endTp"] for k in keysToDelete]))
         localTps = set([data["actions"][k]["startTp"] for k in data["actions"].keys() if k not in keysToDelete]).union(set([data["actions"][k]["endTp"] for k in data["actions"].keys() if k not in keysToDelete]))
-        absTps = set([p[0] for p in data["absolute-time"]])
-        absTimeToKeep = set() #foreign tps that I need
         
         if(len(foreignTps.intersection(localTps)) > 0):
             logger.error("I got timepoints that are both foreign and local ?")
@@ -408,27 +336,15 @@ class Plan:
                         fTp,lTp = tl["startTp"],tl["endTp"]
                     else:
                         fTp,lTp = tl["endTp"],tl["startTp"]
-                    
+                        
                     if lTp in [0,1]:
                         del data[listKey][i] # link with dummy init or dummy end
-                    elif fTp in absTps:
-                        absTimeToKeep.add(fTp)
-                        #transform it in temporal link if necessary
-                        if listKey == "causal-links":
-                            data["temporal-links"].append({"startTp":tl["startTp"], "endTp":tl["endTp"], })
-                            del data[listKey][i]
-                            
-                    elif lTp in absTps:
-                        #cl for the other agent
-                        del data[listKey][i]
                     else:
-                        logger.error("I have a link between a local tp and a foreign, non absolute, tp. Ignoring it")
-                        logger.error(tl)
-                        del data[listKey][i]
+                        pass #keep it
 
         for i in reversed(range(len(data["absolute-time"]))):
             t = data["absolute-time"][i][0]
-            if t in foreignTps and t not in absTimeToKeep:
+            if t in foreignTps:
                 del data["absolute-time"][i]
 
         for k in keysToDelete:
@@ -442,9 +358,38 @@ class Plan:
         return data
 
     # get a dictionnary of plan with agent as a key.
+    # Index of actions and tps are assumed to be in the same 'namespace'
+    # special case for "dead" robots : remove their actions and the link using them
     @staticmethod
     def mergeJsonPlans(data):
         logger.warning(data)
+
+        #Check for consistency
+        for agent1,agent2 in itertools.combinations(data.keys(),2):
+            actionKeys1 = set(data[agent1]["actions"].keys())
+            actionKeys2 = set(data[agent2]["actions"].keys())
+            s = actionKeys1.intersection(actionKeys2).difference(set(["0","1"]))
+            if len(s) > 0:
+                #Two agents are responsible for the same action ?
+                logger.error("Agents %s and %s both uses the same action key" % (agent1, agent2))
+                for k in s:
+                    logger.error(data[agent1]["actions"][k])
+                    logger.error(data[agent2]["actions"][k])
+        
+        #Get all the tp of each plan
+        tps = set(itertools.chain.from_iterable((a["startTp"], a["endTp"]) for d in data.values() for a in d["actions"].values() ))
+        
+        for agent,d in data.items():
+            for cl in d["causal-links"]:
+                if cl["startTp"] not in tps or cl["endTp"] not in tps:
+                    logger.error("Cannot find tp for %s" % cl)
+            for tl in d["temporal-links"]:
+                if tl["startTp"] not in tps or tl["endTp"] not in tps:
+                    logger.error("Cannot find tp for %s" % tl)
+            for tp,_ in d["absolute-time"]:
+                if tp not in tps:
+                    logger.error("Cannot find tp for absolute time %s" % tp)                   
+        
         logger.info("Merging plans of %s" % " ".join(data.keys()))
         result = {}
         
@@ -455,58 +400,25 @@ class Plan:
         result["temporal-links"] = []
         result["absolute-time"] = []
 
-        #keep a mapping, for each agent, of action index and timepoints
-        # for actions : agent-index
-        # for timepoints : use the mapping
-        nextTp = 2
-        tpMapping = {}
-        for agent,plan in data.items():
-            tpMapping[(agent,0)] = 0 #same dummy init for everyone
-            tpMapping[(agent,1)] = 1 #same dummy end for everyone
-        
-            for action in plan["actions"].values():
-                k = (agent, action["startTp"])
-                if k not in tpMapping:
-                    tpMapping[k] = nextTp
-                    nextTp = nextTp + 1
-                    
-                k = (agent, action["endTp"])
-                if k not in tpMapping:
-                    tpMapping[k] = nextTp
-                    nextTp = nextTp + 1
-
-            #also need to check if some absolute are not comming from another agent
-            for t,_ in plan["absolute-time"]:
-                k = (agent, t)
-                if k not in tpMapping:
-                    tpMapping[k] = nextTp
-                    nextTp = nextTp + 1 
-                    
-        for agent,plan in data.items():
+        for _,plan in data.items():
             for key,action in plan["actions"].items():
                 if key in ["0", "1"]:
                     continue
             
                 a = copy(action)
-                a["startTp"] = tpMapping[(agent, a["startTp"])]
-                a["endTp"]   = tpMapping[(agent, a["endTp"])]
-                result["actions"]["%s-%s" % (agent,key)] = a
+                result["actions"][key] = a
                 
             for clink in plan["causal-links"]:
                 cl = copy(clink)
-                cl["startTp"] = tpMapping[(agent, cl["startTp"])]
-                cl["endTp"]   = tpMapping[(agent, cl["endTp"])]
-                cl["startAction"] = "%s-%s" % (agent, cl["startAction"]) if cl["startAction"] not in ["0", "1"] else cl["startAction"]
-                cl["endAction"]   = "%s-%s" % (agent, cl["endAction"]) if cl["endAction"] not in ["0", "1"] else cl["endAction"]
-                result["causal-links"].append(cl)
+                if cl not in result["causal-links"]:
+                    result["causal-links"].append(cl)
                 
             for tlink in plan["temporal-links"]:
                 tl = copy(tlink)
-                tl["startTp"] = tpMapping[(agent, tl["startTp"])]
-                tl["endTp"]   = tpMapping[(agent, tl["endTp"])]
-                result["temporal-links"].append(tl)
+                if tl not in result["temporal-links"]:
+                    result["temporal-links"].append(tl)
                 
             for tp,value in plan["absolute-time"]:
-                result["absolute-time"].append([tpMapping[(agent, tp)],value])
+                result["absolute-time"].append([tp,value])
         
         return result

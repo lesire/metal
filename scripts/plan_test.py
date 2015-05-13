@@ -1,34 +1,11 @@
-import random
 import unittest
 
 import plan
 import json
+import os
+import subprocess
 
 from copy import copy,deepcopy
-
-class TestSequenceFunctions(unittest.TestCase):
-
-    def setUp(self):
-        self.seq = list(range(10))
-
-    def test_shuffle(self):
-        # make sure the shuffled sequence does not lose any elements
-        random.shuffle(self.seq)
-        self.seq.sort()
-        self.assertEqual(self.seq, list(range(10)))
-
-        # should raise an exception for an immutable sequence
-        self.assertRaises(TypeError, random.shuffle, (1,2,3))
-
-    def test_choice(self):
-        element = random.choice(self.seq)
-        self.assertTrue(element in self.seq)
-
-    def test_sample(self):
-        with self.assertRaises(ValueError):
-            random.sample(self.seq, 20)
-        for element in random.sample(self.seq, 5):
-            self.assertTrue(element in self.seq)
 
 class PlanTest(unittest.TestCase):
 
@@ -52,7 +29,8 @@ class PlanTest(unittest.TestCase):
         
         self.plan = plan.Plan(copy(json.dumps(p)))
 
-    def helper_checkJsonPlan(self, data):
+    #If local, there can be references to external timepoints
+    def helper_checkJsonPlan(self, data, local=False):
         self.assertEqual(type(data), dict)
         self.assertIn("actions", data)
         self.assertIn("causal-links", data)
@@ -90,24 +68,26 @@ class PlanTest(unittest.TestCase):
             self.assertIn("startAction", cl)
             self.assertIn("endAction", cl)
             
-            self.assertIn(cl["startAction"], data["actions"])
-            self.assertIn(cl["endAction"], data["actions"])
-        
-            self.assertTrue(cl["startTp"] == data["actions"][cl["startAction"]]["startTp"] or
-                            cl["startTp"] == data["actions"][cl["startAction"]]["endTp"])
-
-            self.assertTrue(cl["endTp"] == data["actions"][cl["endAction"]]["startTp"] or
-                            cl["endTp"] == data["actions"][cl["endAction"]]["endTp"])
+            if not local:
+                self.assertIn(cl["startAction"], data["actions"])
+                self.assertIn(cl["endAction"], data["actions"])
+            
+                self.assertTrue(cl["startTp"] == data["actions"][cl["startAction"]]["startTp"] or
+                                cl["startTp"] == data["actions"][cl["startAction"]]["endTp"])
+    
+                self.assertTrue(cl["endTp"] == data["actions"][cl["endAction"]]["startTp"] or
+                                cl["endTp"] == data["actions"][cl["endAction"]]["endTp"])
         
         tps = [a["startTp"] for a in data["actions"].values()]
         tps += [a["endTp"] for a in data["actions"].values()]
         
         for tl in data["temporal-links"]:
-            self.assertIn("startTp", cl)
-            self.assertIn("endTp", cl)
+            self.assertIn("startTp", tl)
+            self.assertIn("endTp", tl)
         
-            self.assertIn(tl["startTp"], tps)
-            self.assertIn(tl["endTp"], tps)
+            if not local:
+                self.assertIn(tl["startTp"], tps)
+                self.assertIn(tl["endTp"], tps)
         
         for t,v in data["absolute-time"]:
             self.assertIn(t, tps)
@@ -154,21 +134,50 @@ class PlanTest(unittest.TestCase):
 
         d = {}
         agents = set([a["agent"] for a in originalP["actions"].values() if "agent" in a])
-        
-        print(agents)
-        
+                
         for agent in agents:
             d[agent] = originalPlan.getLocalJsonPlan(agent)
-            self.helper_checkJsonPlan(d[agent])
+            self.helper_checkJsonPlan(d[agent], local=True)
 
         p = plan.Plan.mergeJsonPlans(d)
         self.helper_checkJsonPlan(p)
 
         self.assertEqual(len(p["actions"]), len(originalP["actions"]))
+        self.assertEqual(len(p["causal-links"]), len(originalP["causal-links"]))
+        return p
 
     def test_fullMerge1(self):
-        self.helper_mergeLocalPlanFull("/Users/patrick/Documents/workspace_planner/ressources/missions/action-V-mission/hipop-files/action-V-mission.plan")
+        self.helper_mergeLocalPlanFull(os.path.expandvars("$ACTION_HOME/ressources/missions/action-V-mission/hipop-files/action-V-mission.plan"))
 
+    def test_fullMergeRepair(self):
+        p  = self.helper_mergeLocalPlanFull(os.path.expandvars("$ACTION_HOME/ressources/missions/action-V-mission/hipop-files/action-V-mission.plan"))
+
+        with open("/tmp/plan_test.json", "w") as f:
+            json.dump(p, f)
+
+        d = {"domain":os.path.expandvars("$ACTION_HOME/ressources/missions/action-V-mission/hipop-files/action-V-mission-domain.pddl"),
+             "prb":os.path.expandvars("$ACTION_HOME/ressources/missions/action-V-mission/hipop-files/action-V-mission-prb.pddl"),
+             "helper":os.path.expandvars("$ACTION_HOME/ressources/missions/action-V-mission/hipop-files/action-V-mission-prb-helper.pddl"),
+             "agents":"mana_minnie_ressac1_ressac2"}
+        command = "hipop -L error -H {helper} -I /tmp/plan_test.json --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(**d)
+
+        try:
+            r = subprocess.call(command.split(" "))
+        except OSError as e:
+            if e.errno == os.errno.ENOENT:
+                # handle file not found error.
+                self.assertTrue(False, "HiPOP not found")
+            else:
+                # Something else went wrong while trying to run the command
+                self.assertTrue(False, "During the reparation hipop returned %s. Cannot repair." % r)
+        
+        self.assertEqual(0, r)
+        
+    def test_planBroken(self):
+        with open("/home/pbechon/.ros/plan-broken.plan") as f:
+            p = json.load(f)
+            
+        self.helper_checkJsonPlan(p)
 
 if __name__ == '__main__':
     unittest.main()
