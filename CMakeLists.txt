@@ -47,6 +47,8 @@ add_message_files(
     StnVisu.msg
     ActionVisu.msg
     RepairMsg.msg
+    StnArc.msg
+    MaSTNUpdate.msg
 )
 
 ## Generate services in the 'srv' folder

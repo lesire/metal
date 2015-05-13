@@ -28,6 +28,7 @@ class SupervisorRos(Supervisor):
         Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles, useMaSTN)
         
         self.repairRos = True
+        self.useMaSTN = useMaSTN
 
     def aleaReceived(self,msg):
         #logger.warning(msg)
@@ -133,3 +134,7 @@ class SupervisorRos(Supervisor):
             currentTime = self.getCurrentTime()
         self.stnvisu_pub.publish(self.agent, currentTime, data)
 
+    def setTimePoint(self, tp, value):
+        l = Supervisor.setTimePoint(self, tp, value)
+        rospy.logdebug(l)
+        

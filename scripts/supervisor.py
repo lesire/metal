@@ -106,16 +106,19 @@ class Supervisor(threading.Thread):
                 if "abstract" in action:
                     pass
                 elif action["controllable"]:
-                    self.plan.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
+                    self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
                 else:
                     #logger.info("Setting the end to %s" % int(value + round(1000 * (action["dMin"]))))
-                    self.plan.setTimePoint(action["tEnd"], int(value + round(1000 * (action["dMin"]))))
+                    self.setTimePoint(action["tEnd"], int(value + round(1000 * (action["dMin"]))))
                     
             if not self.plan.stn.isConsistent():
                 logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
                 raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
     
         self.stnUpdated()
+    
+    def setTimePoint(self, tpName, value):
+        return self.plan.setTimePoint(tpName, value)
     
     def getExecutableTps(self, now = True):
         return filter(lambda tp: self.isTpExecutable(tp, now), self.tp.keys())
@@ -177,7 +180,7 @@ class Supervisor(threading.Thread):
 
             if self.tp[tp][1] == "controllable":
                 #End of a controllable action
-                self.plan.setTimePoint(tp, currentTime)
+                self.setTimePoint(tp, currentTime)
                 
                 if not self.plan.stn.isConsistent():
                     logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
@@ -212,7 +215,7 @@ class Supervisor(threading.Thread):
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
         
-        self.plan.setTimePoint(action["tStart"], currentTime)
+        self.setTimePoint(action["tStart"], currentTime)
 
         if action["name"] == "dummy end":
             logger.info("finished the plan")
@@ -223,9 +226,9 @@ class Supervisor(threading.Thread):
                 #This action should not be executed by this robot. Assume someone else will do it
                 self.tp[action["tEnd"]][1] = "future"
                 if action["controllable"]:
-                    self.plan.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
+                    self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
                 else:
-                    self.plan.setTimePoint(action["tEnd"], currentTime + int(round(1000 * action["dMin"])))
+                    self.setTimePoint(action["tEnd"], currentTime + int(round(1000 * action["dMin"])))
 
                 logger.debug("Action %s is not for this agent. Assume it will last is minimum duration" % action["name"])
             else:
@@ -283,7 +286,7 @@ class Supervisor(threading.Thread):
         logger.debug("Bounds %s" % c)
         logger.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
             
-        self.plan.setTimePoint(tp, value)
+        self.setTimePoint(tp, value)
             
         if not self.plan.stn.isConsistent():
             logger.error("\tError : invalid STN when finishing execution of tp %s" % tp)

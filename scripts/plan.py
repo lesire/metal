@@ -343,9 +343,10 @@ class Plan:
 
 
         #add this constraint in the STN
-        self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
-
+        l = []
+        self.stn.addConstraint(self.stn.getStartId(), tpName, value, value, l)
         logger.debug("Executing %s at %s" % (tpName, value))
+        return l
 
     def setActionUnavailable(self, action):
         if not "unavailable-actions" in self.jsonDescr:
