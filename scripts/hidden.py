@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 import signal
+import sys
 
 try:
     import Queue
@@ -109,7 +110,8 @@ class Hidden:
                     pddlFiles["helper"] = f.read()
                     
         if args.agentName is not None:
-            threading.main_thread().setName("%s-main" % args.agentName)
+            if sys.version_info >= (3,4):
+                threading.main_thread().setName("%s-main" % args.agentName)
         
         ex = create_executor(args.executor, agentName=args.agentName, folder='/tmp/hidden2')
         #self.createExecutor(args.executor, args.agentName)
