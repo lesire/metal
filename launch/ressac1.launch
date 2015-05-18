@@ -1,0 +1,11 @@
+<launch>
+
+    <arg name="executor" default="ressac"/>
+    <arg name="vnet" default="false"/>
+
+    <node name="ressac1" pkg="roshidden" type="hidden-ros.py" ns="ressac1" args="--executor=$(arg executor) --agentName=ressac1 --waitSignal" >
+        <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+    </node>
+
+</launch>
