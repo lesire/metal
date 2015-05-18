@@ -7,7 +7,7 @@ import rospy
 import json
 import sys
 from std_msgs.msg import Empty,String
-from roshidden.msg import StnVisu, ActionVisu, RepairMsg
+from roshidden.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
 from roshidden.srv import AleaAction
 from supervisor import Supervisor
 
@@ -22,6 +22,8 @@ class SupervisorRos(Supervisor):
         self.repair_pub = rospy.Publisher("hidden/repair/out", RepairMsg, queue_size=10)
         
         self.stnvisu_pub = rospy.Publisher('/hidden/stnvisu', StnVisu, queue_size=10)
+        
+        self.mastn_pub = rospy.Publisher('hidden/mastnUpdate/out', MaSTNUpdate, queue_size=10) 
         
         self.alea_srv = rospy.Service("/%s/alea" % agent, AleaAction, self.aleaReceived)
         
@@ -136,5 +138,10 @@ class SupervisorRos(Supervisor):
 
     def setTimePoint(self, tp, value):
         l = Supervisor.setTimePoint(self, tp, value)
-        rospy.logdebug(l)
-        
+        if self.useMaSTN:
+            rospy.logdebug(l)
+            u = MaSTNUpdate()
+            u.header.stamp = rospy.Time.now()
+            for a in l:
+                u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
+            self.mastn_pub.publish(u)

@@ -14,8 +14,6 @@ import os
 class HiddenRos(Hidden):
     def __init__(self):
         Hidden.__init__(self)
-        rospy.init_node("hidden", log_level=rospy.INFO)
-        rospy.on_shutdown(lambda: os._exit(1))
 
     def getDefaultPDDL(self):
         if rospy.has_param('/hidden/plan'):
@@ -39,6 +37,8 @@ class HiddenRos(Hidden):
         rospy.spin()
 
 if __name__ == "__main__":
+    rospy.init_node("hidden", log_level=rospy.DEBUG)
+    rospy.on_shutdown(lambda: os._exit(1))
     h = HiddenRos()
     h.init(rospy.myargv()[1:])
     h.main()
