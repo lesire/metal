@@ -397,15 +397,29 @@ class Supervisor(threading.Thread):
         planJson = plan.Plan.mergeJsonPlans(self.repairResponse)
         planJson["current-time"] = time.time() - self.beginDate
         
-        #Remove some actions from the plan
+        #Failure because of a deadline : remove the next one
+        if not self.plan.stn.isConsistent():
+            for i in reversed(range(len(planJson["absolute-time"]))):
+                tp,value = planJson["absolute-time"][i]
+                if value*1000 > self.getCurrentTime():
+                    #in the future : this is a deadline
+                    l = [ ("communicate-meta" in a["name"] and self.agent in a["name"]) for a in planJson["actions"].values() if a["startTp"] == tp or a["endTp"] == tp]
+                    if any(l):
+                        logger.info("Deleting %s,%s from the plan to remove a deadline" %(tp,value))
+                        del planJson["absolute-time"][i]
+        
+        #Remove coordinating action for dead robots
         deletedActionKeys = set()
         deletedTps = set()
         
         for k,a in planJson["actions"].items():
-            if "communicate" in a["name"] and a["agent"] in self.agentsDead:
-                deletedActionKeys.add(k)
-                deletedTps.add(a["startTp"])
-                deletedTps.add(a["endTp"])
+            if "communicate-meta" in a["name"]:
+                for deadAgent in self.agentsDead:
+                    if deadAgent in a["name"]:
+                        deletedActionKeys.add(k)
+                        deletedTps.add(a["startTp"])
+                        deletedTps.add(a["endTp"])
+                        break
 
         for k in deletedActionKeys:
             logger.info("Removing action %s" % planJson["actions"][k]["name"])

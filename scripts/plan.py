@@ -270,6 +270,7 @@ class Plan:
         if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
             logger.warning("Calling set timepoint for %s at %s" % (tpName, value))
             logger.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
+            logger.warning(self.stn.export())
 
 
         #add this constraint in the STN
