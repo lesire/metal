@@ -273,8 +273,9 @@ class Plan:
 
 
         #add this constraint in the STN
+        #TODO use L
         l = []
-        self.stn.addConstraint(self.stn.getStartId(), tpName, value, value, l)
+        self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
         logger.debug("Executing %s at %s" % (tpName, value))
         return l
 
