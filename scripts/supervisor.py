@@ -254,7 +254,7 @@ class Supervisor(threading.Thread):
         elif report == "ok":
             logger.info("End of action %s ok" % action["name"])
         else:
-            logger.warning("End of action %s with status" % (action["name"], report))
+            logger.warning("End of action %s with status %s" % (action["name"], report))
 
         if action["controllable"]:
             logger.info("Notified of the end of controllable action %s." % action["name"])
