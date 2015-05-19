@@ -467,7 +467,7 @@ class Supervisor(threading.Thread):
         helperFile.write(self.pddlFiles["helper"])
         helperFile.flush()
         
-        command = "/home/pbechon/workspace_planner/planner/build/hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
+        command = "hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
             r = subprocess.call(command.split(" "))
