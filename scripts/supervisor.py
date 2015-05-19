@@ -242,20 +242,30 @@ class Supervisor(threading.Thread):
             logger.error("\tError : invalid STN when launching execution of %s" % action["name"])
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
+    def targetFound(self, targetPos = None):
+        self.inReparation = True
+        self.outQueue.put({"type":"startAction", "action":{"name":"track", "dMin":1}, "time":self.getCurrentTime()})
+    
     def endAction(self, msg):
         action = msg["action"]
         tp = action["tEnd"]
         value = msg["time"]
 
         report = msg.get("report", None)
+        
+        if type(report) == str:
+            report = {"type" : report}
 
         if report is None:
             logger.warning("End of action %s without report" % action["name"])
-        elif report == "ok":
+        elif report["type"] == "ok":
             logger.info("End of action %s ok" % action["name"])
         else:
             logger.warning("End of action %s with status %s" % (action["name"], report))
-
+            if "target" in report["type"]:
+                targetPos = report.get("position", None)
+                self.targetFound(targetPos)
+        
         if action["controllable"]:
             logger.info("Notified of the end of controllable action %s." % action["name"])
             if self.tp[tp][1] != "past":

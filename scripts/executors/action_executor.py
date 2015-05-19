@@ -71,7 +71,7 @@ class DummyActionExecutor(AbstractActionExecutor):
         logger.info("moving {w} from {a} to {b} in {d}".format(w=who,a=a,b=b,d=dur))
         
         currentTime = time.time()
-        self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]/2),"cb": cb, "actionJson":actionJson})
+        self.nextEvents.append( {"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
         
     def observe(self, who, a, b, cb, actionJson, **kwargs):
         if(self.agent is not None and self.agent != who):
@@ -106,12 +106,19 @@ class DummyActionExecutor(AbstractActionExecutor):
 
     def has_communicated(self, *args, **kwargs):
         pass
-        
+    
+    def track(self, *args, **kwargs):
+        logger.info("Received a track action")
+    
     def update(self):
         currentTime = time.time()
 
         for d in [d for d in self.nextEvents if d["time"] <= currentTime]:
-            d["cb"]("ok")
+            #if "move mana" in d["actionJson"]["name"]:
+            #    d["cb"]({"type":"target_found", "position":{"x":1,"y":1}})
+            #    logger.warning("Simulating target found")
+            #else:
+            d["cb"]({"type":"ok"})
             logger.info("calling a callback for %s" % d["actionJson"]["name"])
             
         self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
