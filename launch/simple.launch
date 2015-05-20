@@ -1,9 +1,28 @@
 <launch>
 
-    <node name="r1" pkg="roshidden" type="hidden-ros.py" ns="r1"
-        args="--plan $(find roshidden)/data/action-V-simple.plan --executor=dummy --agentName=r1 --waitSignal" />
+    <arg name="visu" default="true"/>
+    <arg name="simu" default="true"/>
+    <arg name="executor" default="dummy"/>
+    <arg name="bag_repair" default="false"/>
+    <arg name="vnet" default="false"/>
+    
+    <param name="hidden/plan"        type="str" textfile="$(find roshidden)/data/simple.plan" />
+    <param name="hidden/pddl/domain" type="str" textfile="$(find roshidden)/data/simple-domain.pddl" />
+    <param name="hidden/pddl/prb"    type="str" textfile="$(find roshidden)/data/simple-prb.pddl" />
+    <param name="hidden/pddl/helper" type="str" textfile="$(find roshidden)/data/simple-prb-helper.pddl" />
 
-    <node name="r2" pkg="roshidden" type="hidden-ros.py" ns="r2"
-        args="--plan $(find roshidden)/data/action-V-simple.plan --executor=dummy --agentName=r2 --waitSignal" />
 
+    <node name="visu" pkg="roshidden" type="onlineTimeline.py" ns="visu"  if="$(arg visu)" />
+
+    <node name="r1" pkg="roshidden" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal" if="$(arg simu)" >
+        <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+    </node>
+
+    <node name="r2" pkg="roshidden" type="hidden-ros.py" ns="r2" args="--executor=$(arg executor) --agentName=r2 --waitSignal" if="$(arg simu)" >
+        <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+    </node>
+
+    <node name="bag" pkg="rosbag" type="record" args="/hidden/repair -o hidden_repair" if="$(arg bag_repair)" />
 </launch>

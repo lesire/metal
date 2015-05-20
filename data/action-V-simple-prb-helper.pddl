@@ -1,2 +1,0 @@
-(define (domain-helper action)
-)
