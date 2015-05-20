@@ -107,6 +107,9 @@ class DummyActionExecutor(AbstractActionExecutor):
     def has_communicated(self, *args, **kwargs):
         pass
     
+    def communicate_meta(self, *args, **kwargs):
+        pass
+    
     def track(self, *args, **kwargs):
         logger.info("Received a track action")
     
