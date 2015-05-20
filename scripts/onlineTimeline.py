@@ -74,7 +74,7 @@ class OnlineTimeline(PlotWindow):
 
             self.data[data.agent]["actions"] = []
             for m in data.actions:
-                self.data[data.agent]["actions"].append({"name":m.name, "timeStart": m.timeStartLb,  "timeEnd": m.timeEndLb, "executed":m.executed, "executing":m.executing, "hierarchical":m.hierarchical})
+                self.data[data.agent]["actions"].append({"name":m.name, "timeStart": m.timeStartLb/1000,  "timeEnd": m.timeEndLb/1000, "executed":m.executed, "executing":m.executing, "hierarchical":m.hierarchical})
 
             logger.info("Received message from %s" % data.agent)
 
@@ -128,7 +128,7 @@ class OnlineTimeline(PlotWindow):
         self.axes.set_yticks(range(len(captions)))
         self.axes.set_yticklabels(captions)
 
-        self.axes.vlines(self.getCurrentTime(), 0, len(captions), color="r")
+        self.axes.vlines(self.getCurrentTime()/1000, 0, len(captions), color="r")
                 
         self.canvas.draw()
         
