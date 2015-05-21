@@ -49,13 +49,18 @@ class Plan:
         else:
             self.stn = pystn.STNIntMa(pystn.StnType.GraphSTN, agent)
         
-        self.tpName = {}
-        self.tpName[1] = "1-end"
-        self.stn.addPoint("1-end", self.stn.getAgentName())
-        
         self.absTimes = []
         
         self.actions = copy(d["actions"])
+        
+        self.tpName = {}
+        self.tpAgent = {}
+        
+        # End timepoints are duplicated for each agent
+        self.tpEnd = {}
+        for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
+            self.tpEnd[a] = "1-end-" + a
+            self.stn.addPoint(self.tpEnd[a], self.stn.getAgentName())
         
         if self.agent is not None:
             for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
@@ -66,11 +71,15 @@ class Plan:
             tpNumber = a["startTp"]
             if tpNumber not in self.tpName:
                 self.tpName[tpNumber] = str(tpNumber) + "-start-" + a["name"]
+                if "agent" in a:
+                    self.tpAgent[tpNumber] = a["agent"]
             a["tStart"] = self.tpName[tpNumber]
             
             tpNumber = a["endTp"]
             if tpNumber not in self.tpName:
                 self.tpName[tpNumber] = str(tpNumber) + "-end-" + a["name"]
+                if "agent" in a:
+                    self.tpAgent[tpNumber] = a["agent"]
             a["tEnd"] = self.tpName[tpNumber]
                 
             if isActionControllable(a["name"]):
@@ -94,13 +103,13 @@ class Plan:
         for a in self.actions.values():
 
             if a["tStart"][0] != "0" and a["tStart"] not in self.stn.getNodeIds():
-                if self.agent is not None:
+                if self.agent is not None and "agent" in a:
                     self.stn.addPoint(a["tStart"], a["agent"])
                 else:
                     self.stn.addPoint(a["tStart"])
                 #self.stn.addConstraint(a["tStart"], self.tpName[1], 0)
             if a["tEnd"][0] != "0" and a["tEnd"] not in self.stn.getNodeIds():
-                if self.agent is not None:
+                if self.agent is not None and "agent" in a:
                     self.stn.addPoint(a["tEnd"], a["agent"])
                 else:
                     self.stn.addPoint(a["tEnd"])
@@ -118,35 +127,14 @@ class Plan:
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
-        # 1 is the end point, should be after every one else
-        '''
-        for node in self.stn.getNodeIds():
-            if node != self.tpName[1]:
-                self.stn.addConstraint(node, self.tpName[1], timeDelta)
-        '''
         for cl in (d["causal-links"] + d["temporal-links"]):
-            """
-            starts = []
-            ends = []
-            
-            for tpKey,tpList in zip(["startTp","endTp"],[starts,ends]):
-                if cl[tpKey] in self.splittedTps:
-                    # causal link from a split action
-                    for agent in self.splittedTps[cl[tpKey]]:
-                        newTp = self.tpName[self.splittedTps[cl[tpKey]][agent]]
-                        tpList.append(newTp)
-                else:
-                    newTp = self.tpName[cl[tpKey]]
-                    tpList.append(newTp)
-
-            for start,end in itertools.product(starts, ends):
-                if start.startswith("0-"):
-                    self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
-                else:
-                    self.stn.addConstraint(start, end, timeDelta)
-            """
             start = self.tpName[cl["startTp"]]
+
+            # If end point is the endTp, then get the one correspondng to the agent executing the action            
             end = self.tpName[cl["endTp"]]
+            if cl["endTp"] == 1:
+                agent = self.tpAgent[cl["startTp"]]
+                end = self.tpEnd[agent]
             
             if start.startswith("0-"):
                 self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
@@ -208,7 +196,7 @@ class Plan:
         
         tps = []
         for tp in self.stn.getNodeIds():
-            if tp != "1-end":
+            if tp not in self.tpEnd.keys():
                 tps.append((tp, self.stn.getBounds(tp).lb))
         
         tps.sort(key = lambda x:x[1])
