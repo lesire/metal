@@ -2,7 +2,7 @@
 
     <arg name="visu" default="true"/>
     <arg name="simu" default="true"/>
-    <arg name="executor" default="dummy"/>
+    <arg name="executor" default="dummy-ma"/>
     <arg name="bag_repair" default="false"/>
     <arg name="vnet" default="false"/>
     
@@ -14,7 +14,7 @@
 
     <node name="visu" pkg="metal" type="onlineTimeline.py" ns="visu"  if="$(arg visu)" />
 
-    <node name="r1" pkg="metal" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal" if="$(arg simu)" >
+    <node name="r1" pkg="metal" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal --logLevel=debug" if="$(arg simu)" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>

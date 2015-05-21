@@ -60,8 +60,6 @@ class Hidden:
         parser.add_argument('--agentName', metavar="agent", type=str)
         parser.add_argument('--executor', type=str, choices=executors(), default="dummy", metavar="action executor (eg., 'morse')")
         parser.add_argument('--waitSignal', action="store_true")
-        parser.add_argument('--MaSTN', action="store_true")
-        #parser.add_argument('--repairRos', action="store_true")
         parser.add_argument('--planFile', metavar='plan', type=str)
         args = parser.parse_args(argv)
 
@@ -119,7 +117,7 @@ class Hidden:
         #self.createExecutor(args.executor, args.agentName)
         logger.info("Threads created")
 
-        self.launchAgentArchitecture(ex, pddlFiles["plan"], args.agentName, pddlFiles=pddlFiles, useMaSTN=args.MaSTN)
+        self.launchAgentArchitecture(ex, pddlFiles["plan"], args.agentName, pddlFiles=pddlFiles)
         logger.info("Execution thread launched")
     
         self.started = False
@@ -146,11 +144,11 @@ class Hidden:
     def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
         return supervisor.Supervisor(self.q1, self.q2, plan, stopEvent=self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
 
-    def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False, useMaSTN=False):
+    def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False):
         self.q1 = Queue.Queue() 
         self.q2 = Queue.Queue() 
     
-        self.threadSupervisor = self.createSupervisor(planString, agentName, pddlFiles, useMaSTN=useMaSTN)
+        self.threadSupervisor = self.createSupervisor(planString, agentName, pddlFiles)
         self.threadExecutor = executor.Executor(self.q2, self.q1, self.stopExecutor, ex, agent=agentName)
     
         #threadSupervisor.start()

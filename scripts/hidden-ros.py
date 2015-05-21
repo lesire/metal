@@ -30,8 +30,8 @@ class HiddenRos(Hidden):
     def waitSignal(self):
         self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
 
-    def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
-        return SupervisorRos(self.q1, self.q2, plan, self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
+    def createSupervisor(self, plan, agent, pddlFiles):
+        return SupervisorRos(self.q1, self.q2, plan, self.stopSupervisor, agent=agent, pddlFiles=pddlFiles)
 
     def main(self):
         rospy.spin()
@@ -42,4 +42,3 @@ if __name__ == "__main__":
     rospy.on_shutdown(h.stop)
     h.init(rospy.myargv()[1:])
     h.main()
-
