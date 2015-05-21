@@ -46,6 +46,8 @@ class FileFilter(logging.Filter):
 class Hidden:
     def __init__(self):
         self.threadSupervisor = None
+        self.stopSupervisor = threading.Event()
+        self.stopExecutor = threading.Event()
         #self.logger = logging.getLogger('hidden')
 
     def getDefaultPDDL(self):
@@ -142,14 +144,14 @@ class Hidden:
         logger.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
 
     def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
-        return supervisor.Supervisor(self.q1, self.q2, plan, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
+        return supervisor.Supervisor(self.q1, self.q2, plan, stopEvent=self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
 
     def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False, useMaSTN=False):
         self.q1 = Queue.Queue() 
         self.q2 = Queue.Queue() 
     
         self.threadSupervisor = self.createSupervisor(planString, agentName, pddlFiles, useMaSTN=useMaSTN)
-        self.threadExecutor = executor.Executor(self.q2, self.q1, ex, agent=agentName)
+        self.threadExecutor = executor.Executor(self.q2, self.q1, self.stopExecutor, ex, agent=agentName)
     
         #threadSupervisor.start()
         self.threadExecutor.start()
@@ -157,6 +159,10 @@ class Hidden:
     def main(self):
         while threading.active_count() > 1:
             time.sleep(1)
+            
+    def stop(self):
+        self.stopSupervisor.set()
+        self.stopExecutor.set()
     
 if __name__=="__main__":
     try:
@@ -164,4 +170,4 @@ if __name__=="__main__":
         h.init(sys.argv[1:])
         h.main()
     except KeyboardInterrupt:
-        os._exit(1)
+        h.stop()

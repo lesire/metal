@@ -14,7 +14,7 @@ from supervisor import Supervisor
 #from mastn_execution.srv import StnVisu
 
 class SupervisorRos(Supervisor):
-    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None, useMaSTN=False):
+    def __init__ (self, inQueue, outQueue, planStr, stopEvent, agent = None, pddlFiles=None, useMaSTN=False):
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
@@ -24,10 +24,11 @@ class SupervisorRos(Supervisor):
         self.stnvisu_pub = rospy.Publisher('/hidden/stnvisu', StnVisu, queue_size=10)
         
         self.mastn_pub = rospy.Publisher('hidden/mastnUpdate/out', MaSTNUpdate, queue_size=10) 
+        self.mastn_sub = rospy.Subscriber('hidden/mastnUpdate/in', MaSTNUpdate, self.mastnUpdate) 
         
         self.alea_srv = rospy.Service("/%s/alea" % agent, AleaAction, self.aleaReceived)
         
-        Supervisor.__init__(self, inQueue, outQueue, planStr, agent, pddlFiles, useMaSTN)
+        Supervisor.__init__(self, inQueue, outQueue, planStr, stopEvent, agent, pddlFiles, useMaSTN)
         
         self.repairRos = True
         self.useMaSTN = useMaSTN
@@ -145,3 +146,8 @@ class SupervisorRos(Supervisor):
             for a in l:
                 u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
             self.mastn_pub.publish(u)
+            
+    def mastnUpdate(self, data):
+        if self.useMaSTN:
+            for a in data.arcs:
+                rospy.logdebug(a)

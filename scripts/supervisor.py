@@ -22,7 +22,7 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, planStr, agent = None, pddlFiles=None, useMaSTN = False):
+    def __init__ (self, inQueue, outQueue, planStr, stopEvent, agent = None, pddlFiles=None, useMaSTN = False):
         self.inQueue = inQueue
         self.outQueue = outQueue
         self.pddlFiles = pddlFiles
@@ -39,6 +39,8 @@ class Supervisor(threading.Thread):
         self.init(planStr, agent)
         
         threading.Thread.__init__ (self, name="%s-sup" % agent)
+        
+        self.stopEvent = stopEvent
         
     def init(self, planStr, agent):
         if agent is None:
@@ -529,7 +531,7 @@ class Supervisor(threading.Thread):
     def mainLoop(self):
         hasFailed = False
         try:
-            while not self.isExecuted() and not self.isDead:
+            while not self.isExecuted() and not self.isDead and not self.stopEvent.is_set():
                 if not self.inReparation:
                     while not self.inQueue.empty():
                         msg = self.inQueue.get()
@@ -547,7 +549,7 @@ class Supervisor(threading.Thread):
                         
                 if not self.isDead:
                     self.update()
-                time.sleep(0.1)
+                self.stopEvent.wait(0.1)
         except ExecutionFailed as e:
             hasFailed = True
             logger.error("Execution failed : %s" % str(e))

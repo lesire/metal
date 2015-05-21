@@ -98,13 +98,13 @@ class Plan:
                     self.stn.addPoint(a["tStart"], a["agent"])
                 else:
                     self.stn.addPoint(a["tStart"])
-                self.stn.addConstraint(a["tStart"], self.tpName[1], 0)
+                #self.stn.addConstraint(a["tStart"], self.tpName[1], 0)
             if a["tEnd"][0] != "0" and a["tEnd"] not in self.stn.getNodeIds():
                 if self.agent is not None:
                     self.stn.addPoint(a["tEnd"], a["agent"])
                 else:
                     self.stn.addPoint(a["tEnd"])
-                self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)
+                #self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)
             
             if a["tStart"] != a["tEnd"]:
                 if "dMin" in a:
@@ -119,10 +119,11 @@ class Plan:
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
         # 1 is the end point, should be after every one else
+        '''
         for node in self.stn.getNodeIds():
             if node != self.tpName[1]:
                 self.stn.addConstraint(node, self.tpName[1], timeDelta)
-
+        '''
         for cl in (d["causal-links"] + d["temporal-links"]):
             """
             starts = []

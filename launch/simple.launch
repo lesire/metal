@@ -14,14 +14,18 @@
 
     <node name="visu" pkg="roshidden" type="onlineTimeline.py" ns="visu"  if="$(arg visu)" />
 
-    <node name="r1" pkg="roshidden" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal" if="$(arg simu)" >
+    <node name="r1" pkg="roshidden" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal --MaSTN" if="$(arg simu)" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
     </node>
 
-    <node name="r2" pkg="roshidden" type="hidden-ros.py" ns="r2" args="--executor=$(arg executor) --agentName=r2 --waitSignal" if="$(arg simu)" >
+    <node name="r2" pkg="roshidden" type="hidden-ros.py" ns="r2" args="--executor=$(arg executor) --agentName=r2 --waitSignal --MaSTN" if="$(arg simu)" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
     </node>
 
     <node name="bag" pkg="rosbag" type="record" args="/hidden/repair -o hidden_repair" if="$(arg bag_repair)" />

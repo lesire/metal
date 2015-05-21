@@ -1,4 +1,4 @@
 string nodeSource
 string nodeTarget
-int32 directValue
-int32 indirectValue
+int64 directValue
+int64 indirectValue

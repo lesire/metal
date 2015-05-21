@@ -6,7 +6,7 @@ import threading
 import time
 
 class Executor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, actionExecutor=None, agent=None):
+    def __init__ (self, inQueue, outQueue, stopEvent, actionExecutor=None, agent=None):
         self.inQueue = inQueue
         self.outQueue = outQueue
         
@@ -16,6 +16,7 @@ class Executor(threading.Thread):
         self.nextEvents = [] #list of dicts (time, action, report (opt))
         self.beginDate = -1
         threading.Thread.__init__ (self, name="%s-exec" % agent)
+        self.stopEvent = stopEvent
 
     # get readable time
     def user_time(self, t):
@@ -75,7 +76,7 @@ class Executor(threading.Thread):
     def run(self):
         logger.info("Executor launched")
         
-        while True:
+        while not self.stopEvent.is_set():
             if not self.inQueue.empty():
                 msg = self.inQueue.get()
                 logger.debug("Executor received message : %s" % msg)
@@ -102,6 +103,9 @@ class Executor(threading.Thread):
                     logger.warning("Executor received unknown message %s" % msg)
                     
             self.update()
-            time.sleep(0.1)
+            self.stopEvent.wait(0.1)
             
         logger.info("Executor stopped")
+
+    def __del__(self):
+        del self.actionExecutor

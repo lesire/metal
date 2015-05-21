@@ -31,15 +31,15 @@ class HiddenRos(Hidden):
         self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
 
     def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
-        return SupervisorRos(self.q1, self.q2, plan, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
+        return SupervisorRos(self.q1, self.q2, plan, self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
 
     def main(self):
         rospy.spin()
 
 if __name__ == "__main__":
     rospy.init_node("hidden", log_level=rospy.DEBUG)
-    rospy.on_shutdown(lambda: os._exit(1))
     h = HiddenRos()
+    rospy.on_shutdown(h.stop)
     h.init(rospy.myargv()[1:])
     h.main()
 
