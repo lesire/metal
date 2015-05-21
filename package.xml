@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>roshidden</name>
+  <name>metal</name>
   <version>2.0.0</version>
-  <description>The hidden package</description>
+  <description>Mastn Execution with TemporAl fLexibility</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->

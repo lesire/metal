@@ -4,7 +4,7 @@ import logging; logger = logging.getLogger("hidden")
 
 try:
     import rospy
-    from roshidden.srv import *
+    from metal.srv import *
 
     class ROSActionExecutor(AbstractActionExecutor):
         _name = "ros"

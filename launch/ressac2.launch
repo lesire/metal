@@ -3,7 +3,7 @@
     <arg name="executor" default="ressac"/>
     <arg name="vnet" default="false"/>
 
-    <node name="ressac2" pkg="roshidden" type="hidden-ros.py" ns="ressac2" args="--executor=$(arg executor) --agentName=ressac2 --waitSignal" >
+    <node name="ressac2" pkg="metal" type="hidden-ros.py" ns="ressac2" args="--executor=$(arg executor) --agentName=ressac2 --waitSignal" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
     </node>

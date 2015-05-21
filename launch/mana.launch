@@ -3,7 +3,7 @@
     <arg name="executor" default="hyper"/>
     <arg name="vnet" default="false"/>
 
-    <node name="mana" pkg="roshidden" type="hidden-ros.py" ns="mana" args="--executor=$(arg executor) --agentName=mana --waitSignal" >
+    <node name="mana" pkg="metal" type="hidden-ros.py" ns="mana" args="--executor=$(arg executor) --agentName=mana --waitSignal" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
     </node>

@@ -7,7 +7,7 @@ import logging; logger = logging.getLogger("hidden")
 from plotWindow import PlotWindow
 
 import rospy
-from roshidden.msg import StnVisu
+from metal.msg import StnVisu
 from std_msgs.msg import Empty
 
 import functools
