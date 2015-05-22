@@ -46,6 +46,7 @@ class FileFilter(logging.Filter):
 class Hidden:
     def __init__(self):
         self.threadSupervisor = None
+        self.startSupervisor = threading.Event()
         self.stopSupervisor = threading.Event()
         self.stopExecutor = threading.Event()
         #self.logger = logging.getLogger('hidden')
@@ -134,7 +135,7 @@ class Hidden:
             logger.info("Supervisor already started: doing nothing")
         elif self.threadSupervisor is not None:
             logger.info("Starting Supervisor")
-            self.threadSupervisor.start()
+            self.startSupervisor.set()
             self.started = True
         else:
             logger.error("Supervisor thread not initialized!")
@@ -144,7 +145,7 @@ class Hidden:
         logger.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
 
     def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
-        return supervisor.Supervisor(self.q1, self.q2, plan, stopEvent=self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
+        return supervisor.Supervisor(self.q1, self.q2, plan, startEvent=self.startSupervisor, stopEvent=self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
 
     def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False, useMaSTN=False):
         self.q1 = Queue.Queue() 
@@ -153,7 +154,7 @@ class Hidden:
         self.threadSupervisor = self.createSupervisor(planString, agentName, pddlFiles, useMaSTN=useMaSTN)
         self.threadExecutor = executor.Executor(self.q2, self.q1, self.stopExecutor, ex, agent=agentName)
     
-        #threadSupervisor.start()
+        self.threadSupervisor.start()
         self.threadExecutor.start()
     
     def main(self):
@@ -161,6 +162,7 @@ class Hidden:
             time.sleep(1)
             
     def stop(self):
+        self.startSupervisor.set()
         self.stopSupervisor.set()
         self.stopExecutor.set()
     

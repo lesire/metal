@@ -31,23 +31,26 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, planStr, stopEvent, agent = None, pddlFiles=None, useMaSTN = False):
+    def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None, useMaSTN = False):
         self.inQueue = inQueue
         self.outQueue = outQueue
         self.pddlFiles = pddlFiles
         
         self.beginDate = -1
-        self.state = State.RUNNING
+        self.state = State.INIT
         self.repairRos = False
         self.useMaSTN = useMaSTN
 
         self.agentsDead = []
 
-        self.init(planStr, agent)
-        
+        self.startEvent = startEvent
+        self.stopEvent = stopEvent
+
         threading.Thread.__init__ (self, name="%s-sup" % agent)
         
-        self.stopEvent = stopEvent
+        self.init(planStr, agent)
+        
+    
         
     def init(self, planStr, agent):
         if agent is None:
@@ -124,8 +127,17 @@ class Supervisor(threading.Thread):
                 logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
                 raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
     
-        self.stnUpdated()
+        self.visuUpdate()
     
+    def visuUpdate(self):
+        if self.state == State.DEAD:
+            self.stnUpdated(onlyPast=True)
+            #stop sending messages
+        else:
+            self.stnUpdated()
+            if not self.stopEvent.is_set():
+                threading.Timer(1, self.visuUpdate).start() #re-run it in 1 second
+
     def setTimePoint(self, tpName, value):
         return self.plan.setTimePoint(tpName, value)
     
@@ -208,8 +220,6 @@ class Supervisor(threading.Thread):
         else:
             logger.error("\tError : a timepoint does not match its action %s" % tp)
             raise ExecutionFailed("\tA timepoint does not match its action %s" % tp)
-        
-        self.stnUpdated()
 
     def executeAction(self, action, currentTime):
         if self.tp[action["tStart"]][1] != "controllable" and self.tp[action["tStart"]][1] != "future":
@@ -353,7 +363,6 @@ class Supervisor(threading.Thread):
             if data["robot"] == self.agent:
                 logger.warning("Received a robotDead for myself. Deactivating")
                 self.state = State.DEAD
-                self.stnUpdated(onlyPast=True)
                 return
             else:
                 logger.warning("Dealing with the death of %s" % data["robot"])
@@ -513,7 +522,6 @@ class Supervisor(threading.Thread):
             self.init(planStr, self.agent)
             logger.info("Finished repairation : restarting the main loop")
             self.state = State.RUNNING
-            self.stnUpdated()
             self.mainLoop()
         else:
             logger.error("During the reparation hipop returned %s. Cannot repair." % r)
@@ -525,6 +533,10 @@ class Supervisor(threading.Thread):
     def run(self):
         logger.info("Supervisor launched")
         
+        self.startEvent.wait()
+
+        self.state = State.RUNNING
+
         if self.plan.initTime is None:
             #begining of the plan
             self.beginDate = time.time()

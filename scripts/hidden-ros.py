@@ -31,7 +31,7 @@ class HiddenRos(Hidden):
         self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
 
     def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
-        return SupervisorRos(self.q1, self.q2, plan, self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
+        return SupervisorRos(self.q1, self.q2, plan, self.startSupervisor, self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
 
     def main(self):
         rospy.spin()
