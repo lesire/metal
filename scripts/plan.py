@@ -53,6 +53,11 @@ class Plan:
         
         self.actions = copy(d["actions"])
         
+        if self.agent is not None:
+            for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
+                if a != self.agent:
+                    self.stn.addAgent(a)
+        
         self.tpName = {}
         self.tpAgent = {}
         
@@ -60,16 +65,11 @@ class Plan:
         self.tpEnd = {}
         for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
             self.tpEnd[a] = "1-end-" + a
-            self.stn.addPoint(self.tpEnd[a], self.stn.getAgentName())
+            self.stn.addPoint(self.tpEnd[a], a)
         for a in self.tpEnd.keys():
             for b in self.tpEnd.keys():
                 if a == b: continue
                 self.stn.addConstraint(self.tpEnd[a], self.tpEnd[b], 0, 0)
-        
-        if self.agent is not None:
-            for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
-                if a != self.agent:
-                    self.stn.addAgent(a)
 
         for index,a in self.actions.items():
             tpNumber = a["startTp"]
