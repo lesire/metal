@@ -9,7 +9,7 @@ import sys
 from std_msgs.msg import Empty,String
 from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
 from metal.srv import AleaAction
-from supervisor import Supervisor
+from supervisor import Supervisor,State
 
 #from mastn_execution.srv import StnVisu
 
@@ -74,13 +74,14 @@ class SupervisorRos(Supervisor):
         if self.agent == sender:
             return
     
-        if self.isDead:
+        if self.state == State.DEAD:
             return
         
         if type == "repairRequest":
             logger.info("Received a repair request. Pausing the execution")
-            self.inReparation = True
-
+            self.state = State.REPAIRINGPASSIVE
+            self.stnUpdated()
+            
             msg = RepairMsg(self.agent, "repairResponse", self.getCurrentTime(), json.dumps(self.plan.getLocalJsonPlan(self.agent)))
             self.repair_pub.publish(msg)
 
@@ -103,7 +104,8 @@ class SupervisorRos(Supervisor):
             logger.info("Receiving a new plan to execute from %s" % sender)
             planStr = msg
             self.init(planStr, self.agent)
-            self.inReparation = False
+            self.state = State.RUNNING
+            self.stnUpdated()
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
@@ -135,7 +137,7 @@ class SupervisorRos(Supervisor):
         currentTime = 0
         if self.beginDate >= 0:
             currentTime = self.getCurrentTime()
-        self.stnvisu_pub.publish(self.agent, currentTime, data)
+        self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
     def setTimePoint(self, tp, value):
         l = Supervisor.setTimePoint(self, tp, value)

@@ -75,6 +75,8 @@ class OnlineTimeline(PlotWindow):
             self.data[data.agent]["actions"] = []
             for m in data.actions:
                 self.data[data.agent]["actions"].append({"name":m.name, "timeStart": m.timeStartLb/1000,  "timeEnd": m.timeEndLb/1000, "executed":m.executed, "executing":m.executing, "hierarchical":m.hierarchical})
+                
+                self.data[data.agent]["state"] = data.state
 
             logger.info("Received message from %s" % data.agent)
 
@@ -123,7 +125,7 @@ class OnlineTimeline(PlotWindow):
                 self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, facecolor=color, edgecolor="k", lw=1, ls="solid", alpha=alpha)
                 
             if index is not None:
-                captions[index] = robot
+                captions[index] = robot + "\n" + self.data[robot]["state"]
 
         self.axes.set_yticks(range(len(captions)))
         self.axes.set_yticklabels(captions)

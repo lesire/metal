@@ -15,6 +15,15 @@ import logging; logger = logging.getLogger("hidden")
 
 import plan
 
+#Add enum-like code. Taken from https://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+def enum(*sequential, **named):
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    reverse = dict((value, key) for key, value in enums.items())
+    enums['reverse_mapping'] = reverse
+    return type('Enum', (), enums)
+
+State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD")
+
 class ExecutionFailed(Exception):
     def __init__(self, msg):
         self.msg = msg
@@ -28,11 +37,9 @@ class Supervisor(threading.Thread):
         self.pddlFiles = pddlFiles
         
         self.beginDate = -1
+        self.state = State.RUNNING
         self.repairRos = False
         self.useMaSTN = useMaSTN
-        
-        self.isDead = False #if true, multi will not respond to anything. Simulate a lost robot
-        self.inReparation = False
 
         self.agentsDead = []
 
@@ -245,7 +252,7 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
     def targetFound(self, targetPos = None):
-        self.inReparation = True
+        self.state = State.TRACKING
         self.outQueue.put({"type":"startAction", "action":{"name":"track", "dMin":1}, "time":self.getCurrentTime()})
     
     def endAction(self, msg):
@@ -320,8 +327,8 @@ class Supervisor(threading.Thread):
             print("{: <70} ({}) : [{}, {}]".format(*i))
 
     def update(self):
-        if self.inReparation:
-            return # do not execute the plan if a repair is under way
+        if not self.state == State.RUNNING:
+            return # do not execute the plan if not running
 
         l = next(self.getExecutableTps(), False)
 
@@ -345,7 +352,7 @@ class Supervisor(threading.Thread):
             
             if data["robot"] == self.agent:
                 logger.warning("Received a robotDead for myself. Deactivating")
-                self.isDead = True
+                self.state = State.DEAD
                 self.stnUpdated(onlyPast=True)
                 return
             else:
@@ -370,6 +377,9 @@ class Supervisor(threading.Thread):
         pass
 
     def executionFail(self):
+        
+        self.state = State.REPAIRINGACTIVE
+        self.stnUpdated()
         
         self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
@@ -502,6 +512,8 @@ class Supervisor(threading.Thread):
             
             self.init(planStr, self.agent)
             logger.info("Finished repairation : restarting the main loop")
+            self.state = State.RUNNING
+            self.stnUpdated()
             self.mainLoop()
         else:
             logger.error("During the reparation hipop returned %s. Cannot repair." % r)
@@ -531,8 +543,8 @@ class Supervisor(threading.Thread):
     def mainLoop(self):
         hasFailed = False
         try:
-            while not self.isExecuted() and not self.isDead and not self.stopEvent.is_set():
-                if not self.inReparation:
+            while not self.isExecuted() and self.state != State.DEAD and not self.stopEvent.is_set():
+                if self.state == State.RUNNING:
                     while not self.inQueue.empty():
                         msg = self.inQueue.get()
         
@@ -547,7 +559,7 @@ class Supervisor(threading.Thread):
                         else:
                             logger.warning("Supervisor received unknown message %s" % msg)
                         
-                if not self.isDead:
+                if self.state != State.DEAD:
                     self.update()
                 self.stopEvent.wait(0.1)
         except ExecutionFailed as e:
