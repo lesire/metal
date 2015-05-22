@@ -26,7 +26,7 @@ class SupervisorRos(Supervisor):
         self.mastn_pub = rospy.Publisher('hidden/mastnUpdate/out', MaSTNUpdate, queue_size=10) 
         self.mastn_sub = rospy.Subscriber('hidden/mastnUpdate/in', MaSTNUpdate, self.mastnUpdate) 
         
-        self.alea_srv = rospy.Service("/%s/alea" % agent, AleaAction, self.aleaReceived)
+        self.alea_srv = rospy.Service("alea", AleaAction, self.aleaReceived)
         
         Supervisor.__init__(self, inQueue, outQueue, planStr, startEvent, stopEvent, agent, pddlFiles, useMaSTN)
         
@@ -45,6 +45,19 @@ class SupervisorRos(Supervisor):
             logger.error("Received an AleaAction service call but the filed data is not json-encoded : %s " % msg.data)
             return False
         
+        if msg.aleaType == "state":
+            logger.info("Changing the current state due to a message reveived on the alea topic")
+            s = data["state"]
+            if not isinstance(s, str):
+                logger.error("state field is not a string : " % data)
+                return False
+            s = s.upper()
+            if s not in dir(State):
+                logger.error("State %s is unknown" % s)
+                return False
+            self.state = getattr(State, s)
+            return True
+
         logger.info("Injecting an alea from ROS into the queue")
         data["type"] = "alea"
         data["aleaType"] = msg.aleaType
