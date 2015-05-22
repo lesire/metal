@@ -146,6 +146,8 @@ class SupervisorRos(Supervisor):
         self.mastn_pub.publish(u)
             
     def mastnUpdate(self, data):
+        if data._connection_header["callerid"] == rospy.get_name():
+            return
         for a in data.arcs:
             l = self.plan.stn.addConstraint(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue)
             logger.debug("Constaint %s => %s" % (str(a), str(l)))
