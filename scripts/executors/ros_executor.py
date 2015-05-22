@@ -1,4 +1,4 @@
-from .action_executor import AbstractActionExecutor
+from .action_executor import DummyActionExecutor
 
 import logging; logger = logging.getLogger("hidden")
 
@@ -6,10 +6,11 @@ try:
     import rospy
     from metal.srv import *
 
-    class ROSActionExecutor(AbstractActionExecutor):
+    class ROSActionExecutor(DummyActionExecutor):
         _name = "ros"
 
         def __init__(self, agentName, **kwargs):
+            DummyActionExecutor.__init__(self, agentName, **kwargs)
             self.name = agentName
             self._in_com = False
             self._out_com = False
@@ -40,6 +41,7 @@ try:
                 return CommunicateActionResponse(False)
 
         def update(self):
+            DummyActionExecutor.update(self)
             if self._in_com:
                 try:
                     ack = self._com_proxy(self._com_request)
@@ -50,12 +52,6 @@ try:
                         self._has_com = True
                 except:
                     pass
-
-        def move(self, who, a, b, cb, **kwargs):
-            cb("ok")
-
-        def observe(self, who, point, observation, cb, **kwargs):
-            cb("ok")
 
         def has_communicated(self, first_robot, second_robot, cb, **kwargs):
             cb(self._has_com)
@@ -74,6 +70,7 @@ try:
             self._in_com = True
             self._out_com = True
             self._has_com = False
+            
 except ImportError:
     logger.warning("Cannot import ROS")
     pass

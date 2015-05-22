@@ -2,7 +2,7 @@
 
     <arg name="visu" default="true"/>
     <arg name="simu" default="true"/>
-    <arg name="executor" default="dummy-ma"/>
+    <arg name="executor" default="ros"/>
     <arg name="bag_repair" default="false"/>
     <arg name="vnet" default="false"/>
     
