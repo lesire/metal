@@ -255,7 +255,7 @@ class Supervisor(threading.Thread):
 
         report = msg.get("report", None)
         
-        if type(report) == str:
+        if isinstance(report, str):
             report = {"type" : report}
 
         if report is None:
@@ -536,7 +536,7 @@ class Supervisor(threading.Thread):
                     while not self.inQueue.empty():
                         msg = self.inQueue.get()
         
-                        if type(msg) != dict or "type" not in msg:
+                        if not isinstance(msg, dict) or "type" not in msg:
                             logger.error("Supervisor received an ill-formated message : %s" % msg)
                             continue
                         

@@ -125,26 +125,6 @@ class Plan:
                 self.stn.addConstraint(node, self.tpName[1], timeDelta)
         '''
         for cl in (d["causal-links"] + d["temporal-links"]):
-            """
-            starts = []
-            ends = []
-            
-            for tpKey,tpList in zip(["startTp","endTp"],[starts,ends]):
-                if cl[tpKey] in self.splittedTps:
-                    # causal link from a split action
-                    for agent in self.splittedTps[cl[tpKey]]:
-                        newTp = self.tpName[self.splittedTps[cl[tpKey]][agent]]
-                        tpList.append(newTp)
-                else:
-                    newTp = self.tpName[cl[tpKey]]
-                    tpList.append(newTp)
-
-            for start,end in itertools.product(starts, ends):
-                if start.startswith("0-"):
-                    self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
-                else:
-                    self.stn.addConstraint(start, end, timeDelta)
-            """
             start = self.tpName[cl["startTp"]]
             end = self.tpName[cl["endTp"]]
             
