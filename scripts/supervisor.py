@@ -473,21 +473,18 @@ class Supervisor(threading.Thread):
                     agents.remove(a)
 
         #Write the content of the pddl file to disk since hipop can only read files
-        domainFile = tempfile.NamedTemporaryFile("w")
-        domainFile.write(self.pddlFiles["domain"])
-        domainFile.flush()
-        
-        prbFile = tempfile.NamedTemporaryFile("w")
-        prbFile.write(self.pddlFiles["prb"])
-        prbFile.flush()
-        
-        helperFile = tempfile.NamedTemporaryFile("w")
-        helperFile.write(self.pddlFiles["helper"])
-        helperFile.flush()
+        with open("plan-broken-domain.pddl", "w") as f:
+            f.write(self.pddlFiles["domain"])
+
+        with open("plan-broken-prb.pddl", "w") as f:
+            f.write(self.pddlFiles["prb"])
+
+        with open("plan-broken-helper.pddl", "w") as f:
+            f.write(self.pddlFiles["helper"])
 
         outputFile = tempfile.NamedTemporaryFile("w+")
         
-        command = "hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
+        command = "hipop -L error --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
             r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
