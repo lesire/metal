@@ -210,6 +210,14 @@ class DummyDelay(DummyActionExecutor):
         if who == "mana":
             dur = dur + 30
             logger.warning("Delaying action %s" % actionJson["name"])
+        if who == "effibot1":
+            if "inc" not in dir(self):
+                self.inc = 0
+            self.inc += 1
+            
+            if self.inc < 3:
+                dur = dur + 10
+                logger.warning("Delaying action %s" % actionJson["name"])
         if who == "r1":
             dur = dur + 1
             logger.warning("Delaying action %s" % actionJson["name"])

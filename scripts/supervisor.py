@@ -3,6 +3,7 @@ from __future__ import division
 
 from copy import copy
 from math import floor
+import itertools
 import json
 import os
 import subprocess
@@ -385,11 +386,7 @@ class Supervisor(threading.Thread):
     def repairCallback(self, type, time, sender, msg):
         pass
 
-    def executionFail(self):
-        
-        self.state = State.REPAIRINGACTIVE
-        self.stnUpdated()
-        
+    def computeGlobalPlan(self):
         self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
         if self.repairRos:
@@ -400,7 +397,6 @@ class Supervisor(threading.Thread):
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
             logger.info("Dead agents : %s" % self.agentsDead)
             for agent in self.agentsDead:
-                logger.info("%s %s %s" % (agent in self.repairResponse, "mana" in self.repairResponse, agent))
                 if agent in self.repairResponse:
                     logger.warning("Received a repair response from %s. Ignoring it since he is dead" % agent)
                     del self.repairResponse[agent]
@@ -427,18 +423,7 @@ class Supervisor(threading.Thread):
         
         planJson = plan.Plan.mergeJsonPlans(self.repairResponse)
         planJson["current-time"] = time.time() - self.beginDate
-        
-        #Failure because of a deadline : remove the next one
-        if not self.plan.stn.isConsistent():
-            for i in reversed(range(len(planJson["absolute-time"]))):
-                tp,value = planJson["absolute-time"][i]
-                if value*1000 > self.getCurrentTime():
-                    #in the future : this is a deadline
-                    l = [ ("communicate-meta" in a["name"] and self.agent in a["name"]) for a in planJson["actions"].values() if a["startTp"] == tp or a["endTp"] == tp]
-                    if any(l):
-                        logger.info("Deleting %s,%s from the plan to remove a deadline" %(tp,value))
-                        del planJson["absolute-time"][i]
-        
+
         #Remove coordinating action for dead robots
         deletedActionKeys = set()
         deletedTps = set()
@@ -466,14 +451,18 @@ class Supervisor(threading.Thread):
         for i in reversed(range(len(planJson["absolute-time"]))):
             if planJson["absolute-time"][i][0] in deletedTps:
                 del planJson["absolute-time"][i]
+
+        return planJson
+        
+    def repairPlan(self, planJson):
+    
+        if self.pddlFiles is None:
+            logger.error("No provided PDDL files. Cannot repair")
+            return None
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
         
-        if self.pddlFiles is None:
-            logger.error("No provided PDDL files. Cannot repair")
-            sys.exit(1)
-            
         #compute the list of available agents
         agents = set(self.repairResponse.keys())
         agents.add(self.agent)
@@ -482,9 +471,7 @@ class Supervisor(threading.Thread):
             for a in self.agentsDead:
                 if a in agents:
                     agents.remove(a)
-        
-        del self.repairResponse
-                
+
         #Write the content of the pddl file to disk since hipop can only read files
         domainFile = tempfile.NamedTemporaryFile("w")
         domainFile.write(self.pddlFiles["domain"])
@@ -497,39 +484,98 @@ class Supervisor(threading.Thread):
         helperFile = tempfile.NamedTemporaryFile("w")
         helperFile.write(self.pddlFiles["helper"])
         helperFile.flush()
+
+        outputFile = tempfile.NamedTemporaryFile("w+")
         
         command = "hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
-            r = subprocess.call(command.split(" "))
+            r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
         except OSError as e:
             if e.errno == os.errno.ENOENT:
                 # handle file not found error.
                 logger.error("Hipop is not found. Install it to repair.")
-                sys.exit(1)
+                return None
             else:
                 # Something else went wrong while trying to run the command
-                logger.error("During the reparation hipop returned %s. Cannot repair." % r)
-                sys.exit(1)
+                logger.error("During the reparation something went wrong. Returned %s. Cannot repair." % r)
+                outputFile.seek(0)
+                for l in outputFile.readlines():
+                    logger.error(l.replace("\n",""))
+                return None
+
+        except subprocess.TimeoutExpired as e:
+            logger.error("During reparation : hipop timeout")
+            return None
         
         if(r == 0):
             with open("plan-repaired.plan") as f:
                 planStr = " ".join(f.readlines())
-            
-            #We have a new plan
-            self.sendRepairMessage(planStr)
-            
-            self.init(planStr, self.agent)
-            logger.info("Finished repairation : restarting the main loop")
-            self.state = State.RUNNING
-            self.mainLoop()
+        
+            logger.info("reparation succes")
+            return planStr
+
         else:
             logger.error("During the reparation hipop returned %s. Cannot repair." % r)
             if r == 1:
                 logger.error("No solution was found by hipop")
-            sys.exit(1)
-                
+            outputFile.seek(0)
+            for l in outputFile.readlines():
+                logger.error(l.replace("\n",""))
+            return None
 
+    
+    def executionFail(self):
+        
+        self.state = State.REPAIRINGACTIVE
+        
+        planJson = self.computeGlobalPlan()
+        
+        #Assume failure because of a deadline
+        #Find the next deadline and if possible (action not locked) iteratively shift it
+        if not self.plan.stn.isConsistent():
+            logger.info("Trying to shift deadlines")
+            comMetaKeys = [k for k,a in planJson["actions"].items() if "communicate-meta" in a["name"] and self.agent in a["name"] and ("locked" not in a or not a["locked"])]
+            
+            if len(comMetaKeys) == 0:
+                logger.error("Failed because of a deadline : no communicate-meta action to shift")
+                logger.error(planJson["actions"])
+                sys.exit(1)
+            else:
+                logger.info("I can shift : %s" % [planJson["actions"][k]["name"] for k in comMetaKeys])
+            
+            tps = set(itertools.chain.from_iterable((planJson["actions"][k]["startTp"], planJson["actions"][k]["endTp"]) for k in comMetaKeys))
+            logger.info("I can move tps : %s" % tps)
+            
+            for i in range(5): #number of repair tries
+                shift = 10 # in seconds
+                for i in range(len(planJson["absolute-time"])):
+                    tp,value = planJson["absolute-time"][i]
+                    if tp in tps:
+                        planJson["absolute-time"][i] = [tp, value + shift]
+                
+                planStr = self.repairPlan(planJson)
+                if planStr is not None:
+                    break
+
+        else:
+            planStr = self.repairPlan(planJson)
+        
+        if planStr is None:
+            logger.error("Reparation failed")
+            #TODO : implement a default strategy ? Notify other agents ?
+            sys.exit(1)
+
+
+        #We have a new plan
+        self.sendRepairMessage(planStr)
+        del self.repairResponse
+
+        self.init(planStr, self.agent)
+        logger.info("Finished reparation : restarting the main loop")
+        self.state = State.RUNNING
+        self.mainLoop()
+        
     def run(self):
         logger.info("Supervisor launched")
         
