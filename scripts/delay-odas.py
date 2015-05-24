@@ -12,12 +12,16 @@ def launch(m):
     print("Reveived start message")
     time.sleep(65)
 
+    print("Killing effibot2")
     alea["effibot2"]("robotDead", "{\"robot\":\"effibot2\"}")
     time.sleep(5)
 
+    print("Notifying the death of effibot2")
     #alea["effibot1"]("robotDead", "{\"robot\":\"effibot2\"}")
     alea["ressac1"]("robotDead", "{\"robot\":\"effibot2\"}")
     
+    print("done")
+    rospy.signal_shutdown("Done")
 
 def main():
     rospy.init_node("delay", anonymous=True)
