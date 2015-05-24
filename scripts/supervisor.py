@@ -23,7 +23,7 @@ def enum(*sequential, **named):
     enums['reverse_mapping'] = reverse
     return type('Enum', (), enums)
 
-State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD")
+State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE")
 
 class ExecutionFailed(Exception):
     def __init__(self, msg):
@@ -239,6 +239,8 @@ class Supervisor(threading.Thread):
 
         if action["name"] == "dummy end":
             logger.info("finished the plan")
+            self.state = State.DONE
+            self.stnUpdated()
             return
 
         if "abstract" not in action:
