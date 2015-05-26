@@ -6,6 +6,7 @@ from .hyper_executor import *
 from .libRessac_executor import *
 from .ressac_executor import *
 from .effibot_executor import *
+from .stats_executor import *
 
 def all_subclasses(classname):
     direct_subclasses = eval(classname).__subclasses__()

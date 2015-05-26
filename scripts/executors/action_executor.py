@@ -1,5 +1,6 @@
 import logging; logger = logging.getLogger("hidden")
 
+import threading
 import time
 from functools import partial
 import os
@@ -46,6 +47,8 @@ class DummyActionExecutor(AbstractActionExecutor):
 
     def __init__(self, agentName=None, **kwargs):
         logger.info("Using dummy executor")
+
+        self.eventsLock = threading.RLock()
         self.nextEvents = [] # list of dictionnary with time/callback to call
         
         self.agent = agentName
@@ -116,15 +119,16 @@ class DummyActionExecutor(AbstractActionExecutor):
     def update(self):
         currentTime = time.time()
 
-        for d in [d for d in self.nextEvents if d["time"] <= currentTime]:
-            #if "move mana" in d["actionJson"]["name"]:
-            #    d["cb"]({"type":"target_found", "position":{"x":1,"y":1}})
-            #    logger.warning("Simulating target found")
-            #else:
-            d["cb"]({"type":"ok"})
-            logger.info("calling a callback for %s" % d["actionJson"]["name"])
-            
-        self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
+        with self.eventsLock:
+            for d in [d for d in self.nextEvents if d["time"] <= currentTime]:
+                #if "move mana" in d["actionJson"]["name"]:
+                #    d["cb"]({"type":"target_found", "position":{"x":1,"y":1}})
+                #    logger.warning("Simulating target found")
+                #else:
+                d["cb"]({"type":"ok"})
+                logger.info("calling a callback for %s" % d["actionJson"]["name"])
+
+            self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
     
 class DummyMAActionExecutor(DummyActionExecutor):
     _name = "dummy-ma"
