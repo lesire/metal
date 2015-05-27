@@ -110,8 +110,9 @@ class DummyActionExecutor(AbstractActionExecutor):
     def has_communicated(self, *args, **kwargs):
         pass
     
-    def communicate_meta(self, *args, **kwargs):
-        pass
+    def communicate_meta(self, who1, who2, a, b, cb, actionJson, **kwargs):
+        logger.info("Assume communicate-meta succeed immediately")
+        cb("ok")
     
     def track(self, *args, **kwargs):
         logger.info("Received a track action")
