@@ -1,79 +1,124 @@
-from .action_executor import AbstractActionExecutor
+from .action_executor import DummyActionExecutor
 
 import logging; logger = logging.getLogger("hidden")
 
+import threading
+import time
+
 try:
     import rospy
-    from metal.srv import *
+    from metal.msg import *
 
-    class ROSActionExecutor(AbstractActionExecutor):
+    """
+    Provides an implementation of the communications with ROS.
+    Uses a unique topic (with in/out) for vnet capacities.
+    
+    Messages are split in two : header and payload.
+    The header identify the sender, the receiver, the status of the com (acked or not) and unique information (communication points)
+    
+    During a communicate action, will ack all the matching incomming communication.
+    While the other has not received it, will also send its payload.
+    
+    During a communicate-meta action, periodically send the payload
+    """
+    class ROSActionExecutor(DummyActionExecutor):
         _name = "ros"
 
         def __init__(self, agentName, **kwargs):
+            DummyActionExecutor.__init__(self, agentName, **kwargs)
             self.name = agentName
-            self._in_com = False
-            self._out_com = False
-            self._has_com = False
-            rospy.Service('communicate', CommunicateAction, self._communicate)
+            
+            self._current_msg = None #if not None, assume we are in com and this is the message to send
+            self._com_cb = None
+            
+            self._in_com_meta = False
+            self._com_meta_cb = None
+            
+            self._com_succeded = False #true if received the message from the other side
+            
+            self.last_time_sent = time.time()
+            self.time_gap = 0.1 # min time between resend, in seconds
+
+            self._com_sub = rospy.Subscriber("communicate/in", Communication, self._receiveCom)
+            self._com_pub = rospy.Publisher( "communicate/out", Communication, queue_size=10)
+
+            self._mutex = threading.RLock()
+            
             logger.info("ROS executor initialized")
 
         def _stop(self, action):
-            if "communicate" in action["name"]:
-                self._in_com = False
-                self._out_com = False
+            with self._mutex:
+                if "communicate-meta" in action["name"]:
+                    logger.info("end of a communicate-meta action")
+                    self._in_com_meta = False
+                elif "communicate" in action["name"]:
+                    self._current_msg = None
 
-        def _in_communication(self, com):
-            if self._out_com:
-                return com.first_robot == self._com_request.first_robot \
-                    and com.second_robot == self._com_request.second_robot \
-                    and com.first_position == self._com_request.first_position \
-                    and com.second_position == self._com_request.second_position
-            else:
-                return False
+        def _receiveCom(self, msg):
+            if msg.header.receiver != self.name: return # not for me
+            
+            with self._mutex:
+                if self._current_msg is None: return # Receive a com when not in a communicate action. TODO
+                
+                logger.info("Received a com message")
+                
+                if msg.header.sender == self._current_msg.header.receiver \
+                    and msg.header.receiver == self._current_msg.header.sender \
+                    and msg.header.sender_position == self._current_msg.header.receiver_position \
+                    and msg.header.receiver_position == self._current_msg.header.sender_position:
+                    # matching header
+                    logger.info("Received a com message for me")
+                
+                    self._com_succeded = True
+                    
+                    if self._in_com_meta:
+                        self._com_meta_cb("ok")
+                        self._com_meta_cb = None
+                        self._in_com_meta = False
+            
+                    if msg.header.reply_expected:
+                        self._send_msg()
 
-        def _communicate(self, req):
-            logger.info("Received communication request " + str(req))
-            if self._in_communication(req):
-                self._out_com = self._in_com
-                return CommunicateActionResponse(True)
-            else:
-                return CommunicateActionResponse(False)
-
-        def update(self):
-            if self._in_com:
-                try:
-                    ack = self._com_proxy(self._com_request)
-                    if ack.success:
-                        logger.info("Communication success")
-                        self._com_cb(ack.success)
-                        self._in_com = False
-                        self._has_com = True
-                except:
+                else:
+                    logger.warning("Received a message that I'm not expecting : %s" % msg.header)
+                    #ignore it, not the one I'm expecting
                     pass
 
-        def move(self, who, a, b, cb, **kwargs):
-            cb("ok")
+        def update(self):
+            DummyActionExecutor.update(self)
 
-        def observe(self, who, point, observation, cb, **kwargs):
-            cb("ok")
+            if self._in_com_meta:
+                self._send_msg()
+                
+            #TODO timeout
 
-        def has_communicated(self, first_robot, second_robot, cb, **kwargs):
-            cb(self._has_com)
+        #def has_communicated(self, first_robot, second_robot, cb, **kwargs):
+        #    cb(self._has_com)
+
+        def _send_msg(self):
+            with self._mutex:
+                if self._current_msg is not None and (time.time() - self.last_time_sent) > self.time_gap:
+                    logger.info("Sending a com message")
+                    
+                    self._current_msg.header.reply_expected = not self._com_succeded
+                    self._com_pub.publish(self._current_msg)
+                    self.last_time_sent = time.time()
 
         # communicate ressac1 ressac2 pt_aav_10249_-4585 pt_aav_12245_-4585
         def communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
-            if self.name == first_robot:
-                teammate = second_robot
-            else:
-                teammate = first_robot
+            logger.info("Start communicate action")
+            self._com_succeded = False
 
-            self._com_request = CommunicateActionRequest(first_robot, second_robot, first_point, second_point)
-            self._com_cb = cb
-            self._com_proxy = rospy.ServiceProxy("/" + teammate + "/communicate", CommunicateAction)
-            logger.info("Waiting communication  with /" + teammate + "/communicate")
-            self._in_com = True
-            self._out_com = True
-            self._has_com = False
+            self._current_msg = Communication(CommunicationId(first_robot, second_robot, first_point, second_point, True), [])
+            self.com_cb = cb
+
+        def communicate_meta(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
+            with self._mutex:
+                logger.info("Start communicate-meta action")
+                self._in_com_meta = True
+                self._com_meta_cb = cb
+                self._send_msg()
+
 except ImportError:
     logger.warning("Cannot import ROS")
     pass
