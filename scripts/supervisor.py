@@ -286,9 +286,9 @@ class Supervisor(threading.Thread):
         
         c = self.plan.stn.getBounds(str(tp))
         
-        logger.debug("Is STN Consistent : %s" % self.plan.stn.isConsistent())
-        logger.debug("Bounds %s" % c)
-        logger.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
+        #logger.debug("Is STN Consistent : %s" % self.plan.stn.isConsistent())
+        #logger.debug("Bounds %s" % c)
+        #logger.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
             
         self.setTimePoint(tp, value)
             

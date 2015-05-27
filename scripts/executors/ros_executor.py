@@ -33,7 +33,6 @@ try:
                 return False
 
         def _communicate(self, req):
-            logger.info("Received communication request " + str(req))
             if self._in_communication(req):
                 self._out_com = self._in_com
                 return CommunicateActionResponse(True)
