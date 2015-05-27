@@ -1,0 +1,5 @@
+string sender
+string receiver
+string sender_position
+string receiver_position
+bool reply_expected

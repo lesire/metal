@@ -6,6 +6,8 @@
     <node name="minnie" pkg="metal" type="hidden-ros.py" ns="minnie" args="--executor=$(arg executor) --agentName=minnie --waitSignal" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
     </node>
 
 </launch>

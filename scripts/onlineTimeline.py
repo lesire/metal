@@ -145,7 +145,10 @@ if __name__ == "__main__":
 
     window = OnlineTimeline()
     window.show()
-    
+
+    if "raise_" in dir(window):
+        window.raise_()
+
     timer = QTimer()
     timer.timeout.connect(window.plotResults)
     timer.start(1000)

@@ -49,12 +49,14 @@ add_message_files(
     RepairMsg.msg
     StnArc.msg
     MaSTNUpdate.msg
+    Communication.msg
+    CommunicationId.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  CommunicateAction.srv
+  #CommunicateAction.srv
   AleaAction.srv
 )
 

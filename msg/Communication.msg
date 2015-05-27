@@ -1,0 +1,2 @@
+CommunicationId header
+string[] deadRobots
