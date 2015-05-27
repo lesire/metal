@@ -25,8 +25,8 @@ try:
 
         def _in_communication(self, com):
             if self._out_com:
-                return com.first_robot == self._com_request.first_robot \
-                    and com.second_robot == self._com_request.second_robot \
+                return com.first_robot == self._com_request.second_robot \
+                    and com.second_robot == self._com_request.first_robot \
                     and com.first_position == self._com_request.first_position \
                     and com.second_position == self._com_request.second_position
             else:
@@ -46,14 +46,14 @@ try:
                     ack = self._com_proxy(self._com_request)
                     if ack.success:
                         logger.info("Communication success")
-                        self._com_cb(ack.success)
+                        self._com_cb("ok")
                         self._in_com = False
                         self._has_com = True
                 except:
                     pass
 
         def has_communicated(self, first_robot, second_robot, cb, **kwargs):
-            cb(self._has_com)
+            cb(("ok" if self._has_com else "no-com"))
 
         # communicate ressac1 ressac2 pt_aav_10249_-4585 pt_aav_12245_-4585
         def communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
