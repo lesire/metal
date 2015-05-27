@@ -91,7 +91,7 @@ class OnlineTimeline(PlotWindow):
         captions = [" " for _ in range(len(self.data)+2)]
         for robot in sorted(self.data.keys()):
             index = None
-            posCycle = itertools.cycle([0.1,0.2,0.3,0.4,0.5])
+            posCycle = itertools.cycle([0.15,0.3,0.45,0.6,0.75])
             for action in sorted(self.data[robot]["actions"], key=lambda x: x["timeStart"]):
 
                 if "observe" in action["name"] or action["hierarchical"]:
