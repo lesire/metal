@@ -153,7 +153,7 @@ class SupervisorRos(Supervisor):
 
     def setTimePoint(self, tp, value):
         l = Supervisor.setTimePoint(self, tp, value)
-        logger.debug("Updated constraints: %s" % str(l))
+        rospy.logdebug("Updated constraints: %s" % str(l))
         u = MaSTNUpdate()
         u.header.stamp = rospy.Time.now()
         for a in l:
@@ -165,4 +165,4 @@ class SupervisorRos(Supervisor):
             return
         for a in data.arcs:
             l = self.plan.stn.setConstraint(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue)
-            logger.debug("Constaint %s => %s" % (str(a), str(l)))
+            rospy.logdebug("Constaint %s => %s" % (str(a), str(l)))
