@@ -70,6 +70,7 @@ class Plan:
             for b in self.tpEnd.keys():
                 if a == b: continue
                 self.stn.addConstraint(self.tpEnd[a], self.tpEnd[b], 0, 0)
+        self.tpName[1] = "1-end-" + self.agent
 
         for index,a in self.actions.items():
             tpNumber = a["startTp"]
@@ -125,7 +126,7 @@ class Plan:
                 else:
                     logger.warning("Action %s does not have a dMin ?" % a["name"])
                     
-                if isActionControllable(a["name"]):
+                if False and isActionControllable(a["name"]):
                     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
@@ -260,7 +261,9 @@ class Plan:
                 
             self.jsonDescr["actions"][index] = action
 
-        if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
+        c = self.stn.getBounds(tpName)
+        if value < c.lb or value > c.ub:
+        #if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
             logger.warning("Calling set timepoint for %s at %s" % (tpName, value))
             logger.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
             #logger.warning(self.stn.export())
