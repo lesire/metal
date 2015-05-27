@@ -9,12 +9,12 @@ import sys
 from std_msgs.msg import Empty,String
 from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
 from metal.srv import AleaAction
-from supervisor import Supervisor
+from supervisor import Supervisor,State
 
 #from mastn_execution.srv import StnVisu
 
 class SupervisorRos(Supervisor):
-    def __init__ (self, inQueue, outQueue, planStr, stopEvent, agent = None, pddlFiles=None):
+    def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
             sys.exit(1)
@@ -26,10 +26,10 @@ class SupervisorRos(Supervisor):
         self.mastn_pub = rospy.Publisher('hidden/mastnUpdate/out', MaSTNUpdate, queue_size=10) 
         self.mastn_sub = rospy.Subscriber('hidden/mastnUpdate/in', MaSTNUpdate, self.mastnUpdate) 
         
-        self.alea_srv = rospy.Service("/%s/alea" % agent, AleaAction, self.aleaReceived)
+        self.alea_srv = rospy.Service("alea", AleaAction, self.aleaReceived)
         
-        Supervisor.__init__(self, inQueue, outQueue, planStr, stopEvent, agent, pddlFiles)
-        
+        Supervisor.__init__(self, inQueue, outQueue, planStr, startEvent, stopEvent, agent, pddlFiles)
+       
         self.repairRos = True
 
     def aleaReceived(self,msg):
@@ -44,6 +44,19 @@ class SupervisorRos(Supervisor):
             logger.error("Received an AleaAction service call but the filed data is not json-encoded : %s " % msg.data)
             return False
         
+        if msg.aleaType == "state":
+            logger.info("Changing the current state due to a message reveived on the alea topic")
+            s = data["state"]
+            if not isinstance(s, str):
+                logger.error("state field is not a string : " % data)
+                return False
+            s = s.upper()
+            if s not in dir(State):
+                logger.error("State %s is unknown" % s)
+                return False
+            self.state = getattr(State, s)
+            return True
+
         logger.info("Injecting an alea from ROS into the queue")
         data["type"] = "alea"
         data["aleaType"] = msg.aleaType
@@ -73,13 +86,14 @@ class SupervisorRos(Supervisor):
         if self.agent == sender:
             return
     
-        if self.isDead:
+        if self.state == State.DEAD:
             return
         
         if type == "repairRequest":
             logger.info("Received a repair request. Pausing the execution")
-            self.inReparation = True
-
+            self.state = State.REPAIRINGPASSIVE
+            self.stnUpdated()
+            
             msg = RepairMsg(self.agent, "repairResponse", self.getCurrentTime(), json.dumps(self.plan.getLocalJsonPlan(self.agent)))
             self.repair_pub.publish(msg)
 
@@ -102,7 +116,8 @@ class SupervisorRos(Supervisor):
             logger.info("Receiving a new plan to execute from %s" % sender)
             planStr = msg
             self.init(planStr, self.agent)
-            self.inReparation = False
+            self.state = State.RUNNING
+            self.stnUpdated()
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
@@ -134,7 +149,7 @@ class SupervisorRos(Supervisor):
         currentTime = 0
         if self.beginDate >= 0:
             currentTime = self.getCurrentTime()
-        self.stnvisu_pub.publish(self.agent, currentTime, data)
+        self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
     def setTimePoint(self, tp, value):
         l = Supervisor.setTimePoint(self, tp, value)

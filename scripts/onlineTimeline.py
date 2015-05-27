@@ -28,13 +28,11 @@ class OnlineTimeline(PlotWindow):
         
         self.data = {}
         self.colors = itertools.cycle(["r","g","b"])
-
-        self.mutex = True
         
-        self.beginDate = time.time()
+        self.beginDate = -1
 
         rospy.init_node('visu', anonymous=True)
-        self.subscriber = rospy.Subscriber("/hidden/stnvisu", StnVisu, self.plotResults, queue_size = 1 )
+        self.subscriber = rospy.Subscriber("/hidden/stnvisu", StnVisu, self.getInput, queue_size = 1 )
 
         self.subscriber = rospy.Subscriber("/hidden/start", Empty, self.start, queue_size = 1 )
         
@@ -66,8 +64,8 @@ class OnlineTimeline(PlotWindow):
             return " ".join(name.split(" ")[1:3])
         else:
             return name
-    
-    def plotResults(self, data): 
+
+    def getInput(self, data):
         if data is not None:
             if data.agent not in self.data:
                 self.data[data.agent] = {"color" : next(self.colors), "index":1+len(self.data)}
@@ -75,13 +73,12 @@ class OnlineTimeline(PlotWindow):
             self.data[data.agent]["actions"] = []
             for m in data.actions:
                 self.data[data.agent]["actions"].append({"name":m.name, "timeStart": m.timeStartLb/1000,  "timeEnd": m.timeEndLb/1000, "executed":m.executed, "executing":m.executing, "hierarchical":m.hierarchical})
+                
+                self.data[data.agent]["state"] = data.state
 
-            logger.info("Received message from %s" % data.agent)
+            #logger.info("Received message from %s" % data.agent)
 
-        while not self.mutex:
-            rospy.sleep(0.1)
-        self.mutex = False
-        
+    def plotResults(self):
         self.axes.clear()        
         self.axes.set_autoscaley_on(False)
         
@@ -94,7 +91,7 @@ class OnlineTimeline(PlotWindow):
         captions = [" " for _ in range(len(self.data)+2)]
         for robot in sorted(self.data.keys()):
             index = None
-            posCycle = itertools.cycle([0.1,0.2,0.3,0.4,0.5])
+            posCycle = itertools.cycle([0.15,0.3,0.45,0.6,0.75])
             for action in sorted(self.data[robot]["actions"], key=lambda x: x["timeStart"]):
 
                 if "observe" in action["name"] or action["hierarchical"]:
@@ -123,12 +120,13 @@ class OnlineTimeline(PlotWindow):
                 self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, facecolor=color, edgecolor="k", lw=1, ls="solid", alpha=alpha)
                 
             if index is not None:
-                captions[index] = robot
+                captions[index] = robot + "\n" + self.data[robot]["state"]
 
         self.axes.set_yticks(range(len(captions)))
         self.axes.set_yticklabels(captions)
 
-        self.axes.vlines(self.getCurrentTime()/1000, 0, len(captions), color="r")
+        if self.beginDate > 0:
+            self.axes.vlines(self.getCurrentTime()/1000, 0, len(captions), color="r")
                 
         self.canvas.draw()
         
@@ -149,7 +147,7 @@ if __name__ == "__main__":
     window.show()
     
     timer = QTimer()
-    timer.timeout.connect(functools.partial(window.plotResults, None))
+    timer.timeout.connect(window.plotResults)
     timer.start(1000)
     
     app.exec_()

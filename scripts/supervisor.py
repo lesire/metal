@@ -3,6 +3,7 @@ from __future__ import division
 
 from copy import copy
 from math import floor
+import itertools
 import json
 import os
 import subprocess
@@ -15,6 +16,15 @@ import logging; logger = logging.getLogger("hidden")
 
 import plan
 
+#Add enum-like code. Taken from https://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+def enum(*sequential, **named):
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    reverse = dict((value, key) for key, value in enums.items())
+    enums['reverse_mapping'] = reverse
+    return type('Enum', (), enums)
+
+State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE")
+
 class ExecutionFailed(Exception):
     def __init__(self, msg):
         self.msg = msg
@@ -22,24 +32,25 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
-    def __init__ (self, inQueue, outQueue, planStr, stopEvent, agent = None, pddlFiles=None):
+    def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
         self.inQueue = inQueue
         self.outQueue = outQueue
         self.pddlFiles = pddlFiles
         
         self.beginDate = -1
+        self.state = State.INIT
         self.repairRos = False
-        
-        self.isDead = False #if true, multi will not respond to anything. Simulate a lost robot
-        self.inReparation = False
 
         self.agentsDead = []
 
-        self.init(planStr, agent)
-        
+        self.startEvent = startEvent
+        self.stopEvent = stopEvent
+
         threading.Thread.__init__ (self, name="%s-sup" % agent)
         
-        self.stopEvent = stopEvent
+        self.init(planStr, agent)
+        
+    
         
     def init(self, planStr, agent):
         if agent is None:
@@ -109,8 +120,17 @@ class Supervisor(threading.Thread):
                 logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
                 raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
     
-        self.stnUpdated()
+        self.visuUpdate()
     
+    def visuUpdate(self):
+        if self.state == State.DEAD:
+            self.stnUpdated(onlyPast=True)
+            #stop sending messages
+        else:
+            self.stnUpdated()
+            if not self.stopEvent.is_set():
+                threading.Timer(1, self.visuUpdate).start() #re-run it in 1 second
+
     def setTimePoint(self, tpName, value):
         return self.plan.setTimePoint(tpName, value)
     
@@ -193,8 +213,6 @@ class Supervisor(threading.Thread):
         else:
             logger.error("\tError : a timepoint does not match its action %s" % tp)
             raise ExecutionFailed("\tA timepoint does not match its action %s" % tp)
-        
-        self.stnUpdated()
 
     def executeAction(self, action, currentTime):
         if self.tp[action["tStart"]][1] != "controllable" and self.tp[action["tStart"]][1] != "future":
@@ -213,6 +231,8 @@ class Supervisor(threading.Thread):
 
         if action["name"] == "dummy end":
             logger.info("finished the plan")
+            self.state = State.DONE
+            self.stnUpdated()
             return
 
         if "abstract" not in action:
@@ -237,7 +257,7 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
     def targetFound(self, targetPos = None):
-        self.inReparation = True
+        self.state = State.TRACKING
         self.outQueue.put({"type":"startAction", "action":{"name":"track", "dMin":1}, "time":self.getCurrentTime()})
     
     def endAction(self, msg):
@@ -247,7 +267,7 @@ class Supervisor(threading.Thread):
 
         report = msg.get("report", None)
         
-        if type(report) == str:
+        if isinstance(report, str):
             report = {"type" : report}
 
         if report is None:
@@ -312,8 +332,8 @@ class Supervisor(threading.Thread):
             print("{: <70} ({}) : [{}, {}]".format(*i))
 
     def update(self):
-        if self.inReparation:
-            return # do not execute the plan if a repair is under way
+        if not self.state == State.RUNNING:
+            return # do not execute the plan if not running
 
         l = next(self.getExecutableTps(), False)
 
@@ -337,8 +357,7 @@ class Supervisor(threading.Thread):
             
             if data["robot"] == self.agent:
                 logger.warning("Received a robotDead for myself. Deactivating")
-                self.isDead = True
-                self.stnUpdated(onlyPast=True)
+                self.state = State.DEAD
                 return
             else:
                 logger.warning("Dealing with the death of %s" % data["robot"])
@@ -361,8 +380,7 @@ class Supervisor(threading.Thread):
     def repairCallback(self, type, time, sender, msg):
         pass
 
-    def executionFail(self):
-        
+    def computeGlobalPlan(self):
         self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
         if self.repairRos:
@@ -373,7 +391,6 @@ class Supervisor(threading.Thread):
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
             logger.info("Dead agents : %s" % self.agentsDead)
             for agent in self.agentsDead:
-                logger.info("%s %s %s" % (agent in self.repairResponse, "mana" in self.repairResponse, agent))
                 if agent in self.repairResponse:
                     logger.warning("Received a repair response from %s. Ignoring it since he is dead" % agent)
                     del self.repairResponse[agent]
@@ -400,18 +417,7 @@ class Supervisor(threading.Thread):
         
         planJson = plan.Plan.mergeJsonPlans(self.repairResponse)
         planJson["current-time"] = time.time() - self.beginDate
-        
-        #Failure because of a deadline : remove the next one
-        if not self.plan.stn.isConsistent():
-            for i in reversed(range(len(planJson["absolute-time"]))):
-                tp,value = planJson["absolute-time"][i]
-                if value*1000 > self.getCurrentTime():
-                    #in the future : this is a deadline
-                    l = [ ("communicate-meta" in a["name"] and self.agent in a["name"]) for a in planJson["actions"].values() if a["startTp"] == tp or a["endTp"] == tp]
-                    if any(l):
-                        logger.info("Deleting %s,%s from the plan to remove a deadline" %(tp,value))
-                        del planJson["absolute-time"][i]
-        
+
         #Remove coordinating action for dead robots
         deletedActionKeys = set()
         deletedTps = set()
@@ -439,14 +445,18 @@ class Supervisor(threading.Thread):
         for i in reversed(range(len(planJson["absolute-time"]))):
             if planJson["absolute-time"][i][0] in deletedTps:
                 del planJson["absolute-time"][i]
+
+        return planJson
+        
+    def repairPlan(self, planJson):
+    
+        if self.pddlFiles is None:
+            logger.error("No provided PDDL files. Cannot repair")
+            return None
         
         with open("plan-broken.plan", "w") as f:
             json.dump(planJson, f)
         
-        if self.pddlFiles is None:
-            logger.error("No provided PDDL files. Cannot repair")
-            sys.exit(1)
-            
         #compute the list of available agents
         agents = set(self.repairResponse.keys())
         agents.add(self.agent)
@@ -455,56 +465,115 @@ class Supervisor(threading.Thread):
             for a in self.agentsDead:
                 if a in agents:
                     agents.remove(a)
-        
-        del self.repairResponse
-                
+
         #Write the content of the pddl file to disk since hipop can only read files
-        domainFile = tempfile.NamedTemporaryFile("w")
-        domainFile.write(self.pddlFiles["domain"])
-        domainFile.flush()
+        with open("plan-broken-domain.pddl", "w") as f:
+            f.write(self.pddlFiles["domain"])
+
+        with open("plan-broken-prb.pddl", "w") as f:
+            f.write(self.pddlFiles["prb"])
+
+        with open("plan-broken-helper.pddl", "w") as f:
+            f.write(self.pddlFiles["helper"])
+
+        outputFile = tempfile.NamedTemporaryFile("w+")
         
-        prbFile = tempfile.NamedTemporaryFile("w")
-        prbFile.write(self.pddlFiles["prb"])
-        prbFile.flush()
-        
-        helperFile = tempfile.NamedTemporaryFile("w")
-        helperFile.write(self.pddlFiles["helper"])
-        helperFile.flush()
-        
-        command = "hipop -L error --timing -H {helper} -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan {domain} {prb}".format(domain=domainFile.name, prb=prbFile.name, helper=helperFile.name, agents="_".join(agents))
+        command = "hipop -L error --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
-            r = subprocess.call(command.split(" "))
+            r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
         except OSError as e:
             if e.errno == os.errno.ENOENT:
                 # handle file not found error.
                 logger.error("Hipop is not found. Install it to repair.")
-                sys.exit(1)
+                return None
             else:
                 # Something else went wrong while trying to run the command
-                logger.error("During the reparation hipop returned %s. Cannot repair." % r)
-                sys.exit(1)
+                logger.error("During the reparation something went wrong. Returned %s. Cannot repair." % r)
+                outputFile.seek(0)
+                for l in outputFile.readlines():
+                    logger.error(l.replace("\n",""))
+                return None
+
+        except subprocess.TimeoutExpired as e:
+            logger.error("During reparation : hipop timeout")
+            return None
         
         if(r == 0):
             with open("plan-repaired.plan") as f:
                 planStr = " ".join(f.readlines())
-            
-            #We have a new plan
-            self.sendRepairMessage(planStr)
-            
-            self.init(planStr, self.agent)
-            logger.info("Finished repairation : restarting the main loop")
-            self.mainLoop()
+        
+            logger.info("reparation succes")
+            return planStr
+
         else:
             logger.error("During the reparation hipop returned %s. Cannot repair." % r)
             if r == 1:
                 logger.error("No solution was found by hipop")
-            sys.exit(1)
-                
+            outputFile.seek(0)
+            for l in outputFile.readlines():
+                logger.error(l.replace("\n",""))
+            return None
 
+    
+    def executionFail(self):
+        
+        self.state = State.REPAIRINGACTIVE
+        
+        planJson = self.computeGlobalPlan()
+        
+        #Assume failure because of a deadline
+        #Find the next deadline and if possible (action not locked) iteratively shift it
+        if not self.plan.stn.isConsistent():
+            logger.info("Trying to shift deadlines")
+            comMetaKeys = [k for k,a in planJson["actions"].items() if "communicate-meta" in a["name"] and self.agent in a["name"] and ("locked" not in a or not a["locked"])]
+            
+            if len(comMetaKeys) == 0:
+                logger.error("Failed because of a deadline : no communicate-meta action to shift")
+                logger.error(planJson["actions"])
+                sys.exit(1)
+            else:
+                logger.info("I can shift : %s" % [planJson["actions"][k]["name"] for k in comMetaKeys])
+            
+            tps = set(itertools.chain.from_iterable((planJson["actions"][k]["startTp"], planJson["actions"][k]["endTp"]) for k in comMetaKeys))
+            logger.info("I can move tps : %s" % tps)
+            
+            for i in range(5): #number of repair tries
+                shift = 10 # in seconds
+                for i in range(len(planJson["absolute-time"])):
+                    tp,value = planJson["absolute-time"][i]
+                    if tp in tps:
+                        planJson["absolute-time"][i] = [tp, value + shift]
+                
+                planStr = self.repairPlan(planJson)
+                if planStr is not None:
+                    break
+
+        else:
+            planStr = self.repairPlan(planJson)
+        
+        if planStr is None:
+            logger.error("Reparation failed")
+            #TODO : implement a default strategy ? Notify other agents ?
+            sys.exit(1)
+
+
+        #We have a new plan
+        self.sendRepairMessage(planStr)
+        del self.repairResponse
+
+        self.init(planStr, self.agent)
+        logger.info("Finished reparation : restarting the main loop")
+        self.state = State.RUNNING
+        self.mainLoop()
+        
     def run(self):
         logger.info("Supervisor launched")
         
+        self.startEvent.wait()
+
+        self.state = State.RUNNING
+
         if self.plan.initTime is None:
             #begining of the plan
             self.beginDate = time.time()
@@ -523,12 +592,12 @@ class Supervisor(threading.Thread):
     def mainLoop(self):
         hasFailed = False
         try:
-            while not self.isExecuted() and not self.isDead and not self.stopEvent.is_set():
-                if not self.inReparation:
+            while not self.isExecuted() and self.state != State.DEAD and not self.stopEvent.is_set():
+                if self.state == State.RUNNING:
                     while not self.inQueue.empty():
                         msg = self.inQueue.get()
         
-                        if type(msg) != dict or "type" not in msg:
+                        if not isinstance(msg, dict) or "type" not in msg:
                             logger.error("Supervisor received an ill-formated message : %s" % msg)
                             continue
                         
@@ -539,7 +608,7 @@ class Supervisor(threading.Thread):
                         else:
                             logger.warning("Supervisor received unknown message %s" % msg)
                         
-                if not self.isDead:
+                if self.state != State.DEAD:
                     self.update()
                 self.stopEvent.wait(0.1)
         except ExecutionFailed as e:

@@ -263,7 +263,7 @@ class Plan:
         if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
             logger.warning("Calling set timepoint for %s at %s" % (tpName, value))
             logger.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
-            logger.warning(self.stn.export())
+            #logger.warning(self.stn.export())
 
 
         #add this constraint in the STN
@@ -354,8 +354,6 @@ class Plan:
     # special case for "dead" robots : remove their actions and the link using them
     @staticmethod
     def mergeJsonPlans(data):
-        logger.warning(data)
-
         #Check for consistency
         for agent1,agent2 in itertools.combinations(data.keys(),2):
             actionKeys1 = set(data[agent1]["actions"].keys())
