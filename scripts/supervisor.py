@@ -83,7 +83,7 @@ class Supervisor(threading.Thread):
                     self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
                 if a["tEnd"] in self.plan.stn.getNodeIds():
                     self.tp[a["tEnd"]] = [a["name"], "uncontrollable"]
-            elif "abstract" in a:
+            elif a["abstract"]:
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "controllable"]
             elif a["controllable"]:
@@ -116,7 +116,7 @@ class Supervisor(threading.Thread):
             if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
                 logger.info("When importing, setting the end time of %s" % action["name"])
                 self.tp[action["tEnd"]][1] = "future"
-                if "abstract" in action:
+                if action["abstract"]:
                     pass
                 elif action["controllable"]:
                     self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
@@ -208,7 +208,7 @@ class Supervisor(threading.Thread):
                     logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
 
-                if not "abstract" in a and self.isResponsibleForAction(a):
+                if a["abstract"] and self.isResponsibleForAction(a):
                     logger.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
@@ -243,7 +243,7 @@ class Supervisor(threading.Thread):
             self.stnUpdated()
             return
 
-        if "abstract" not in action:
+        if not action["abstract"]:
             if not self.isResponsibleForAction(action):
                 #This action should not be executed by this robot. Assume someone else will do it
                 self.tp[action["tEnd"]][1] = "future"
