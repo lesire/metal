@@ -21,6 +21,8 @@
         <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
         <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
         <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/in" to="/hidden/executedTp" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/out" to="/hidden/executedTp" unless="$(arg vnet)"/>
     </node>
 
     <node name="r2" pkg="metal" type="hidden-ros.py" ns="r2" args="--executor=$(arg executor) --agentName=r2 --waitSignal" if="$(arg simu)" >
@@ -30,6 +32,8 @@
         <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
         <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
         <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/in" to="/hidden/executedTp" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/out" to="/hidden/executedTp" unless="$(arg vnet)"/>
     </node>
 
     <node name="bag" pkg="rosbag" type="record" args="/hidden/repair -o hidden_repair" if="$(arg bag_repair)" />

@@ -7,7 +7,7 @@ import rospy
 import json
 import sys
 from std_msgs.msg import Empty,String
-from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
+from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc, ExecutedTp
 from metal.srv import AleaAction
 from supervisor import Supervisor,State
 
@@ -26,6 +26,9 @@ class SupervisorRos(Supervisor):
         self.mastn_pub = rospy.Publisher('hidden/mastnUpdate/out', MaSTNUpdate, queue_size=10) 
         self.mastn_sub = rospy.Subscriber('hidden/mastnUpdate/in', MaSTNUpdate, self.mastnUpdate) 
         
+        self.exectp_pub = rospy.Publisher('hidden/executedTp/out', ExecutedTp, queue_size=10) 
+        self.exectp_sub = rospy.Subscriber('hidden/executedTp/in', ExecutedTp, self.executedTp_cb)
+
         self.alea_srv = rospy.Service("alea", AleaAction, self.aleaReceived)
         
         Supervisor.__init__(self, inQueue, outQueue, planStr, startEvent, stopEvent, agent, pddlFiles)
@@ -154,11 +157,16 @@ class SupervisorRos(Supervisor):
     def setTimePoint(self, tp, value):
         l = Supervisor.setTimePoint(self, tp, value)
         rospy.logdebug("Updated constraints: %s" % str(l))
+        
         u = MaSTNUpdate()
         u.header.stamp = rospy.Time.now()
         for a in l:
             u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
-        self.mastn_pub.publish(u)
+        self.mastn_pub.publish(u) 
+        
+        l = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+        rospy.logdebug("Executed frontier nodes: %s" % str(l))
+        self.exectp_pub.publish(l)
             
     def mastnUpdate(self, data):
         if data._connection_header["callerid"] == rospy.get_name():
@@ -166,3 +174,11 @@ class SupervisorRos(Supervisor):
         for a in data.arcs:
             l = self.plan.stn.setConstraint(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue)
             rospy.logdebug("Constaint %s => %s" % (str(a), str(l)))
+
+    def executedTp_cb(self, data):
+        if data._connection_header["callerid"] == rospy.get_name():
+            return
+        rospy.logdebug("Executed remote nodes: %s" % str(data.nodes))
+        for n in data.nodes:
+            self.tp[n][1] = "past"
+            self.executedTp[n] = self.plan.stn.getBounds(n).lb
