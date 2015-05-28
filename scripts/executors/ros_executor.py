@@ -186,7 +186,13 @@ try:
                 logger.error("Cannot know the start time of %s" % actionJson["name"])
             t = kwargs.get("time", None)
 
-            self._stats_pub.publish(json.dumps({"type":"observe", "by":who, "from":a, "to":b, "time":t}))
+            self._stats_pub.publish(json.dumps({"type":"observe", "by":who, "from":a, "to":b, "time":t}, sort_keys=True))
+
+        def stopExecutor(self, time):
+            super(ROSActionExecutor, self).stopExecutor(time)
+
+            self._stats_pub.publish(json.dumps({"type":"stop", "by":self.name, "time":time}, sort_keys=True))
+
 
 
 

@@ -130,7 +130,10 @@ class DummyActionExecutor(AbstractActionExecutor):
                 logger.info("calling a callback for %s" % d["actionJson"]["name"])
 
             self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
-    
+
+    def stopExecutor(self, time):
+        pass
+
 class DummyMAActionExecutor(DummyActionExecutor):
     _name = "dummy-ma"
 

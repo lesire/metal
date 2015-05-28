@@ -71,8 +71,8 @@ class Executor(threading.Thread):
         
     def stopExecutor(self, msg):
         logger.info("Executor received stop message")
-        pass
-    
+        self.actionExecutor.stopExecutor(self.user_time(time.time()))
+
     def run(self):
         logger.info("Executor launched")
         
