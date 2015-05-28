@@ -15,7 +15,7 @@ import sys
 import rospy
 import rosgraph
 from std_msgs.msg import Empty
-from roshidden.srv import AleaAction
+from metal.srv import AleaAction
 
 aleaServices = {}
 
