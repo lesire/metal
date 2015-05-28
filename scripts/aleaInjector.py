@@ -30,13 +30,6 @@ def getServices():
             aleaServices[agent] = rospy.ServiceProxy("/%s/executor/alea" % agent, AleaAction)
 
 #assume each field has type, date, to and data
-"""
-data = {"0":{"type" : "robotDead", "date":70, "to":"effibot2", "data":{"robot" : "effibot2"}},
-        "1":{"type" : "robotDead", "date":72, "to":"ressac1", "data":{"robot" : "effibot2"}},
-        "2":{"type" : "delay", "date":10, "to":"effibot1", "data":{"delay" : 10}},
-        "3":{"type" : "delay", "date":30, "to":"effibot1", "data":{"delay" : 10}}
-        }
-"""
 data = {}
 
 def launch(m):
@@ -92,7 +85,7 @@ def main(argv):
 
     rospy.Subscriber("/hidden/start", Empty, launch, queue_size = 1 )
 
-    logger.info("Delay module started")
+    logger.info("Alea injector module started")
     
     if sys.version_info >= (3,4):
         threading.main_thread().setName("%delay")
