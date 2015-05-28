@@ -16,12 +16,12 @@ class AbstractActionExecutor:
         for f in os.listdir(folder):
             os.remove(os.path.join(folder, f))
 
-    def execute(self, action, cb):
+    def execute(self, action, cb, time = None):
         a, *args = action["name"].split(" ")
         a = a.replace('-', '_')
         logger.debug("executing {a}({args})".format(a=a,args=args))
         method = getattr(self, a)
-        method(*args, cb=partial(self.report, action, cb), actionJson=action)
+        method(*args, cb=partial(self.report, action, cb), actionJson=action, time=time)
 
     def stop(self, action):
         if not action["controllable"]:
