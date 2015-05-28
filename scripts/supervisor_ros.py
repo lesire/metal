@@ -175,6 +175,9 @@ class SupervisorRos(Supervisor):
             l = self.plan.stn.setConstraint(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue)
             rospy.logdebug("Constaint %s => %s" % (str(a), str(l)))
 
+            if not self.plan.stn.isConsistent():
+                logger.error("Received an update from %s. When setting the constraint %s, stn become inconsistent" % (data._connection_header["callerid"], a))
+
     def executedTp_cb(self, data):
         if data._connection_header["callerid"] == rospy.get_name():
             return
