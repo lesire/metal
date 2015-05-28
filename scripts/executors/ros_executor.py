@@ -2,15 +2,23 @@ from .action_executor import DummyActionExecutor
 
 import logging; logger = logging.getLogger("hidden")
 
+import json
 import threading
 import time
 
 try:
     import rospy
+    from std_msgs.msg import Empty, String
     from metal.msg import *
+    from metal.srv import *
 
     """
-    Provides an implementation of the communications with ROS.
+    Provides several capabilities:
+      - communication with ROS
+      - listen for injected alea
+      - broadcast information for creating statistics
+    
+    For the communications :
     Uses a unique topic (with in/out) for vnet capacities.
     
     Messages are split in two : header and payload.
@@ -28,6 +36,7 @@ try:
             DummyActionExecutor.__init__(self, agentName, **kwargs)
             self.name = agentName
             
+            ## Communication ##
             self._current_msg = None #if not None, assume we are in com and this is the message to send
             self._com_cb = None
             
@@ -42,12 +51,20 @@ try:
             self._com_sub = rospy.Subscriber("communicate/in", Communication, self._receiveCom)
             self._com_pub = rospy.Publisher( "communicate/out", Communication, queue_size=10)
 
-            self._mutex = threading.RLock()
+            self._com_mutex = threading.RLock()
             
+            ## Injecting aleas ##
+            self._alea_srv = rospy.Service("executor/alea", AleaAction, self.aleaReceived)
+
+            ## Broadcast statistics ##
+            self._stats_pub = rospy.Publisher("/hidden/stats", String, queue_size=10)
+
             logger.info("ROS executor initialized")
+        
+        ## Communications ##
 
         def _stop(self, action):
-            with self._mutex:
+            with self._com_mutex:
                 if "communicate-meta" in action["name"]:
                     logger.info("end of a communicate-meta action")
                     self._in_com_meta = False
@@ -57,7 +74,7 @@ try:
         def _receiveCom(self, msg):
             if msg.header.receiver != self.name: return # not for me
             
-            with self._mutex:
+            with self._com_mutex:
                 if self._current_msg is None: return # Receive a com when not in a communicate action. TODO
                 
                 logger.info("Received a com message")
@@ -92,11 +109,8 @@ try:
                 
             #TODO timeout
 
-        #def has_communicated(self, first_robot, second_robot, cb, **kwargs):
-        #    cb(self._has_com)
-
         def _send_msg(self):
-            with self._mutex:
+            with self._com_mutex:
                 if self._current_msg is not None and (time.time() - self.last_time_sent) > self.time_gap:
                     logger.info("Sending a com message")
                     
@@ -113,11 +127,68 @@ try:
             self.com_cb = cb
 
         def communicate_meta(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
-            with self._mutex:
+            with self._com_mutex:
                 logger.info("Start communicate-meta action")
                 self._in_com_meta = True
                 self._com_meta_cb = cb
                 self._send_msg()
+
+
+        ## Injecting aleas ##
+        def aleaReceived(self,msg):
+            #logger.warning(msg)
+            try:
+                data = json.loads(msg.data)
+                
+                if type(data) != dict:
+                    logger.error("Received an ill formated AleaAction service call. Data should be a dict : %s" % data)
+                    return False
+            except ValueError:
+                logger.error("Received an AleaAction service call but the filed data is not json-encoded : %s " % msg.data)
+                return False
+            if msg.aleaType == "delay":
+                if not "delay" in data:
+                    logger.error("Received an ill formated AleaAction service call for a delay %s" % data)
+                    return False
+
+                try:
+                    d = float(data["delay"])
+                except ValueError:
+                    logger.error("Cannot convert the delay field to a numeric value : %s" % data["delay"])
+                    return False
+                
+                with self.eventsLock:
+                    if len(self.nextEvents) == 0:
+                        logger.warning("No action currently being executed")
+                
+                    for event in self.nextEvents:
+                        event["time"] += d
+                        logger.info("Adding %s to the current action : %s" % (d, event["actionJson"]["name"]))
+                return True
+            elif msg.aleaType == "target":
+                logger.info("Received a alea of type target")
+                logger.error("Not implemented yet")
+                return False
+            elif msg.aleaType == "robotDead":
+                #forward it
+                return rospy.ServiceProxy("alea", AleaAction)(msg.aleaType, msg.data)
+            else:
+                logger.error("Unknown alea received : %s. %s" % (msg.aleaType, data))
+                return False
+
+            return False
+
+        ## Broadcast statistics ##
+        def observe(self, who, a, b, cb, actionJson, **kwargs):
+            super(ROSActionExecutor, self).observe(who, a, b, cb, actionJson, **kwargs)
+            
+            if "time" not in kwargs:
+                logger.error("Cannot know the start time of %s" % actionJson["name"])
+            t = kwargs.get("time", None)
+
+            self._stats_pub.publish(json.dumps({"type":"observe", "by":who, "from":a, "to":b, "time":t}))
+
+
 
 except ImportError:
     logger.warning("Cannot import ROS")
