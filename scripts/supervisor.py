@@ -144,18 +144,28 @@ class Supervisor(threading.Thread):
         return int(round(1000 * (time.time() - self.beginDate)))
 
     def isTpExecutable(self, tp, now = True):
+        if "start-move r1 wp_com" in tp: logger.debug("isTpExecutable? %s" % tp)
+        
         if self.tp[tp][1] != "controllable" and self.tp[tp][1] != "future":
             return False
+
+        if "start-move r1 wp_com" in tp: logger.debug("1")
         
         #Check that the lower bound is before the current time
         if now and self.plan.stn.getBounds(str(tp)).lb > self.getCurrentTime():
             return False
 
+        if "start-move r1 wp_com" in tp: logger.debug("2")
+
         #check that there is no ingoing edge from a non-executed time point
         preconditions = self.plan.stn.getPredecessors(tp)
 
+        if "start-move r1 wp_com" in tp: logger.debug(preconditions)
+
         if any([tp not in self.executedTp for tp in preconditions]):
             return False
+
+        if "start-move r1 wp_com" in tp: logger.debug(True)
 
         return True
     
@@ -193,19 +203,27 @@ class Supervisor(threading.Thread):
         elif a["tEnd"] == tp:
 
             if self.tp[tp][1] == "controllable":
+                
+                logger.debug("Tp %s controllable" % tp)
+                
                 #End of a controllable action
                 self.setTimePoint(tp, currentTime)
+
+                logger.debug("setTimePoint(%s, %s)" % (tp, currentTime))
                 
                 if not self.plan.stn.isConsistent():
                     logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
+
+                logger.debug("STN consistent")
 
                 if not "abstract" in a and self.isResponsibleForAction(a):
                     logger.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
                     self.outQueue.put(msg)
-                    
+                
+                logger.debug("ok")    
                 
             self.tp[tp][1] = "past"
             self.executedTp[tp] = currentTime
@@ -309,16 +327,15 @@ class Supervisor(threading.Thread):
         #logger.debug("Is STN Consistent : %s" % self.plan.stn.isConsistent())
         #logger.debug("Bounds %s" % c)
         #logger.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
+
+        self.executedTp[tp] = value
+        self.tp[tp][1] = "past"
             
         self.setTimePoint(tp, value)
             
         if not self.plan.stn.isConsistent():
             logger.error("\tError : invalid STN when finishing execution of tp %s" % tp)
             raise ExecutionFailed("Invalid STN when finishing execution of tp %s" % tp)
-
-            
-        self.executedTp[tp] = value
-        self.tp[tp][1] = "past"
 
     def isExecuted(self):
         return all([tp[1] == "past" for tp in self.tp.values()])

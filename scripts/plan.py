@@ -277,6 +277,7 @@ class Plan:
 
         #add this constraint in the STN
         logger.debug("Executing %s at %s" % (tpName, value))
+        if  "3-end-communicate" in tpName: logger.debug(self.stn.export())
         return self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
 
     def setActionUnavailable(self, action):
