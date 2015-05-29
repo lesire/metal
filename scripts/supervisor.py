@@ -144,28 +144,18 @@ class Supervisor(threading.Thread):
         return int(round(1000 * (time.time() - self.beginDate)))
 
     def isTpExecutable(self, tp, now = True):
-        if "start-move r1 wp_com" in tp: logger.debug("isTpExecutable? %s" % tp)
-        
         if self.tp[tp][1] != "controllable" and self.tp[tp][1] != "future":
             return False
 
-        if "start-move r1 wp_com" in tp: logger.debug("1")
-        
         #Check that the lower bound is before the current time
         if now and self.plan.stn.getBounds(str(tp)).lb > self.getCurrentTime():
             return False
 
-        if "start-move r1 wp_com" in tp: logger.debug("2")
-
         #check that there is no ingoing edge from a non-executed time point
         preconditions = self.plan.stn.getPredecessors(tp)
 
-        if "start-move r1 wp_com" in tp: logger.debug(preconditions)
-
         if any([tp not in self.executedTp for tp in preconditions]):
             return False
-
-        if "start-move r1 wp_com" in tp: logger.debug(True)
 
         return True
     

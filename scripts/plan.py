@@ -276,9 +276,13 @@ class Plan:
 
 
         #add this constraint in the STN
-        logger.debug("Executing %s at %s" % (tpName, value))
-        if  "3-end-communicate" in tpName: logger.debug(self.stn.export())
-        return self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
+        logger.info("Executing %s at %s" % (tpName, value))
+        l = self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
+        
+        if not self.stn.isConsistent():
+            logger.error("When executing %s at %s, stn became inconsistent" % (tpName, value))
+            logger.error("Bounds were : %s,%s" % (c.lb, c.ub))
+        return l
 
     def setActionUnavailable(self, action):
         if not "unavailable-actions" in self.jsonDescr:

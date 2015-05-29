@@ -51,7 +51,6 @@ add_message_files(
     MaSTNUpdate.msg
     Communication.msg
     CommunicationId.msg
-    ExecutedTp.msg
 )
 
 ## Generate services in the 'srv' folder
