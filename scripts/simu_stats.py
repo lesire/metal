@@ -50,7 +50,7 @@ def runSimu(missionDir, aleaFile, outputDir = None):
         
     #create the output dir
     if outputDir is None:
-        outputDir = getNewOutputDir()
+        outputDir = getNewOutputDir(prefix = "simu")
 
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
@@ -76,7 +76,26 @@ def runSimu(missionDir, aleaFile, outputDir = None):
 
     parseSimu(outputDir)
     
-    logger.info("done with this simulation")
+    logger.info("Done with this simulation : %s" % outputDir)
+
+"""
+Run a succession of simulations. For now, sequentially.
+"""
+def runBenchmark(missionDir, aleaFiles, outputDir = None):
+
+    #create the output dir
+    if outputDir is None:
+        outputDir = getNewOutputDir(prefix = "benchmark")
+
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+
+    for i,alea in enumerate(aleaFiles):
+        runSimu(missionDir, alea, outputDir= os.path.join(outputDir, "simu_%d" % i))
+
+    logger.info("Done with this benchmark : %s" % outputDir)
+
+    #TODO merge all the results of the simulations
 
 """
 Parse the ros bag and extract metrics :
@@ -184,10 +203,10 @@ def main(argv):
             logger.error("Cannot open a given alea file : %s" % alea)
             sys.exit(1)
 
-    for alea in args.aleaFiles:
-        runSimu(args.mission, alea)
-
-    #runSimu("$ACTION_HOME/ressources/missions/odas-mission", "$ACTION_HOME/action_ros_ws/src/metal/data/delay-odas.json")
+    if len(args.aleaFiles) == 1:
+        runSimu(args.mission, args.aleaFiles[0], args.outputFolder)
+    else:
+        runBenchmark(args.mission, args.aleaFiles, args.outputFolder)
 
 if __name__=="__main__":
     main(sys.argv[1:])
