@@ -105,7 +105,7 @@ Parse the ros bag and extract metrics :
 """
 def parseSimu(outputDir):
     logger.info("Parsing %s" % outputDir)
-    result = {"obsPoints" : {}}
+    result = {"obsPoints" : {}, "repair":{}}
     
     ## Parse the pddl files ##
     
@@ -136,7 +136,7 @@ def parseSimu(outputDir):
             if data["type"] == "observe":
                 obsPoints.add(data["to"])
             
-            logger.info(data)
+            logger.debug(data)
 
         result["obsPoints"]["nbr"] = len(obsPoints)
         result["obsPoints"]["ratio"] = float(result["obsPoints"]["nbr"]) / result["obsPoints"]["nominalNbr"]
@@ -162,6 +162,17 @@ def parseSimu(outputDir):
         result["success"] = not hasError
         result["finishTime"] = max([d["finishTime"]/1000. for d in agents.values() if "finishTime" in d])
         
+
+        repairRequestNbr = 0
+        repairDoneNbr = 0
+        for _,msg,_ in bag.read_messages(topics="/hidden/repair"):
+            if msg.type == "repairRequest": repairRequestNbr += 1
+            if msg.type == "repairDone": repairDoneNbr += 1
+
+        result["repair"]["requestNbr"] = repairRequestNbr
+        result["repair"]["doneNbr"] = repairDoneNbr
+
+
     finally:
         bag.close()
 
