@@ -23,7 +23,7 @@ def enum(*sequential, **named):
     enums['reverse_mapping'] = reverse
     return type('Enum', (), enums)
 
-State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE")
+State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE", "ERROR")
 
 class ExecutionFailed(Exception):
     def __init__(self, msg):
@@ -539,6 +539,8 @@ class Supervisor(threading.Thread):
             if len(comMetaKeys) == 0:
                 logger.error("Failed because of a deadline : no communicate-meta action to shift")
                 logger.error(planJson["actions"])
+                self.state = State.ERROR
+                self.stnUpdated()
                 sys.exit(1)
             else:
                 logger.info("I can shift : %s" % [planJson["actions"][k]["name"] for k in comMetaKeys])
@@ -563,6 +565,8 @@ class Supervisor(threading.Thread):
         if planStr is None:
             logger.error("Reparation failed")
             #TODO : implement a default strategy ? Notify other agents ?
+            self.state = State.ERROR
+            self.stnUpdated()
             sys.exit(1)
 
 
