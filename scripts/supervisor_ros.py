@@ -2,7 +2,6 @@ import logging; logger = logging.getLogger("hidden")
 
 from copy import copy
 
-#import sys
 import rospy
 import json
 import sys
