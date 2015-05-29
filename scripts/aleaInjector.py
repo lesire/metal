@@ -38,6 +38,11 @@ def launch(m):
     getServices()
     logger.info("Got agents %d agents: %s" % (len(aleaServices), " ".join(aleaServices.keys())))
     
+    if len(data) == 0:
+        logger.info("No alea to inject")
+        rospy.signal_shutdown("Nothing to do")
+        return
+    
     for d in data.values():
         if d["to"] not in aleaServices:
             logger.error("Unknown robot : %s. I know %s" % (d["to"], " ".join(aleaServices.keys())))
