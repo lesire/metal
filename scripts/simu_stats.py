@@ -2,11 +2,13 @@
 ### rosbag API is not python3 compatible ###
 
 import argparse
+from copy import copy
 import json
 import logging; logger = logging.getLogger("simu")
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -25,6 +27,23 @@ logger.addHandler(sh)
 
 class InputError(Exception):
     pass
+
+############### Signal Handling ######################
+"""
+To stop the creation of new processes, you can use :
+  kill -SIGUSR1 pID
+to send the SIGUSR1 signal
+"""
+#once this signal is received, stop creating threads
+sigusrReceived = False
+
+def sigusrHandler(signum, frame):
+    global sigusrReceived
+    logger.info("Received the signal : not creating new processes any more")
+    sigusrReceived = True
+
+signal.signal(signal.SIGUSR1, sigusrHandler)
+#######################################################
 
 def getNewOutputDir(prefix = "simu"):
     return os.path.join(rospack.get_path("metal"), "data/simu_output/" + prefix + "_" + time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime()))
@@ -70,16 +89,25 @@ def configureSimu(missionDir, aleaFile, outputDir = None):
 """
 Launch a simuation and returns a Popen object
 """
-def launchSimu(missionDir, aleaFile, outputDir):
+def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = False):
     os.chdir(missionDir)
+    
+    stdout = None
+    stderr = None
+    if redirectOutput:
+        stdout = open(os.path.join(outputDir, "roslaunch-out.txt"), 'w')
+        stderr = open(os.path.join(outputDir, "roslaunch-err.txt"), 'w')
+
 
     #run the rolaunch command
     os.environ["ROS_LOG_DIR"] = outputDir
-    os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:11312"
-    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea}".format(alea=aleaFile).split(" "))
+    os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:%d" %  port
+    logger.info("Launching a simulation on port %s" % port)
+    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea}".format(alea=aleaFile).split(" "), stdout=stdout, stderr=stderr)
 
     time.sleep(5)
 
+    logger.info("Starting simulation on port %s" % port)
     subprocess.call("rostopic pub /hidden/start std_msgs/Empty -1".split(" "))
 
     return p
@@ -95,9 +123,48 @@ def runSimu(missionDir, aleaFile, outputDir = None):
     logger.info("Done with this simulation : %s" % outputDir)
 
 """
+Inputs is a list of dictionnaries, each containing the missionDir, aleaFile and an option outputDir
+"""
+def runParallelSimu(inputs, maxJobs = 1):
+
+    # Configure all the simus
+    nextPort = 11312
+    for d in inputs:
+        d["outputDir"] = configureSimu(d["missionDir"], d["aleaFile"], d.get("outputDir", None))
+        d["port"] = nextPort
+        nextPort += 1
+
+    # Launch all the simus
+    simuToLaunch = copy(inputs)
+    processes = []
+    while (len(simuToLaunch) > 0 and not sigusrReceived) or len(processes) > 0:
+        #still work to do. First launch new processes
+        if len(processes) < maxJobs and len(simuToLaunch) > 0 and not sigusrReceived:
+            input = simuToLaunch[0]
+            processes.append(launchSimu(input["missionDir"], input["aleaFile"], input["outputDir"], port=input["port"], redirectOutput=True))
+            del simuToLaunch[0]
+
+        # Now check for the end of the launched processes
+        # Iterate backward to remove elements while iterating
+        for i in reversed(range(len(processes))):
+            p = processes[i]
+            p.poll()
+            if(p.returncode != None):
+                #process finished
+                logger.info("Process finished with error code %s" % p.returncode)
+                del processes[i]
+
+        time.sleep(1)
+
+    # Parse all the simus
+    for d in inputs:
+        parseSimu(d["outputDir"])
+
+
+"""
 Run a succession of simulations. For now, sequentially.
 """
-def runBenchmark(missionDir, aleaFiles, outputDir = None):
+def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1):
 
     #create the output dir
     if outputDir is None:
@@ -106,9 +173,14 @@ def runBenchmark(missionDir, aleaFiles, outputDir = None):
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
-    for i,alea in enumerate(aleaFiles):
-        runSimu(missionDir, alea, outputDir= os.path.join(outputDir, "simu_%d" % i))
+    #for i,alea in enumerate(aleaFiles):
+    #    runSimu(missionDir, alea, outputDir= os.path.join(outputDir, "simu_%d" % i))
 
+    inputs = []
+    for i,alea in enumerate(aleaFiles):
+        inputs.append({"missionDir" : missionDir, "aleaFile" :  alea, "outputDir":os.path.join(outputDir, "simu_%d" % i)})
+    runParallelSimu(inputs, maxJobs=maxJobs)
+    
     logger.info("Done with this benchmark : %s" % outputDir)
 
     #TODO merge all the results of the simulations
@@ -122,6 +194,11 @@ Parse the ros bag and extract metrics :
 def parseSimu(outputDir):
     logger.info("Parsing %s" % outputDir)
     result = {"obsPoints" : {}, "repair":{}}
+    
+    if not os.path.exists(os.path.join(outputDir, "stats.bag")):
+        logger.error("No simulation ran in %s" % outputDir)
+        return
+    
     
     ## Parse the pddl files ##
     
@@ -199,6 +276,7 @@ def main(argv):
     parser = argparse.ArgumentParser(description="Launch a statistical simulation")
     parser.add_argument("-a", "--aleaFiles", type=os.path.abspath, nargs="+")
     parser.add_argument("-m", "--mission"  , type=os.path.abspath)
+    parser.add_argument("-j", "--jobs"     , type=int, default=1)
     parser.add_argument("--parseOnly"      , action="store_true")
     parser.add_argument("--outputFolder"   , type=os.path.abspath)
     parser.add_argument("--logLevel"       , type=str, default="info")
@@ -233,7 +311,7 @@ def main(argv):
     if len(args.aleaFiles) == 1:
         runSimu(args.mission, args.aleaFiles[0], args.outputFolder)
     else:
-        runBenchmark(args.mission, args.aleaFiles, args.outputFolder)
+        runBenchmark(args.mission, args.aleaFiles, args.outputFolder, maxJobs=args.jobs)
 
 if __name__=="__main__":
     main(sys.argv[1:])
