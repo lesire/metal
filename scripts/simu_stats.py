@@ -23,15 +23,17 @@ logger.setLevel(logging.INFO)
 sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
 logger.addHandler(sh)
 
-
 class InputError(Exception):
     pass
 
 def getNewOutputDir(prefix = "simu"):
     return os.path.join(rospack.get_path("metal"), "data/simu_output/" + prefix + "_" + time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime()))
 
-def runSimu(missionDir, aleaFile, outputDir = None):
-    # Sanity check
+"""
+Check the input and configure the simulation : creates the output folder, 
+copy the input files, etc.
+"""
+def configureSimu(missionDir, aleaFile, outputDir = None):
     if not os.path.exists(missionDir):
         logger.error("The mission directory does not exists : %s" % missionDir)
         raise InputError("The mission directory does not exists : %s" % missionDir)
@@ -63,15 +65,29 @@ def runSimu(missionDir, aleaFile, outputDir = None):
     shutil.copytree("hipop-files", os.path.join(outputDir, "hipop-files"))
     shutil.copy(aleaFile, outputDir)
 
+    return outputDir
+
+"""
+Launch a simuation and returns a Popen object
+"""
+def launchSimu(missionDir, aleaFile, outputDir):
+    os.chdir(missionDir)
+
     #run the rolaunch command
     os.environ["ROS_LOG_DIR"] = outputDir
+    os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:11312"
     p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea}".format(alea=aleaFile).split(" "))
 
     time.sleep(5)
 
     subprocess.call("rostopic pub /hidden/start std_msgs/Empty -1".split(" "))
 
-    #TODO add a timeout or make the watcher detect deadlocks
+    return p
+
+def runSimu(missionDir, aleaFile, outputDir = None):
+    outputDir = configureSimu(missionDir, aleaFile, outputDir)
+
+    p = launchSimu(missionDir, aleaFile, outputDir)
     p.wait()
 
     parseSimu(outputDir)
