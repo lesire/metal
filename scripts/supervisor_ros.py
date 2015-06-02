@@ -7,7 +7,7 @@ import rospy
 import json
 import sys
 from std_msgs.msg import Empty,String
-from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc, ExecutedTp
+from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
 from metal.srv import AleaAction
 from supervisor import Supervisor,State
 
