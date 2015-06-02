@@ -293,6 +293,12 @@ class Supervisor(threading.Thread):
             if "target" in report["type"]:
                 targetPos = report.get("position", None)
                 self.targetFound(targetPos)
+            elif report["type"] in ["ko", "broken"]:
+                self.state = State.DEAD
+                logger.warning("End of the action %s with status %s. Killing myself" % (action["name"], report["type"]))
+                return
+            else:
+                logger.info("Ignoring it")
         
         if action["controllable"]:
             logger.info("Notified of the end of controllable action %s." % action["name"])

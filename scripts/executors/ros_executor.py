@@ -175,6 +175,18 @@ try:
                 self.outQueue.put({"type":"alea", "aleaType":"targetFound", "position":{"x":x, "y":y}})
 
                 return True
+            elif msg.aleaType == "nextReport":
+                logger.info("Received an alea setting the value of the next report")
+
+                if "report" not in data:
+                    logger.error("Mission the report field")
+                    return False
+                r = data["report"]
+                self.nextReport = r
+
+                logger.info("Set the next report to %s" % r)
+
+                return True
             elif msg.aleaType == "robotDead":
                 #forward it
                 return rospy.ServiceProxy("alea", AleaAction)(msg.aleaType, msg.data)

@@ -53,6 +53,7 @@ class DummyActionExecutor(AbstractActionExecutor):
         
         self.agent = agentName
         self.pos = {}
+        self.nextReport = None
         
     def init(self, who, a, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
@@ -123,11 +124,11 @@ class DummyActionExecutor(AbstractActionExecutor):
 
         with self.eventsLock:
             for d in [d for d in self.nextEvents if d["time"] <= currentTime]:
-                #if "move mana" in d["actionJson"]["name"]:
-                #    d["cb"]({"type":"target_found", "position":{"x":1,"y":1}})
-                #    logger.warning("Simulating target found")
-                #else:
-                d["cb"]({"type":"ok"})
+                if self.nextReport is not None:
+                    d["cb"]({"type":self.nextReport})
+                    self.nextReport = None
+                else:
+                    d["cb"]({"type":"ok"})
                 logger.info("calling a callback for %s" % d["actionJson"]["name"])
 
             self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
