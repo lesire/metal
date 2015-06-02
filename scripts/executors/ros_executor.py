@@ -165,10 +165,16 @@ try:
                         event["time"] += d
                         logger.info("Adding %s to the current action : %s" % (d, event["actionJson"]["name"]))
                 return True
-            elif msg.aleaType == "target":
+            elif msg.aleaType == "targetFound":
                 logger.info("Received a alea of type target")
-                logger.error("Not implemented yet")
-                return False
+
+                pos = data.get("position", {})
+                x = pos.get("x", 0)
+                y = pos.get("y", 0)
+
+                self.outQueue.put({"type":"alea", "aleaType":"targetFound", "position":{"x":x, "y":y}})
+
+                return True
             elif msg.aleaType == "robotDead":
                 #forward it
                 return rospy.ServiceProxy("alea", AleaAction)(msg.aleaType, msg.data)

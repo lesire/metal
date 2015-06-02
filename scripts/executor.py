@@ -11,6 +11,7 @@ class Executor(threading.Thread):
         self.outQueue = outQueue
         
         self.actionExecutor = actionExecutor
+        self.actionExecutor.outQueue = self.outQueue #shate the outque to allow the actionExecutor to write aleas
 
         self.isStarted = False
         self.nextEvents = [] #list of dicts (time, action, report (opt))
