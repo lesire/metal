@@ -40,6 +40,7 @@ class Supervisor(threading.Thread):
         self.beginDate = -1
         self.state = State.INIT
         self.repairRos = False
+        self.allowShorterAction = False
 
         self.agentsDead = []
 
@@ -90,6 +91,15 @@ class Supervisor(threading.Thread):
             else:
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "uncontrollable"]
+        
+        for tp in self.plan.stn.getNodeIds():
+            if tp not in self.tp:
+                
+                if tp.startswith("1-end-"):
+                    self.tp[tp] = [tp, "uncontrollable"]
+                else:
+                    logger.error("There is a tp that I do not know about : %s" % tp)
+                
         
         for tpName,value in self.plan.absTimes:
             action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
@@ -300,10 +310,15 @@ class Supervisor(threading.Thread):
         #check the scheduled duration of the action
         startTime = self.plan.stn.getBounds(action["tStart"]).lb
         dReal = value - startTime
-        dMin = action["dMin"]*plan.timeFactor
+        dMin = int(action["dMin"]*plan.timeFactor)
+        
         if dReal < dMin:
-            logger.warning("An action finished early : %.2f instead of %.2f. Updating its dMin." % (dReal/1000, dMin/1000))
-            self.plan.stn.setConstraint(action["tStart"], tp, int(floor(dReal)))
+            if self.allowShorterAction:
+                logger.warning("An action finished early : %.2f instead of %.2f. Updating its dMin." % (dReal/1000, dMin/1000))
+                self.plan.stn.setConstraint(action["tStart"], tp, int(floor(dReal)))
+            else:
+                logger.warning("An action finished early : %.2f instead of %.2f. Will wait" % (dReal/1000, dMin/1000))
+                value = startTime + dMin
         
         lb = self.plan.stn.getBounds(tp).lb
         if self.tp[tp][1] == "uncontrollable" and value < lb:

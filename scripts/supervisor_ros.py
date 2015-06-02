@@ -172,11 +172,20 @@ class SupervisorRos(Supervisor):
             return
 
         for a in data.arcs:
+            e = self.plan.stn.export()
+            if not self.plan.stn.isConsistent():
+                logger.error("Stn already inconsistent")
+
+            #TODO
+            if a.nodeTarget.startswith("1-end") or a.nodeSource.startswith("1-end"):
+                continue
+
             l = self.plan.stn.setConstraint(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue)
             rospy.logdebug("Constaint %s => %s" % (str(a), str(l)))
 
             if not self.plan.stn.isConsistent():
                 logger.error("Received an update from %s. When setting the constraint %s, stn become inconsistent" % (data._connection_header["callerid"], a))
+                logger.error(e)
 
         for n in data.executedNodes:
             self.tp[n][1] = "past"
