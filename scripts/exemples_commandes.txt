@@ -1,0 +1,11 @@
+# Pour lancer le plan
+rostopic pub /hidden/start std_msgs/Empty "{}" -1
+
+# Pour tuer mana
+rosservice call /mana/alea robotDead '!!str "{\"robot\":\"mana\"}"'
+
+# Pour informer minnie que mana est mort
+rosservice call /minnie/alea robotDead '!!str "{\"robot\":\"mana\"}"'
+
+# Pour simuler la detection de la cible par ressac1
+rosservice call /ressac1/alea targetFound '!!str "{\"position\":{\"x\":12, \"y\":24}}"'
