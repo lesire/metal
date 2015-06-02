@@ -114,8 +114,9 @@ class DummyActionExecutor(AbstractActionExecutor):
         logger.info("Assume communicate-meta succeed immediately")
         cb("ok")
     
-    def track(self, *args, **kwargs):
-        logger.info("Received a track action")
+    def track(self, x, y, *args, **kwargs):
+        #if x,y == 0,0 : no position known
+        logger.info("Received a track action. Target in (%s,%s)" %(x,y))
     
     def update(self):
         currentTime = time.time()

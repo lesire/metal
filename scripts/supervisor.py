@@ -264,9 +264,15 @@ class Supervisor(threading.Thread):
             logger.error("\tError : invalid STN when launching execution of %s" % action["name"])
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
+    # targetPos is a dict
     def targetFound(self, targetPos = None):
         self.state = State.TRACKING
-        self.outQueue.put({"type":"startAction", "action":{"name":"track", "dMin":1}, "time":self.getCurrentTime()})
+        
+        x,y = 0,0
+        if targetPos is not None:
+            x = targetPos.get("x", 0)
+            y = targetPos.get("y", 0)
+        self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
     
     def endAction(self, msg):
         action = msg["action"]
@@ -371,6 +377,9 @@ class Supervisor(threading.Thread):
                 logger.warning("Dealing with the death of %s" % data["robot"])
                 self.agentsDead.append(data["robot"])
                 raise ExecutionFailed("Received an alea of type robotDead")
+        elif aleaType == "targetFound":
+            targetPos = data.get("position", None)
+            self.targetFound(targetPos)
         else:
             logger.error("Cannot deal with an alea of unknown type : %s" % aleaType)
             return
