@@ -1,10 +1,12 @@
 #! /usr/bin/env python
 ### rosbag API is not python3 compatible ###
 
+from __future__ import division
+
 import argparse
 from copy import copy
 import json
-import logging; logger = logging.getLogger("simu")
+import logging; logger = logging.getLogger(__name__)
 import os
 import re
 import shutil
@@ -18,12 +20,6 @@ rospack = rospkg.RosPack()
 import rosbag
 from std_msgs.msg import Empty, String
 from metal.msg import StnVisu
-
-
-sh = logging.StreamHandler()
-logger.setLevel(logging.INFO)
-sh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
-logger.addHandler(sh)
 
 class InputError(Exception):
     pass
@@ -44,6 +40,23 @@ def sigusrHandler(signum, frame):
 
 signal.signal(signal.SIGUSR1, sigusrHandler)
 #######################################################
+
+def mean(l):
+    return sum(l)/len(l)
+
+def getPlanLength(planPDDLFile):
+    result = 0
+    with open(planPDDLFile) as f:
+        for line in f:
+            if line.startswith(";"):
+                continue
+
+            m = re.match("^(\d*(?:.\d*)?)\s*:\s*\((.*)\)\s*\[(\d*(?:.\d*)?)\]", line)
+            if m:
+                endAction = float(m.groups()[0]) + float(m.groups()[2])
+                result = max(result, endAction)
+            
+    return result
 
 def getNewOutputDir(prefix = "simu"):
     return os.path.join(rospack.get_path("metal"), "data/simu_output/" + prefix + "_" + time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime()))
@@ -185,6 +198,46 @@ def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1):
 
     #TODO merge all the results of the simulations
 
+def parseBenchmark(outputDir):
+    
+    #rerun the parsing in case of an update
+    results = {}
+    for dir in sorted(os.listdir(outputDir)):
+        if re.match("^simu_\d+$", dir):
+            parseSimu(os.path.join(outputDir, dir))
+            
+            with open(os.path.join(outputDir, dir, "results.json")) as f:
+                data = json.load(f)
+                
+            results[dir] = data
+            
+    logger.info("Found %s runs" % len(results))
+    
+    i = len([v for v in results.values() if v["success"]])
+    logger.info("Found %d successes : %.2f%%" % (i, 100*i/len(results)))
+    
+    lengths = [v["finishTime"] for v in results.values() if v["success"]]
+    m = mean(lengths)
+    logger.info("Mean time (for the sucessful missions) : %.2f" % (m))
+    
+    lengths = [(v["finishTime"]/v["nominalTime"] - 1) for v in results.values() if v["success"]]
+    m = mean(lengths)
+    logger.info("Mean increase of time (for the sucessful missions) : %.2f%%" % (100*m))
+    
+    lengths = [v["obsPoints"]["nbr"] for v in results.values() if v["success"]]
+    m = mean(lengths)
+    logger.info("Mean number of points explored (for the sucessful missions) : %.2f" % (m))
+    
+    lengths = [v["obsPoints"]["ratio"] for v in results.values() if v["success"]]
+    m = mean(lengths)
+    logger.info("Mean percentage of points explored (for the sucessful missions) : %.2f%%" % (100*m))
+    
+    lengths = [v["repair"]["requestNbr"] for v in results.values() if v["success"]]
+    m = mean(lengths)
+    logger.info("Mean number of repair requests (for the sucessful missions) : %.2f" % (m))
+    
+    pass
+    
 """
 Parse the ros bag and extract metrics :
  - Success of the mission
@@ -202,12 +255,14 @@ def parseSimu(outputDir):
     
     ## Parse the pddl files ##
     
+    missionName = None
     pddlPrb = None
     for f in os.listdir(os.path.join(outputDir, "hipop-files")):
         if re.match(".*-prb.pddl", f):
             pddlPrb = f
             break #assume there is only one file for this pattern
 
+    missionName = pddlPrb.replace("-prb.pddl", "")
     with open(os.path.join(outputDir, "hipop-files", pddlPrb)) as f:
         strPrb = " ".join(f.readlines())
         #TODO : replace("\n", " ")
@@ -215,6 +270,8 @@ def parseSimu(outputDir):
     obsPointsNominal = re.findall("(explored [^)]*)", strPrb)
     result["obsPoints"]["nominalNbr"] = len(obsPointsNominal)
 
+    
+    result["nominalTime"] = getPlanLength(os.path.join(outputDir, "hipop-files", missionName + ".pddl"))
     ## Parse the ros bag ##
     
     bag = rosbag.Bag(os.path.join(outputDir, "stats.bag"))
@@ -282,6 +339,16 @@ def main(argv):
     parser.add_argument("--logLevel"       , type=str, default="info")
     args = parser.parse_args(argv)
 
+    #Configure the logger
+    numeric_level = getattr(logging, args.logLevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.logLevel)
+    logger.propagate = False
+    sh = logging.StreamHandler()
+    logger.setLevel(numeric_level)
+    sh.setFormatter(logging.Formatter('%(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
+    logger.addHandler(sh)
+        
     ## Parse only ##
     if args.parseOnly:
         if args.outputFolder is None:
@@ -291,7 +358,12 @@ def main(argv):
             logger.error("Cannot open the output folder : %s" % args.outputFolder)
             sys.exit(1)
     
-        parseSimu(args.outputFolder)
+        if "simu_0" in os.listdir(args.outputFolder):
+            parseBenchmark(args.outputFolder)
+        elif "stats.bag" in os.listdir(args.outputFolder):
+            parseSimu(args.outputFolder)
+        else:
+            logger.error("Cannot determine if %s is a simulation or a benchmark" % args.outputFolder)
         sys.exit(0)
 
     ## Run simulation ##
