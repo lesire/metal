@@ -236,6 +236,10 @@ def parseBenchmark(outputDir):
     m = mean(lengths)
     logger.info("Mean number of repair requests (for the sucessful missions) : %.2f" % (m))
     
+    lengths = [v["repair"]["totalTime"] for v in results.values() if v["success"]]
+    m = mean(lengths)
+    logger.info("Mean time taken to repair the plan (sec) (for the sucessful missions) : %.2f" % (m/1000))
+
     pass
     
 """
@@ -315,12 +319,24 @@ def parseSimu(outputDir):
 
         repairRequestNbr = 0
         repairDoneNbr = 0
+        repairLengths = []
+        repairBegin = None
         for _,msg,_ in bag.read_messages(topics="/hidden/repair"):
-            if msg.type == "repairRequest": repairRequestNbr += 1
-            if msg.type == "repairDone": repairDoneNbr += 1
+            if msg.type == "repairRequest":
+                repairRequestNbr += 1
+                repairBegin = int(msg.time)
+            if msg.type == "repairDone":
+                repairDoneNbr += 1
+                if repairBegin is None:
+                    print("Error : repairDone sent before repairRequest ?")
+                else:
+                    repairLengths.append(int(msg.time) - repairBegin)
+                    repairBegin = None
 
         result["repair"]["requestNbr"] = repairRequestNbr
         result["repair"]["doneNbr"] = repairDoneNbr
+        result["repair"]["lengths"] = repairLengths
+        result["repair"]["totalTime"] = sum(repairLengths)
 
 
     finally:
