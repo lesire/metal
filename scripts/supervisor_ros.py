@@ -66,16 +66,25 @@ class SupervisorRos(Supervisor):
     def init(self, plan, agent):
         Supervisor.init(self, plan, agent)
 
-    def sendRepairMessage(self, data = None):
+    def sendNewStatusMessage(self, type, data = None):
         if data is None:
+            data = "{}"
+        if not isinstance(data, str):
+            logger.error("When sending a new status, the data field is not a string")
+        
+        if type == "repairRequest":
             logger.info("Sending repair request")
-            self.repair_pub.publish(self.agent, "repairRequest", self.getCurrentTime(), "{}")
-
-        elif type(data) == str:
+            self.repair_pub.publish(self.agent, "repairRequest", self.getCurrentTime(), data)
+        elif type == "repairResponse":
+            self.repair_pub.publish(self.agent, "repairResponse", self.getCurrentTime(), data)
+        elif type == "repairDone":
             logger.info("Sending a new plan repaired")
             self.repair_pub.publish(self.agent, "repairDone", self.getCurrentTime(), data)
+        elif type == "targetFound":
+            logger.info("Sending a target found with data %s" % data)
+            self.repair_pub.publish(self.agent, "targetFound", self.getCurrentTime(), data)
         else:
-            logger.error("Invalid call to sendRepairMessage. Type : %s" % type(data))
+            logger.error("Invalid call to sendNewStatusMessage. Type : %s" % type)
 
     def repairCallback(self, data):
         type = data.type
@@ -90,12 +99,15 @@ class SupervisorRos(Supervisor):
             return
         
         if type == "repairRequest":
+            if self.state != State.RUNNING:
+                logger.error("Received a repair request not when running. Ignoring it")
+                return
+            
             logger.info("Received a repair request. Pausing the execution")
             self.state = State.REPAIRINGPASSIVE
             self.stnUpdated()
-            
-            msg = RepairMsg(self.agent, "repairResponse", self.getCurrentTime(), json.dumps(self.plan.getLocalJsonPlan(self.agent)))
-            self.repair_pub.publish(msg)
+
+            self.sendNewStatusMessage("repairResponse", json.dumps(self.plan.getLocalJsonPlan(self.agent)))
 
         elif type == "repairResponse":
             try:
@@ -118,6 +130,8 @@ class SupervisorRos(Supervisor):
             self.init(planStr, self.agent)
             self.state = State.RUNNING
             self.stnUpdated()
+        elif type == "targetFound":
+            self.targetFound(json.loads(msg), notifyTeam = False)
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 

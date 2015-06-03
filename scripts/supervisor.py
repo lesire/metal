@@ -265,7 +265,7 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
     # targetPos is a dict
-    def targetFound(self, targetPos = None):
+    def targetFound(self, targetPos = None, notifyTeam = True):
         self.state = State.TRACKING
         
         x,y = 0,0
@@ -274,6 +274,9 @@ class Supervisor(threading.Thread):
             y = targetPos.get("y", 0)
         self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
     
+        if notifyTeam:
+            self.sendNewStatusMessage("targetFound", json.dumps(targetPos))
+        
     def endAction(self, msg):
         action = msg["action"]
         tp = action["tEnd"]
@@ -395,19 +398,21 @@ class Supervisor(threading.Thread):
     def stnUpdated(self, onlyPast = False):
         pass
 
-    #if data = None : repair request
-    #if data is a str : assume this is a new repaired plan
-    def sendRepairMessage(self, data = None):
+    #type can be repairRequest, repairDone, targetFound
+    # repairRequest : no data
+    # repairDone    : data is a string : the new plan
+    # targetFound   : data is a dict with keys x,y for the targetpos
+    def sendNewStatusMessage(self, t, data = None):
         pass
     
-    def repairCallback(self, type, time, sender, msg):
+    def repairCallback(self, t, time, sender, msg):
         pass
 
     def computeGlobalPlan(self):
         self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
         if self.repairRos:
-            self.sendRepairMessage()
+            self.sendNewStatusMessage("repairRequest")
             
             time.sleep(2)
             
@@ -570,7 +575,7 @@ class Supervisor(threading.Thread):
                     if tp in tps:
                         planJson["absolute-time"][i] = [tp, value + shift]
                 
-                planStr = self.repairPlan(planJson)
+                planStr = self.sendNewStatusMessage("repairDone", planJson)
                 if planStr is not None:
                     break
 
@@ -586,7 +591,7 @@ class Supervisor(threading.Thread):
 
 
         #We have a new plan
-        self.sendRepairMessage(planStr)
+        self.sendNewStatusMessage("repairDone", planStr)
         del self.repairResponse
 
         self.init(planStr, self.agent)
