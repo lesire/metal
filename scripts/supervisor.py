@@ -208,7 +208,7 @@ class Supervisor(threading.Thread):
                     logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
 
-                if a["abstract"] and self.isResponsibleForAction(a):
+                if not a["abstract"] and self.isResponsibleForAction(a):
                     logger.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
