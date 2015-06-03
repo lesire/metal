@@ -96,7 +96,11 @@ class Supervisor(threading.Thread):
             if tp not in self.tp:
                 
                 if tp.startswith("1-end-"):
-                    self.tp[tp] = [tp, "uncontrollable"]
+                    self.tp[tp] = [tp, "uncontrollable"] #end of the local plan of another agent
+                elif tp == "1-endglobal-" + self.agent:
+                    self.tp[tp] = ["dummy end", "controllable"] # my end of the global plan
+                elif tp.startswith("1-endglobal-"):
+                    self.tp[tp] = [tp, "uncontrollable"] #end of the global plan of another agent
                 else:
                     logger.error("There is a tp that I do not know about : %s" % tp)
                 
@@ -184,6 +188,18 @@ class Supervisor(threading.Thread):
         return False
     
     def executeTp(self, tp):
+
+        if tp.startswith("1-endglobal-"):
+            currentTime = self.getCurrentTime()
+            self.executedTp[tp] = currentTime
+            self.tp[tp][1] = "past"
+            self.setTimePoint(tp, currentTime)
+
+            logger.info("finished the plan")
+            self.state = State.DONE
+            self.stnUpdated()
+            return
+
         #Retrieve the corresponding action
         a = [a for a in self.plan.actions.values() if (a["tStart"] == tp or a["tEnd"] == tp)][0]
         logger.debug("Executing tp : %s" % tp)
@@ -248,9 +264,7 @@ class Supervisor(threading.Thread):
         self.setTimePoint(action["tStart"], currentTime)
 
         if action["name"] == "dummy end":
-            logger.info("finished the plan")
-            self.state = State.DONE
-            self.stnUpdated()
+            #do nothing, the plan is finished only if the 1-endglobal is executed
             return
 
         if "abstract" not in action:

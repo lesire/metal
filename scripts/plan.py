@@ -62,14 +62,16 @@ class Plan:
         self.tpAgent = {}
         
         # End timepoints are duplicated for each agent
+        agentsSet = set(a["agent"] for a in self.actions.values() if "agent" in a)
         self.tpEnd = {}
-        for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
+        for a in agentsSet:
             self.tpEnd[a] = "1-end-" + a
-            self.stn.addPoint(self.tpEnd[a], a)
-        for a in self.tpEnd.keys():
-            for b in self.tpEnd.keys():
-                if a == b: continue
-                self.stn.addConstraint(self.tpEnd[a], self.tpEnd[b], 0, 0)
+            self.stn.addPoint(self.tpEnd[a], a) #end of all the actions of this robot
+
+            self.stn.addPoint("1-endglobal-" + a, a) #end of all the actions of all the robots
+        for a in agentsSet:
+            for b in agentsSet:
+                self.stn.addConstraint("1-end-" + a, "1-endglobal-" + b, 1)
         self.tpName[1] = "1-end-" + self.agent
 
         for index,a in self.actions.items():
