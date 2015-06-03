@@ -220,26 +220,18 @@ class Supervisor(threading.Thread):
 
             if self.tp[tp][1] == "controllable":
                 
-                logger.debug("Tp %s controllable" % tp)
-                
                 #End of a controllable action
                 self.setTimePoint(tp, currentTime)
-
-                logger.debug("setTimePoint(%s, %s)" % (tp, currentTime))
                 
                 if not self.plan.stn.isConsistent():
                     logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
-
-                logger.debug("STN consistent")
 
                 if not "abstract" in a and self.isResponsibleForAction(a):
                     logger.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
                     self.outQueue.put(msg)
-                
-                logger.debug("ok")    
                 
             self.tp[tp][1] = "past"
             self.executedTp[tp] = currentTime
@@ -342,10 +334,6 @@ class Supervisor(threading.Thread):
         logger.info("End of the action %s at %s" % (action["name"], value/1000))
         
         c = self.plan.stn.getBounds(str(tp))
-        
-        #logger.debug("Is STN Consistent : %s" % self.plan.stn.isConsistent())
-        #logger.debug("Bounds %s" % c)
-        #logger.debug("May be consistent %s " % self.plan.stn.mayBeConsistent(self.plan.stn.getStartId(), str(tp), value, value))
 
         self.executedTp[tp] = value
         self.tp[tp][1] = "past"
