@@ -96,8 +96,9 @@ class Plan:
             
             if "children" in a and a["children"]:
                 a["abstract"] = True
-            #else:
-            #    a["abstract"] = False
+                a["controllable"] = True
+            else:
+                a["abstract"] = False
                 
             if not "executed" in a:
                 a["executed"] = False
@@ -167,11 +168,11 @@ class Plan:
                 t = time
                 value = int(round(value*timeFactor))
                 
-                potentialActions = [a for a in self.actions.values() if a["endTp"] == t]
-                if len(potentialActions) > 0 and any(map(lambda x:x["controllable"] == False and x["executed"] == False, potentialActions)):
-                    logger.error("Plan with an absolute time for an uncontrollable, non-executed action")
-                    logger.error(self.tpName[t])
-                    continue
+                #potentialActions = [a for a in self.actions.values() if a["endTp"] == t]
+                #if len(potentialActions) > 0 and any(map(lambda x: not x["controllable"] and not x["executed"] and not x["abstract"], potentialActions)):
+                #    logger.error("Plan with an absolute time for an uncontrollable, non-executed action")
+                #    logger.error(self.tpName[t])
+                #    continue
 
                 logger.debug("Adding %s at exactly %s" % (self.tpName[t], value))
                 logger.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))

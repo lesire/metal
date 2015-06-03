@@ -1,0 +1,3 @@
+{       "2":{"type" : "delay", "date":10, "to":"effibot1", "data":{"delay" : 10}},
+        "3":{"type" : "delay", "date":30, "to":"effibot1", "data":{"delay" : 10}}
+        }

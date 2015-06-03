@@ -11,6 +11,7 @@ class Executor(threading.Thread):
         self.outQueue = outQueue
         
         self.actionExecutor = actionExecutor
+        self.actionExecutor.outQueue = self.outQueue #shate the outque to allow the actionExecutor to write aleas
 
         self.isStarted = False
         self.nextEvents = [] #list of dicts (time, action, report (opt))
@@ -51,7 +52,7 @@ class Executor(threading.Thread):
         logger.info("Start of action {a} at time {t}".format(a=action["name"],t=self.user_time(currentTime)/1000))
 
         try:
-            self.actionExecutor.execute(action, self.action_callback)
+            self.actionExecutor.execute(action, self.action_callback, time=self.user_time(currentTime))
         except AttributeError as e:
             logger.error("Cannot execute %s." % action["name"])
             logger.error(e)
@@ -71,8 +72,8 @@ class Executor(threading.Thread):
         
     def stopExecutor(self, msg):
         logger.info("Executor received stop message")
-        pass
-    
+        self.actionExecutor.stopExecutor(self.user_time(time.time()))
+
     def run(self):
         logger.info("Executor launched")
         

@@ -1,0 +1,3 @@
+{"0":{"type" : "robotDead", "date":30, "to":"effibot2", "data":{"robot" : "effibot2"}},
+        "1":{"type" : "robotDead", "date":35, "to":"ressac1", "data":{"robot" : "effibot2"}}
+        }

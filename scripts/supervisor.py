@@ -23,7 +23,7 @@ def enum(*sequential, **named):
     enums['reverse_mapping'] = reverse
     return type('Enum', (), enums)
 
-State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE")
+State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE", "ERROR")
 
 class ExecutionFailed(Exception):
     def __init__(self, msg):
@@ -82,7 +82,7 @@ class Supervisor(threading.Thread):
                     self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
                 if a["tEnd"] in self.plan.stn.getNodeIds():
                     self.tp[a["tEnd"]] = [a["name"], "uncontrollable"]
-            elif "abstract" in a:
+            elif a["abstract"]:
                 self.tp[a["tStart"]] = [a["name"], "controllable"]
                 self.tp[a["tEnd"]] =   [a["name"], "controllable"]
             elif a["controllable"]:
@@ -122,7 +122,7 @@ class Supervisor(threading.Thread):
             if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
                 logger.info("When importing, setting the end time of %s" % action["name"])
                 self.tp[action["tEnd"]][1] = "future"
-                if "abstract" in action:
+                if action["abstract"]:
                     pass
                 elif action["controllable"]:
                     self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
@@ -227,7 +227,7 @@ class Supervisor(threading.Thread):
                     logger.warning("\tError : invalid STN when finishing execution of %s" % a["name"])
                     raise ExecutionFailed("\tInvalid STN when finishing execution of %s" % a["name"])
 
-                if not "abstract" in a and self.isResponsibleForAction(a):
+                if not a["abstract"] and self.isResponsibleForAction(a):
                     logger.info("Stop of action {a} at time {t}".format(a=a["name"],t=currentTime))
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
@@ -259,7 +259,7 @@ class Supervisor(threading.Thread):
             #do nothing, the plan is finished only if the 1-endglobal is executed
             return
 
-        if "abstract" not in action:
+        if not action["abstract"]:
             if not self.isResponsibleForAction(action):
                 #This action should not be executed by this robot. Assume someone else will do it
                 self.tp[action["tEnd"]][1] = "future"
@@ -280,10 +280,19 @@ class Supervisor(threading.Thread):
             logger.error("\tError : invalid STN when launching execution of %s" % action["name"])
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
-    def targetFound(self, targetPos = None):
+    # targetPos is a dict
+    def targetFound(self, targetPos = None, notifyTeam = True):
         self.state = State.TRACKING
-        self.outQueue.put({"type":"startAction", "action":{"name":"track", "dMin":1}, "time":self.getCurrentTime()})
+        
+        x,y = 0,0
+        if targetPos is not None:
+            x = targetPos.get("x", 0)
+            y = targetPos.get("y", 0)
+        self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
     
+        if notifyTeam:
+            self.sendNewStatusMessage("targetFound", json.dumps(targetPos))
+        
     def endAction(self, msg):
         action = msg["action"]
         tp = action["tEnd"]
@@ -303,6 +312,12 @@ class Supervisor(threading.Thread):
             if "target" in report["type"]:
                 targetPos = report.get("position", None)
                 self.targetFound(targetPos)
+            elif report["type"] in ["ko", "broken"]:
+                self.state = State.DEAD
+                logger.warning("End of the action %s with status %s. Killing myself" % (action["name"], report["type"]))
+                return
+            else:
+                logger.info("Ignoring it")
         
         if action["controllable"]:
             logger.info("Notified of the end of controllable action %s." % action["name"])
@@ -387,6 +402,9 @@ class Supervisor(threading.Thread):
                 logger.warning("Dealing with the death of %s" % data["robot"])
                 self.agentsDead.append(data["robot"])
                 raise ExecutionFailed("Received an alea of type robotDead")
+        elif aleaType == "targetFound":
+            targetPos = data.get("position", None)
+            self.targetFound(targetPos)
         else:
             logger.error("Cannot deal with an alea of unknown type : %s" % aleaType)
             return
@@ -396,19 +414,21 @@ class Supervisor(threading.Thread):
     def stnUpdated(self, onlyPast = False):
         pass
 
-    #if data = None : repair request
-    #if data is a str : assume this is a new repaired plan
-    def sendRepairMessage(self, data = None):
+    #type can be repairRequest, repairDone, targetFound
+    # repairRequest : no data
+    # repairDone    : data is a string : the new plan
+    # targetFound   : data is a dict with keys x,y for the targetpos
+    def sendNewStatusMessage(self, t, data = None):
         pass
     
-    def repairCallback(self, type, time, sender, msg):
+    def repairCallback(self, t, time, sender, msg):
         pass
 
     def computeGlobalPlan(self):
         self.repairResponse = {self.agent:self.plan.getLocalJsonPlan(self.agent)}
         
         if self.repairRos:
-            self.sendRepairMessage()
+            self.sendNewStatusMessage("repairRequest")
             
             time.sleep(2)
             
@@ -502,7 +522,7 @@ class Supervisor(threading.Thread):
 
         outputFile = tempfile.NamedTemporaryFile("w+")
         
-        command = "hipop -L error --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
+        command = "hipop -L error -u --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
             r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
@@ -555,6 +575,8 @@ class Supervisor(threading.Thread):
             if len(comMetaKeys) == 0:
                 logger.error("Failed because of a deadline : no communicate-meta action to shift")
                 logger.error(planJson["actions"])
+                self.state = State.ERROR
+                self.stnUpdated()
                 sys.exit(1)
             else:
                 logger.info("I can shift : %s" % [planJson["actions"][k]["name"] for k in comMetaKeys])
@@ -569,7 +591,7 @@ class Supervisor(threading.Thread):
                     if tp in tps:
                         planJson["absolute-time"][i] = [tp, value + shift]
                 
-                planStr = self.repairPlan(planJson)
+                planStr = self.sendNewStatusMessage("repairDone", planJson)
                 if planStr is not None:
                     break
 
@@ -579,11 +601,13 @@ class Supervisor(threading.Thread):
         if planStr is None:
             logger.error("Reparation failed")
             #TODO : implement a default strategy ? Notify other agents ?
+            self.state = State.ERROR
+            self.stnUpdated()
             sys.exit(1)
 
 
         #We have a new plan
-        self.sendRepairMessage(planStr)
+        self.sendNewStatusMessage("repairDone", planStr)
         del self.repairResponse
 
         self.init(planStr, self.agent)

@@ -15,7 +15,7 @@ import sys
 import rospy
 import rosgraph
 from std_msgs.msg import Empty
-from roshidden.srv import AleaAction
+from metal.srv import AleaAction
 
 aleaServices = {}
 
@@ -30,13 +30,6 @@ def getServices():
             aleaServices[agent] = rospy.ServiceProxy("/%s/executor/alea" % agent, AleaAction)
 
 #assume each field has type, date, to and data
-"""
-data = {"0":{"type" : "robotDead", "date":70, "to":"effibot2", "data":{"robot" : "effibot2"}},
-        "1":{"type" : "robotDead", "date":72, "to":"ressac1", "data":{"robot" : "effibot2"}},
-        "2":{"type" : "delay", "date":10, "to":"effibot1", "data":{"delay" : 10}},
-        "3":{"type" : "delay", "date":30, "to":"effibot1", "data":{"delay" : 10}}
-        }
-"""
 data = {}
 
 def launch(m):
@@ -44,6 +37,11 @@ def launch(m):
     
     getServices()
     logger.info("Got agents %d agents: %s" % (len(aleaServices), " ".join(aleaServices.keys())))
+    
+    if len(data) == 0:
+        logger.info("No alea to inject")
+        rospy.signal_shutdown("Nothing to do")
+        return
     
     for d in data.values():
         if d["to"] not in aleaServices:
@@ -92,7 +90,7 @@ def main(argv):
 
     rospy.Subscriber("/hidden/start", Empty, launch, queue_size = 1 )
 
-    logger.info("Delay module started")
+    logger.info("Alea injector module started")
     
     if sys.version_info >= (3,4):
         threading.main_thread().setName("%delay")

@@ -16,12 +16,12 @@ class AbstractActionExecutor:
         for f in os.listdir(folder):
             os.remove(os.path.join(folder, f))
 
-    def execute(self, action, cb):
+    def execute(self, action, cb, time = None):
         a, *args = action["name"].split(" ")
         a = a.replace('-', '_')
         logger.debug("executing {a}({args})".format(a=a,args=args))
         method = getattr(self, a)
-        method(*args, cb=partial(self.report, action, cb), actionJson=action)
+        method(*args, cb=partial(self.report, action, cb), actionJson=action, time=time)
 
     def stop(self, action):
         if not action["controllable"]:
@@ -53,6 +53,7 @@ class DummyActionExecutor(AbstractActionExecutor):
         
         self.agent = agentName
         self.pos = {}
+        self.nextReport = None
         
     def init(self, who, a, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
@@ -114,23 +115,27 @@ class DummyActionExecutor(AbstractActionExecutor):
         logger.info("Assume communicate-meta succeed immediately")
         cb("ok")
     
-    def track(self, *args, **kwargs):
-        logger.info("Received a track action")
+    def track(self, x, y, *args, **kwargs):
+        #if x,y == 0,0 : no position known
+        logger.info("Received a track action. Target in (%s,%s)" %(x,y))
     
     def update(self):
         currentTime = time.time()
 
         with self.eventsLock:
             for d in [d for d in self.nextEvents if d["time"] <= currentTime]:
-                #if "move mana" in d["actionJson"]["name"]:
-                #    d["cb"]({"type":"target_found", "position":{"x":1,"y":1}})
-                #    logger.warning("Simulating target found")
-                #else:
-                d["cb"]({"type":"ok"})
+                if self.nextReport is not None:
+                    d["cb"]({"type":self.nextReport})
+                    self.nextReport = None
+                else:
+                    d["cb"]({"type":"ok"})
                 logger.info("calling a callback for %s" % d["actionJson"]["name"])
 
             self.nextEvents = [d for d in self.nextEvents if d["time"] > currentTime]
-    
+
+    def stopExecutor(self, time):
+        pass
+
 class DummyMAActionExecutor(DummyActionExecutor):
     _name = "dummy-ma"
 
