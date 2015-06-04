@@ -40,7 +40,7 @@ class Supervisor(threading.Thread):
         self.beginDate = -1
         self.state = State.INIT
         self.repairRos = False
-        self.allowShorterAction = False
+        self.allowShorterAction = True
 
         self.agentsDead = []
 
@@ -250,6 +250,7 @@ class Supervisor(threading.Thread):
         else:
             logger.debug("Starting %s at time %f. Not my action." % (action["name"], currentTime/1000))
 
+
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
         
@@ -336,7 +337,8 @@ class Supervisor(threading.Thread):
         if dReal < dMin:
             if self.allowShorterAction:
                 logger.warning("An action finished early : %.2f instead of %.2f. Updating its dMin." % (dReal/1000, dMin/1000))
-                self.plan.stn.setConstraint(action["tStart"], tp, int(floor(dReal)))
+                l = self.plan.stn.setConstraint(action["tStart"], tp, int(floor(dReal)))
+                self.plan.mastnMsg = self.plan.mastnMsg + l
             else:
                 logger.warning("An action finished early : %.2f instead of %.2f. Will wait" % (dReal/1000, dMin/1000))
                 value = startTime + dMin
@@ -591,7 +593,7 @@ class Supervisor(threading.Thread):
                     if tp in tps:
                         planJson["absolute-time"][i] = [tp, value + shift]
                 
-                planStr = self.sendNewStatusMessage("repairDone", planJson)
+                planStr = self.sendNewStatusMessage("repairDone", json.dumps(planJson))
                 if planStr is not None:
                     break
 

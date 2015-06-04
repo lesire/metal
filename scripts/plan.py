@@ -43,6 +43,8 @@ class Plan:
         d = json.loads(planStr)
         self.jsonDescr = deepcopy(d)
 
+        self.mastnMsg = []
+
         self.agent = agent
         if agent is None:
             self.stn = pystn.STNIntMa(pystn.StnType.GraphSTN)
@@ -238,6 +240,32 @@ class Plan:
     def getJsonDescription(self):
         return deepcopy(self.jsonDescr)
     
+    # Add a temporal constraint to the plan.
+    # Will be exported into Json to be included during the repair attemps
+    def addTemporalConstraint(self, startTp, endTp, lb, ub = None):
+        if startTp is None:
+            startTp = self.stn.getStartId()
+            startTpIndex = 0
+        else:
+            startTpIndex = int(startTp.split("-")[0])
+
+        if ub is None:
+            l = self.stn.addConstraint(startTp, endTp, lb)
+        else:
+            l = self.stn.addConstraint(startTp, endTp, lb, ub)
+
+        self.mastnMsg = l + self.mastnMsg
+
+        if not self.stn.isConsistent():
+            logger.warning("When adding constraint between %s and %s (%s, %s), STN became inconsistent" % (startTp, endTp, lb, ub))
+
+        tLink = {"startTp":startTpIndex, "endTp":int(endTp.split("-")[0]), "lb":lb}
+        if ub is not None:
+            tLink["ub"] = ub
+
+        logger.info("Adding %s to the plan json description" % tLink)
+        self.jsonDescr["temporal-links"].append(tLink)
+
     #assume value in ms
     def setTimePoint(self, tpName, value):
         logger.debug("plan.setTimpoint %s %s" % (tpName, value))
@@ -282,9 +310,15 @@ class Plan:
         logger.info("Executing %s at %s" % (tpName, value))
         l = self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
         
+        self.mastnMsg = self.mastnMsg + l
+
         if not self.stn.isConsistent():
             logger.error("When executing %s at %s, stn became inconsistent" % (tpName, value))
             logger.error("Bounds were : %s,%s" % (c.lb, c.ub))
+
+    def getMastnMsg(self):
+        l = self.mastnMsg
+        self.mastnMsg = []
         return l
 
     def setActionUnavailable(self, action):

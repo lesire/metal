@@ -2,6 +2,7 @@ import logging; logger = logging.getLogger("hidden")
 
 from copy import copy
 
+import pystn
 import rospy
 import json
 import sys
@@ -168,33 +169,35 @@ class SupervisorRos(Supervisor):
         self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
     def setTimePoint(self, tp, value):
-        l = Supervisor.setTimePoint(self, tp, value)
+        Supervisor.setTimePoint(self, tp, value)
+        
+        l = self.plan.getMastnMsg()
         rospy.logdebug("Updated constraints: %s" % str(l))
-        
-        u = MaSTNUpdate()
-        u.header.stamp = rospy.Time.now()
-        for a in l:
-            u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
-        
-        u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
-        rospy.logdebug("Executed frontier nodes: %s" % str(u.executedNodes))
-        self.mastn_pub.publish(u)
+
+        #only send a MaSTN update if the stn is consistent
+        if self.plan.stn.isConsistent():
+            u = MaSTNUpdate()
+            u.header.stamp = rospy.Time.now()
+            for a in l:
+                u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
+
+            u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+            rospy.logdebug("Executed frontier nodes: %s" % str(u.executedNodes))
+            self.mastn_pub.publish(u)
             
     def mastnUpdate(self, data):
         if data._connection_header["callerid"] == rospy.get_name():
             return
 
+        cl = pystn.ConstraintListL()
         for a in data.arcs:
-            e = self.plan.stn.export()
-            if not self.plan.stn.isConsistent():
-                logger.error("Stn already inconsistent")
+            cl.append(pystn.ConstraintInt(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue))
 
-            l = self.plan.stn.setConstraint(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue)
-            rospy.logdebug("Constaint %s => %s" % (str(a), str(l)))
+        self.plan.stn.setConstraints(cl)
 
-            if not self.plan.stn.isConsistent():
-                logger.error("Received an update from %s. When setting the constraint %s, stn become inconsistent" % (data._connection_header["callerid"], a))
-                logger.error(e)
+        if not self.plan.stn.isConsistent():
+            logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
+            logger.error(data.arcs)
 
         for n in data.executedNodes:
             self.tp[n][1] = "past"
