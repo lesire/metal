@@ -575,7 +575,7 @@ class Supervisor(threading.Thread):
                     if tp in tps:
                         planJson["absolute-time"][i] = [tp, value + shift]
                 
-                planStr = self.sendNewStatusMessage("repairDone", planJson)
+                planStr = self.sendNewStatusMessage("repairDone", json.dumps(planJson))
                 if planStr is not None:
                     break
 
