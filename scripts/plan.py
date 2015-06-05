@@ -125,7 +125,7 @@ class Plan:
                     self.stn.addPoint(a["tEnd"])
                 #self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)
             
-            if a["tStart"] != a["tEnd"]:
+            if a["tStart"] != a["tEnd"] and not a["controllable"]:
                 if "dMin" in a:
                     self.stn.addConstraint(a["tStart"], a["tEnd"], int(round(timeFactor*a["dMin"])))
                 else:
