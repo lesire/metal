@@ -106,7 +106,11 @@ class Supervisor(threading.Thread):
                 
         
         for tpName,value in self.plan.absTimes:
+            #Ignore nodes that belongs to another robot
+            if tpName not in self.plan.stn.getNodeIds(): continue
+
             action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+
             if action["executed"]:
                 #action was executed, this is a past action
                 self.executedTp[tpName] = value
@@ -117,6 +121,9 @@ class Supervisor(threading.Thread):
             #TODO if this is an action being executed, send a message to the executor
     
         for tpName,value in self.plan.absTimes:
+            #Ignore nodes that belongs to another robot
+            if tpName not in self.plan.stn.getNodeIds(): continue
+
             action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
                 
             if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
