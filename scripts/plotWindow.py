@@ -33,7 +33,7 @@ class PlotWindow(QMainWindow):
     def create_main_frame(self):
         self.main_frame = QWidget()
         self.dpi = 100
-        self.fig = Figure((5.0, 4.0), dpi=self.dpi)
+        self.fig = Figure((20.0, 6.0), dpi=self.dpi)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
         self.axes = self.fig.add_subplot(111)

@@ -117,7 +117,17 @@ class OnlineTimeline(PlotWindow):
                 offset = next(posCycle)
                 self.axes.text((xstart + xstop)/2, index + offset, self.getPrintName(action["name"]),horizontalalignment='center',verticalalignment='center',fontsize=8)
                 self.axes.vlines((xstart + xstop)/2, index, index + offset - 0.05)
-                self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, facecolor=color, edgecolor="k", lw=1, ls="solid", alpha=alpha)
+                
+                d = {}
+                if "communicate" in action["name"]:
+                    d["hatch"] = 'x'
+                    d["edgecolor"] = color
+                    d["facecolor"] = "w"
+                else:
+                    d["edgecolor"] = "k"
+                    d["facecolor"] = color
+
+                self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, lw=1, ls="solid", alpha=alpha, **d)
                 
             if index is not None:
                 captions[index] = robot + "\n" + self.data[robot]["state"]
