@@ -123,7 +123,7 @@ class Plan:
                     self.stn.addPoint(a["tEnd"], a["agent"])
                 else:
                     self.stn.addPoint(a["tEnd"])
-                #self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)
+                self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)  #prevent the end to be executed before any actions (for instance if the last action does not provide a goal)
             
             if a["tStart"] != a["tEnd"] and not a["controllable"]:
                 if "dMin" in a:
@@ -167,6 +167,12 @@ class Plan:
         if "absolute-time" in d:
             for time, value in d["absolute-time"]:
                 
+                #Ignore absolute dates on communication if there are in the future to allow their exectution
+                #as soon as possible.
+                if "start-communicate" in self.tpName[time]:
+                    if "current-time" not in d or value > d["current-time"]:
+                        continue
+
                 t = time
                 value = int(round(value*timeFactor))
                 
@@ -274,8 +280,13 @@ class Plan:
             self.jsonDescr["absolute-time"] = []
             
         #add it in the plan description
+        tpIndex = int(tpName.split("-")[0])
         valueSec = float(value)/timeFactor
-        self.jsonDescr["absolute-time"].append([int(tpName.split("-")[0]), valueSec])
+        if tpIndex in [t for t,_ in self.jsonDescr["absolute-time"]]:
+            if "start-communicate" not in tpName:
+                logger.error("Trying to execute %s. But its date is already set in the json description. Overwriting it" % tpName)
+            self.jsonDescr["absolute-time"] = [(t,v) for t,v in self.jsonDescr["absolute-time"] if t != tpIndex] #remove the previous absolute time if needed
+        self.jsonDescr["absolute-time"].append([tpIndex, valueSec])
 
         for index,action in self.jsonDescr["actions"].items():
 
