@@ -52,7 +52,8 @@ class Supervisor(threading.Thread):
 
         threading.Thread.__init__ (self, name="%s-sup" % agent)
         
-        self.ongoingActions = [] # Set it here (and not in init) so it is not reset when the plan is repaired
+        #key = (name, startTp, endTp). Value is the JSOn description of the action
+        self.ongoingActions = {} # Set it here (and not in init) so it is not reset when the plan is repaired
 
         self.init(planStr, agent)
         
@@ -219,10 +220,16 @@ class Supervisor(threading.Thread):
         
         if self.tp[tp][1] == "future":
             #If this is a deadline, must use the exact deadline time
-            currentTime = self.plan.stn.getBounds(tp).lb
+            c = self.plan.stn.getBounds(tp)
+            if c.lb != c.ub:
+                logger.error("A deadline timepoint still has some flexibility ? %s %s" % (tp, c))
+            currentTime = c.lb
         elif a["tEnd"] == tp and self.tp[tp][1] == "controllable":
-            #If this is the end of a action with strict duration
-            currentTime = self.plan.stn.getBounds(tp).lb
+            #If this is the end of an action with temporal constraints
+            c = self.plan.stn.getBounds(tp)
+            currentTime = self.getCurrentTime()
+            currentTime = max(min(currentTime, c.ub), c.lb)
+            #currentTime = self.plan.stn.getBounds(tp).lb
         else:
             currentTime = self.getCurrentTime()
 
@@ -230,10 +237,12 @@ class Supervisor(threading.Thread):
             self.executeAction(a, currentTime)
         elif a["tEnd"] == tp:
         
-            if a not in self.ongoingActions:
+            if (a["name"], a["startTp"], a["endTp"]) not in self.ongoingActions:
                 logger.warning("When finishing the execution of %s, could not find it in self.ongoingActions" % a["name"])
+                logger.warning(self.ongoingActions)
+                logger.warning(a)
             else:
-                self.ongoingActions.remove(a)
+                del self.ongoingActions[(a["name"], a["startTp"], a["endTp"])]
                 logger.info("Ongoing actions : %s" % self.ongoingActions)
 
             if self.tp[tp][1] == "controllable":
@@ -274,7 +283,7 @@ class Supervisor(threading.Thread):
             s = copy(self.plan.stn)
             endNode = "1-end-%s" %  self.agent if self.agent is not None else "1-end"
             c = s.getBounds(endNode)
-            s.addConstraint(s.getStartId(), endNode, 0, c.lb + 6000) #Aim to finish the plan within 1 minute of its lower bound
+            s.addConstraint(s.getStartId(), endNode, 0, c.lb + 60000) #Aim to finish the plan within 1 minute of its lower bound
             if not s.isConsistent():
                 logger.error("When trying to constrain the end timepoint, the stn became inconsistent")
                 logger.error("I did not set a deadline for this action")
@@ -294,6 +303,9 @@ class Supervisor(threading.Thread):
                     self.stnUpdated()
                     return
 
+                threading.Timer((ub - currentTime)/1000, lambda : self.inQueue.put({"type":"ubAction", "action":action, "date":ub})).start()
+
+
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
         
@@ -304,7 +316,7 @@ class Supervisor(threading.Thread):
             return
             
         if self.isResponsibleForAction(action):
-            self.ongoingActions.append(action)
+            self.ongoingActions[(action["name"], action["startTp"], action["endTp"])] = action
 
         if not action["abstract"]:
             if not self.isResponsibleForAction(action):
@@ -350,17 +362,20 @@ class Supervisor(threading.Thread):
         if isinstance(report, str):
             report = {"type" : report}
         
-            
-        if action not in self.ongoingActions:
-            logger.warning("When finishing the execution of %s, could not find it in self.ongoingActions" % a["name"])
+        if (action["name"], action["startTp"], action["endTp"]) not in self.ongoingActions:
+            logger.warning("When finishing the execution of %s, could not find it in self.ongoingActions" % action["name"])
+            logger.warning(self.ongoingActions)
+            logger.warning(action)
         else:
-            self.ongoingActions.remove(action)
+            del self.ongoingActions[(action["name"], action["startTp"], action["endTp"])]
             logger.info("Ongoing actions : %s" % self.ongoingActions)
-
+            
         if report is None:
             logger.warning("End of action %s without report" % action["name"])
         elif report["type"] == "ok":
             logger.info("End of action %s ok" % action["name"])
+        elif report["type"] == "interrupted":
+            logger.info("Action %s interrupted by the supervisor" % action["name"])
         else:
             logger.warning("End of action %s with status %s" % (action["name"], report))
             if "target" in report["type"]:
@@ -413,6 +428,51 @@ class Supervisor(threading.Thread):
         if not self.plan.stn.isConsistent():
             logger.error("\tError : invalid STN when finishing execution of tp %s" % tp)
             raise ExecutionFailed("Invalid STN when finishing execution of tp %s" % tp)
+
+    def checkActionUB(self, msg):
+        if "action" not in msg or "date" not in msg:
+            logger.error("Ill-formated ubAction message : %s" % msg)
+
+        action = msg["action"]
+        date = msg["date"]
+        
+        if (action["name"], action["startTp"], action["endTp"]) not in self.ongoingActions:
+            return # action already finished, nothing to do
+
+        logger.info("Reached the upper bound for %s" % action["name"])
+
+        if "communicate " in action["name"]:
+            # remove the communicate meta from the pla
+            planJson = self.plan.getJsonDescription()
+            
+            # match the action also if I'm not the owner
+            comMetaName = action["name"].replace("communicate", "communicate-meta")
+            l = [(k,a) for k,a in planJson["actions"].items() if set(a["name"].split(" ")) == set(comMetaName.split(" "))]
+            if len(l) != 1:
+                logger.error("Could not find a single meta action when interrupting an action")
+                logger.error(len(l))
+                return
+
+            k,a = l[0]
+
+            if "executed" in a and a["executed"]:
+                logger.error("Cannot interrupt %s. %s is executed" % (action["name"], a["name"]))
+                return
+
+            planJson = plan.Plan.removeAction(planJson, k)
+            planJson["current-time"] = self.getCurrentTime()
+
+            self.init(json.dumps(planJson), self.agent)
+            
+            logger.info("Finished importing the new plan when deleting the com-meta action")
+            if not self.plan.stn.isConsistent():
+                logger.error("Removing the com-meta action invalidated the stn")
+
+        if action["controllable"]:
+            self.executeTp(action["tEnd"])
+        else:
+            fakeMsg = {"type":"endAction", "action":action, "time":date, "report":{"type":"interrupted"}}
+            self.endAction(fakeMsg)
 
     def isExecuted(self):
         return all([tp[1] == "past" for tp in self.tp.values()])
@@ -623,6 +683,7 @@ class Supervisor(threading.Thread):
         
         #Assume failure because of a deadline
         #Find the next deadline and if possible (action not locked) iteratively shift it
+        """
         if not self.plan.stn.isConsistent():
             logger.info("Trying to shift deadlines")
             comMetaKeys = [k for k,a in planJson["actions"].items() if "communicate-meta" in a["name"] and self.agent in a["name"] and ("locked" not in a or not a["locked"])]
@@ -651,7 +712,8 @@ class Supervisor(threading.Thread):
                     break
 
         else:
-            planStr = self.repairPlan(planJson)
+        """
+        planStr = self.repairPlan(planJson)
         
         if planStr is None:
             logger.error("Reparation failed")
@@ -708,6 +770,8 @@ class Supervisor(threading.Thread):
                             self.endAction(msg)
                         elif msg["type"] == "alea":
                             self.dealAlea(msg.get("aleaType"), msg)
+                        elif msg["type"] == "ubAction":
+                            self.checkActionUB(msg)
                         else:
                             logger.warning("Supervisor received unknown message %s" % msg)
                         
