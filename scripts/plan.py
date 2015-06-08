@@ -112,6 +112,11 @@ class Plan:
 
         for a in self.actions.values():
 
+            if self.agent is not None and "agent" in a:
+                endPoint = "1-end-" + a["agent"]
+            else:
+                endPoint = "1-end"
+
             if a["tStart"][0] != "0" and a["tStart"] not in self.stn.getNodeIds():
                 if self.agent is not None and "agent" in a:
                     self.stn.addPoint(a["tStart"], a["agent"])
@@ -123,7 +128,7 @@ class Plan:
                     self.stn.addPoint(a["tEnd"], a["agent"])
                 else:
                     self.stn.addPoint(a["tEnd"])
-                self.stn.addConstraint(a["tEnd"], self.tpName[1], 0)  #prevent the end to be executed before any actions (for instance if the last action does not provide a goal)
+                self.stn.addConstraint(a["tEnd"], endPoint, 0)  #prevent the end to be executed before any actions (for instance if the last action does not provide a goal)
             
             if a["tStart"] != a["tEnd"] and not a["controllable"]:
                 if "dMin" in a:
