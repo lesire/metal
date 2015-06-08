@@ -55,26 +55,26 @@ class Plan:
         
         self.actions = copy(d["actions"])
         
-        if self.agent is not None:
-            for a in set(a["agent"] for a in self.actions.values() if "agent" in a):
-                if a != self.agent:
-                    self.stn.addAgent(a)
-        
         self.tpName = {}
         self.tpAgent = {}
         
         # End timepoints are duplicated for each agent
-        agentsSet = set(a["agent"] for a in self.actions.values() if "agent" in a)
+        agentsSet = set([a["agent"] for a in self.actions.values() if "agent" in a])
         self.tpEnd = {}
-        for a in agentsSet:
-            self.tpEnd[a] = "1-end-" + a
-            self.stn.addPoint(self.tpEnd[a], a) #end of all the actions of this robot
+        if len(agentsSet) > 0:
+            for a in agentsSet:
+                if a != self.agent:
+                    self.stn.addAgent(a)
+                    
+                self.tpEnd[a] = "1-end-" + a
+                self.stn.addPoint(self.tpEnd[a], a) #end of all the actions of this robot
 
-            self.stn.addPoint("1-endglobal-" + a, a) #end of all the actions of all the robots
-        for a in agentsSet:
-            for b in agentsSet:
-                self.stn.addConstraint("1-end-" + a, "1-endglobal-" + b, 1)
-        self.tpName[1] = "1-end-" + self.agent
+                self.stn.addPoint("1-endglobal-" + a, a) #end of all the actions of all the robots
+            for a in agentsSet:
+                for b in agentsSet:
+                    self.stn.addConstraint("1-end-" + a, "1-endglobal-" + b, 1)
+
+        self.tpName[1] = "1-end-" + self.agent if self.agent is not None else "1-end"
 
         for index,a in self.actions.items():
             tpNumber = a["startTp"]
@@ -276,6 +276,25 @@ class Plan:
     def setTimePoint(self, tpName, value):
         logger.debug("plan.setTimpoint %s %s" % (tpName, value))
     
+        c = self.stn.getBounds(tpName)
+        if value < c.lb or value > c.ub:
+        #if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
+            logger.warning("Calling set timepoint for %s at %s" % (tpName, value))
+            logger.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
+            #logger.warning(self.stn.export())
+
+
+        #add this constraint in the STN
+        logger.info("Executing %s at %s. Bounds are %s" % (tpName, value, c))
+        l = self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
+        
+        self.mastnMsg = self.mastnMsg + l
+
+        if not self.stn.isConsistent():
+            logger.error("When executing %s at %s, stn became inconsistent" % (tpName, value))
+            logger.error("Bounds were : %s,%s" % (c.lb, c.ub))
+
+
         if not "absolute-time" in self.jsonDescr:
             self.jsonDescr["absolute-time"] = []
             
@@ -310,24 +329,6 @@ class Plan:
                     action["dMax"] = max(duration, action["dMax"])
                 
             self.jsonDescr["actions"][index] = action
-
-        c = self.stn.getBounds(tpName)
-        if value < c.lb or value > c.ub:
-        #if not self.stn.mayBeConsistent(self.stn.getStartId(), tpName, value, value):
-            logger.warning("Calling set timepoint for %s at %s" % (tpName, value))
-            logger.warning("STN will not be consistent. Bonds are : %s" % self.stn.getBounds(tpName))
-            #logger.warning(self.stn.export())
-
-
-        #add this constraint in the STN
-        logger.info("Executing %s at %s" % (tpName, value))
-        l = self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
-        
-        self.mastnMsg = self.mastnMsg + l
-
-        if not self.stn.isConsistent():
-            logger.error("When executing %s at %s, stn became inconsistent" % (tpName, value))
-            logger.error("Bounds were : %s,%s" % (c.lb, c.ub))
 
     def getMastnMsg(self):
         l = self.mastnMsg
@@ -476,3 +477,22 @@ class Plan:
                 result["absolute-time"].append([tp,value])
         
         return result
+
+    # get a plan (as a dictionnary) and remove an action from it.
+    # Remove all the relevant element to keep the plan consistent
+    @staticmethod
+    def removeAction(planJson, actionKey):
+        planJson = deepcopy(planJson)
+        a = planJson["actions"][actionKey]
+        
+        deletedTps = [a["startTp"], a["endTp"]]
+
+        # must remove all elements that refer to the deleted action
+        del planJson["actions"][actionKey]
+        planJson["causal-links"] = [cl for cl in planJson["causal-links"] if cl["startTp"] not in deletedTps and cl["endTp"] not in deletedTps]
+        planJson["temporal-links"] = [cl for cl in planJson["temporal-links"] if cl["startTp"] not in deletedTps and cl["endTp"] not in deletedTps]
+        planJson["absolute-time"] = [(t,v) for t,v in planJson["absolute-time"] if t not in deletedTps]
+
+        return planJson
+
+

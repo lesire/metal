@@ -19,7 +19,7 @@ class PlanTest(unittest.TestCase):
         p["temporal-links"] = []
         p["absolute-time"] = []
     
-        self.emptyPlan = plan.Plan(copy(json.dumps(p)))
+        self.emptyPlan = plan.Plan(copy(json.dumps(p)), "mana")
         
         p["actions"]["2"] = {"name":"observe minnie agvpt_12305_2615_0 ptobs_12070_2605","startTp":2,"endTp":3,"dMin":-1.0,"dMax":1.0,"agent":"mana"}
         p["actions"]["3"] = {"name":"observe minnie agvpt_12305_2615_0 ptobs_22070_2605","startTp":4,"endTp":5,"dMin":-1.0,"dMax":1.0,"agent":"minnie"}
@@ -27,7 +27,7 @@ class PlanTest(unittest.TestCase):
         p["causal-links"].append({"startAction":"2","endAction":"1","startTp":3,"endTp":1,"startTs":2,"endTs":3,"lit":"explored ptobs_12070_2605"})
         p["causal-links"].append({"startAction":"3","endAction":"1","startTp":5,"endTp":1,"startTs":2,"endTs":3,"lit":"explored ptobs_22070_2605"})
         
-        self.plan = plan.Plan(copy(json.dumps(p)))
+        self.plan = plan.Plan(copy(json.dumps(p)), "mana")
 
     #If local, there can be references to external timepoints
     def helper_checkJsonPlan(self, data, local=False):
@@ -128,7 +128,7 @@ class PlanTest(unittest.TestCase):
         with open(planFile) as f:
             l = " ".join(f.readlines())
 
-        originalPlan = plan.Plan(l)
+        originalPlan = plan.Plan(l, "mana")
         originalP = originalPlan.getJsonDescription()
         self.helper_checkJsonPlan(originalP)
 
@@ -172,12 +172,22 @@ class PlanTest(unittest.TestCase):
                 self.assertTrue(False, "During the reparation hipop returned %s. Cannot repair." % r)
         
         self.assertEqual(0, r)
-        
+    
+    def test_removeAction(self):
+        planJson = self.plan.getJsonDescription()
+    
+        newPlanJson = plan.Plan.removeAction(planJson, "3")
+    
+        self.assertEqual(len(planJson["actions"]), 4)
+        self.assertEqual(len(newPlanJson["actions"]), 3)
+    
+    
     def test_planBroken(self):
-        with open("/home/pbechon/.ros/plan-broken.plan") as f:
-            p = json.load(f)
-            
-        self.helper_checkJsonPlan(p)
+        if os.path.exists("/home/pbechon/.ros/plan-broken.plan"):
+            with open("/home/pbechon/.ros/plan-broken.plan") as f:
+                p = json.load(f)
+                
+            self.helper_checkJsonPlan(p)
 
 if __name__ == '__main__':
     unittest.main()
