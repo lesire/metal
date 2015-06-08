@@ -5,6 +5,7 @@
     <arg name="executor" default="ros"/>
     <arg name="bag_repair" default="false"/>
     <arg name="vnet" default="false"/>
+    <arg name="auto_start" default="false"/>
     
     <param name="hidden/plan"        type="str" textfile="$(find metal)/data/simple.plan" />
     <param name="hidden/pddl/domain" type="str" textfile="$(find metal)/data/simple-domain.pddl" />
@@ -14,7 +15,10 @@
 
     <node name="visu" pkg="metal" type="onlineTimeline.py" ns="visu"  if="$(arg visu)" />
 
-    <node name="r1" pkg="metal" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal --logLevel=debug" if="$(arg simu)" >
+    <node name="$(anon autoStart)" pkg="metal" type="autoStart.py" ns="autoStart" if="$(arg auto_start)" />
+
+
+    <node name="r1" pkg="metal" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal" if="$(arg simu)" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
