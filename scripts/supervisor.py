@@ -5,6 +5,7 @@ from copy import copy
 from math import floor
 import itertools
 import json
+import math
 import os
 import subprocess
 import sys
@@ -40,7 +41,9 @@ class Supervisor(threading.Thread):
         self.beginDate = -1
         self.state = State.INIT
         self.repairRos = False
-        self.allowShorterAction = True
+        
+        self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
+        self.ubForCom = False # If true, set an upper bound for communications
 
         self.agentsDead = []
 
@@ -257,6 +260,31 @@ class Supervisor(threading.Thread):
         else:
             logger.debug("Starting %s at time %f. Not my action." % (action["name"], currentTime/1000))
 
+        if self.ubForCom and action["name"].startswith("communicate "):
+            # Compute an upper bound for this action
+
+            s = copy(self.plan.stn)
+            endNode = "1-end-%s" %  self.agent if self.agent is not None else "1-end"
+            c = s.getBounds(endNode)
+            s.addConstraint(s.getStartId(), endNode, 0, c.lb + 6000) #Aim to finish the plan within 1 minute of its lower bound
+            if not s.isConsistent():
+                logger.error("When trying to constrain the end timepoint, the stn became inconsistent")
+                logger.error("I did not set a deadline for this action")
+            else:
+                cCom = s.getBounds(action["tEnd"])
+                logger.info("The bounds for the end of this com is : %s" % cCom)
+                ub =  math.ceil((cCom.ub + cCom.lb)/2)
+
+                #ub = self.plan.stn.getBounds(action["tEnd"]).lb + 10000 #10 seconds
+                logger.info("Executing a com action at %.2f. Set its upper bound to %.2f. Max duration : %.2f" % (currentTime/1000, ub/1000, (ub - currentTime)/1000))
+
+                self.plan.addTemporalConstraint(None, action["tEnd"], 0, ub)
+
+                if not self.plan.stn.isConsistent():
+                    logger.error("When constraining the end of %s before %d, stn became inconsistent" % (action["name"], ub))
+                    self.state = State.ERROR
+                    self.stnUpdated()
+                    return
 
         self.executedTp[action["tStart"]] = currentTime
         self.tp[action["tStart"]][1] = "past"
