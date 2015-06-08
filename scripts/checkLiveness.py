@@ -14,11 +14,17 @@ import time
 # inside each group.
 
 hosts = {
-          "PC Mission" :                 {"addr" : "localhost",     "group":"PC Opérateur"},
-          "Ressac 1 : Station Sol" :     {"addr" : "11.11.22.33",   "group":"Ressac 1"},
-          "Ressac 1 : Charge utile" :    {"addr" : "11.11.22.34",   "group":"Ressac 1"},
-          "Ressac 2 : Station Sol" :     {"addr" : "11.11.22.35",   "group":"Ressac 2"},
-          "Ressac 2 : Charge utile" :    {"addr" : "11.11.22.36",   "group":"Ressac 2"}
+          "PC Mission" :                 {"addr" : "134.212.28.32",    "group":"PC Opérateur"},
+          "Ressac 1 : Station Sol" :     {"addr" : "134.212.244.34",   "group":"Ressac 1"},
+          "Ressac 1 : Charge utile" :    {"addr" : "134.212.244.176",  "group":"Ressac 1"},
+          "Ressac 2 : Station Sol" :     {"addr" : "134.212.244.35",   "group":"Ressac 2"},
+          "Ressac 2 : Charge utile" :    {"addr" : "134.212.244.178",  "group":"Ressac 2"},
+          "Minode" :                     {"addr" : "134.212.244.36",   "group":"Ressac"},
+          "Mana" :                       {"addr" : "1.0.0.0",          "group":"Mana"},
+          "Minnie" :                     {"addr" : "1.0.0.0",          "group":"Minnie"},
+          "Passerelle ONERA-LASS" :      {"addr" : "134.212.90.100",   "group":"0 - Réseaux"},
+          "Access point WiFi 1" :        {"addr" : "134.212.244.109",  "group":"0 - Réseaux"},
+          "Access point WiFi 2" :        {"addr" : "134.212.244.110",  "group":"0 - Réseaux"},
         }
 
 ######################
