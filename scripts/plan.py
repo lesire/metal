@@ -279,14 +279,16 @@ class Plan:
         if not "absolute-time" in self.jsonDescr:
             self.jsonDescr["absolute-time"] = []
             
-        #add it in the plan description
-        tpIndex = int(tpName.split("-")[0])
-        valueSec = float(value)/timeFactor
-        if tpIndex in [t for t,_ in self.jsonDescr["absolute-time"]]:
-            if "start-communicate" not in tpName:
-                logger.error("Trying to execute %s. But its date is already set in the json description. Overwriting it" % tpName)
-            self.jsonDescr["absolute-time"] = [(t,v) for t,v in self.jsonDescr["absolute-time"] if t != tpIndex] #remove the previous absolute time if needed
-        self.jsonDescr["absolute-time"].append([tpIndex, valueSec])
+        #add it in the plan description.
+        if not tpName.startswith("1-end-"): #ignore the end of the local plan. Only the global end matters
+            tpIndex = int(tpName.split("-")[0])
+            valueSec = float(value)/timeFactor
+            # For communicate action, the Json plan can have a deadline that we ignored. We need to rewrite it with the real execution time
+            if tpIndex in [t for t,_ in self.jsonDescr["absolute-time"]]:
+                if "start-communicate" not in tpName:
+                    logger.error("Trying to execute %s. But its date is already set in the json description. Overwriting it" % tpName)
+                self.jsonDescr["absolute-time"] = [(t,v) for t,v in self.jsonDescr["absolute-time"] if t != tpIndex] #remove the previous absolute time if needed.
+            self.jsonDescr["absolute-time"].append([tpIndex, valueSec])
 
         for index,action in self.jsonDescr["actions"].items():
 
