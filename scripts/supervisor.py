@@ -52,6 +52,8 @@ class Supervisor(threading.Thread):
 
         threading.Thread.__init__ (self, name="%s-sup" % agent)
         
+        self.ongoingActions = [] # Set it here (and not in init) so it is not reset when the plan is repaired
+
         self.init(planStr, agent)
         
     
@@ -227,6 +229,12 @@ class Supervisor(threading.Thread):
         if a["tStart"] == tp:
             self.executeAction(a, currentTime)
         elif a["tEnd"] == tp:
+        
+            if a not in self.ongoingActions:
+                logger.warning("When finishing the execution of %s, could not find it in self.ongoingActions" % a["name"])
+            else:
+                self.ongoingActions.remove(a)
+                logger.info("Ongoing actions : %s" % self.ongoingActions)
 
             if self.tp[tp][1] == "controllable":
                 
@@ -294,6 +302,9 @@ class Supervisor(threading.Thread):
         if action["name"] == "dummy end":
             #do nothing, the plan is finished only if the 1-endglobal is executed
             return
+            
+        if self.isResponsibleForAction(action):
+            self.ongoingActions.append(action)
 
         if not action["abstract"]:
             if not self.isResponsibleForAction(action):
@@ -338,6 +349,13 @@ class Supervisor(threading.Thread):
         
         if isinstance(report, str):
             report = {"type" : report}
+        
+            
+        if action not in self.ongoingActions:
+            logger.warning("When finishing the execution of %s, could not find it in self.ongoingActions" % a["name"])
+        else:
+            self.ongoingActions.remove(action)
+            logger.info("Ongoing actions : %s" % self.ongoingActions)
 
         if report is None:
             logger.warning("End of action %s without report" % action["name"])
