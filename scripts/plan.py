@@ -133,6 +133,8 @@ class Plan:
                     
                 if False and isActionControllable(a["name"]):
                     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
+            elif a["tStart"] != a["tEnd"]:
+                    self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), 0)
 
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
