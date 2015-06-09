@@ -21,7 +21,7 @@ try:
             ROSActionExecutor.communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs)
 
         def communicate_meta(self, first_robot, second_robot, first_point, second_point, cb, **kwargs):
-            ROSActionExecutor.communicate(self, first_robot, second_robot, first_point, second_point, cb, **kwargs)
+            ROSActionExecutor.communicate_meta(self, first_robot, second_robot, first_point, second_point, cb, **kwargs)
 
         def has_communicated(self, first_robot, second_robot, cb, **kwargs):
             ROSActionExecutor.has_communicated(self, first_robot, second_robot, cb, **kwargs)
