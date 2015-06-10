@@ -640,7 +640,7 @@ class Supervisor(threading.Thread):
         command = "hipop -L error -u --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
-            r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
+            r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT)
         except OSError as e:
             if e.errno == os.errno.ENOENT:
                 # handle file not found error.
