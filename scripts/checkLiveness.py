@@ -15,13 +15,13 @@ import time
 
 hosts = {
           "PC Mission" :                 {"addr" : "134.212.28.32",    "group":"PC Opérateur"},
-          "Ressac 1 : Station Sol" :     {"addr" : "134.212.244.34",   "group":"Ressac 1"},
+          "Ressac 2 : Station Sol" :     {"addr" : "134.212.244.34",   "group":"Ressac 2"},
           "Ressac 1 : Charge utile" :    {"addr" : "134.212.244.176",  "group":"Ressac 1"},
-          "Ressac 2 : Station Sol" :     {"addr" : "134.212.244.35",   "group":"Ressac 2"},
+          "Ressac 1 : Station Sol" :     {"addr" : "134.212.244.35",   "group":"Ressac 1"},
           "Ressac 2 : Charge utile" :    {"addr" : "134.212.244.178",  "group":"Ressac 2"},
           "Minode" :                     {"addr" : "134.212.244.36",   "group":"Ressac"},
-          "Mana" :                       {"addr" : "1.0.0.0",          "group":"Mana"},
-          "Minnie" :                     {"addr" : "1.0.0.0",          "group":"Minnie"},
+          "Mana" :                       {"addr" : "140.93.16.55",     "group":"Mana"},
+          "Minnie" :                     {"addr" : "140.93.16.57",     "group":"Minnie"},
           "Passerelle ONERA-LASS" :      {"addr" : "134.212.90.100",   "group":"0 - Réseaux"},
           "Access point WiFi 1" :        {"addr" : "134.212.244.109",  "group":"0 - Réseaux"},
           "Access point WiFi 2" :        {"addr" : "134.212.244.110",  "group":"0 - Réseaux"},
@@ -79,10 +79,10 @@ class Application(tk.Frame):
         else:
             d["status"] = "ko"
             d["widget"]["bg"] = "red"
-        print("Done for %s" % d["addr"])
+        print("Done %s for %s" % (d["status"], d["addr"]))
 
     def ping(self, addr):
-        command = "ping -c 1 -t 1 %s" % addr
+        command = "ping -c 1 -W 1 %s" % addr
         try:
             c = subprocess.call(command.split(" "), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
             return (c == 0)
