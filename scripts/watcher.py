@@ -25,7 +25,7 @@ def getStnVisu(msg):
 
         if msg.state.upper() == "ERROR":
             rospy.signal_shutdown("error of %s" % msg.agent)
-        elif msg.state.upper() == "DONE" or msg.state.upper() == "DEAD":
+        elif msg.state.upper() == "DONE" or msg.state.upper() == "DEAD" or msg.state.upper() == "TRACKING":
             agents[msg.agent] = True
         else:
             agents[msg.agent] = False

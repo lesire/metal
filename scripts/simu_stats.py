@@ -197,6 +197,7 @@ def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1):
     logger.info("Done with this benchmark : %s" % outputDir)
 
     #TODO merge all the results of the simulations
+    parseBenchmark(outputDir)
 
 def parseBenchmark(outputDir):
     
@@ -296,16 +297,20 @@ def parseSimu(outputDir):
         result["obsPoints"]["ratio"] = float(result["obsPoints"]["nbr"]) / result["obsPoints"]["nominalNbr"]
 
         hasError = False
+        trackingRobots = set()
         agents = {}
         for _,msg,_ in bag.read_messages(topics="/hidden/stnvisu"):
             if msg.agent not in agents:
                 agents[msg.agent] = {}
             
-            if "finishTime" not in agents[msg.agent] and msg.state in ["DONE", "ERROR", "DEAD"]:
+            if "finishTime" not in agents[msg.agent] and msg.state in ["DONE", "ERROR", "DEAD", "TRACKING"]:
                 agents[msg.agent]["finishTime"] = msg.time
                 
             if msg.state == "ERROR":
                 hasError = True
+                
+            if msg.state == "TRACKING":
+                trackingRobots.add(msg.agent)
             
             logger.debug("%s : %s -> %s" % (msg.time, msg.agent, msg.state))
 
@@ -314,6 +319,8 @@ def parseSimu(outputDir):
                 logger.error("Cannot determine the end time of %s" % agent)
 
         result["success"] = not hasError
+        result["trackingRobots"] = list(trackingRobots)
+        result["trackingRobotsNbr"] = len(trackingRobots)
         result["finishTime"] = max([d["finishTime"]/1000. for d in agents.values() if "finishTime" in d])
         
 
