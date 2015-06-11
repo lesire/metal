@@ -11,8 +11,6 @@ from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
 from metal.srv import AleaAction
 from supervisor import Supervisor,State
 
-#from mastn_execution.srv import StnVisu
-
 class SupervisorRos(Supervisor):
     def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
         if agent is None:
