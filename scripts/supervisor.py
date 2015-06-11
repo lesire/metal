@@ -43,9 +43,10 @@ class Supervisor(threading.Thread):
         self.repairRos = False
         
         self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
-        self.ubForCom = False # If true, set an upper bound for communications
+        self.ubForCom = True # If true, set an upper bound for communications
 
         self.agentsDead = []
+        self.droppedComs = []
 
         self.startEvent = startEvent
         self.stopEvent = stopEvent
@@ -442,37 +443,50 @@ class Supervisor(threading.Thread):
         logger.info("Reached the upper bound for %s" % action["name"])
 
         if "communicate " in action["name"]:
-            # remove the communicate meta from the pla
-            planJson = self.plan.getJsonDescription()
-            
-            # match the action also if I'm not the owner
-            comMetaName = action["name"].replace("communicate", "communicate-meta")
-            l = [(k,a) for k,a in planJson["actions"].items() if set(a["name"].split(" ")) == set(comMetaName.split(" "))]
-            if len(l) != 1:
-                logger.error("Could not find a single meta action when interrupting an action")
-                logger.error(len(l))
-                return
-
-            k,a = l[0]
-
-            if "executed" in a and a["executed"]:
-                logger.error("Cannot interrupt %s. %s is executed" % (action["name"], a["name"]))
-                return
-
-            planJson = plan.Plan.removeAction(planJson, k)
-            planJson["current-time"] = self.getCurrentTime()
-
-            self.init(json.dumps(planJson), self.agent)
-            
-            logger.info("Finished importing the new plan when deleting the com-meta action")
-            if not self.plan.stn.isConsistent():
-                logger.error("Removing the com-meta action invalidated the stn")
+            self.dropCommunication(action["name"])
 
         if action["controllable"]:
             self.executeTp(action["tEnd"])
         else:
             fakeMsg = {"type":"endAction", "action":action, "time":date, "report":{"type":"interrupted"}}
             self.endAction(fakeMsg)
+
+    # Remove the synchronising action of a communication.
+    def dropCommunication(self, comName):
+        # remove the communicate meta from the pla
+        planJson = self.plan.getJsonDescription()
+        
+        # match the action also if I'm not the owner
+        if "communicate-meta" in comName:
+            comMetaName = comName
+        else:
+            comMetaName = comName.replace("communicate", "communicate-meta")
+        l = [(k,a) for k,a in planJson["actions"].items() if set(a["name"].split(" ")) == set(comMetaName.split(" "))]
+        if len(l) != 1:
+            logger.error("Could not find a single meta action when dropping a com action")
+            logger.error(len(l))
+            return
+
+        k,a = l[0]
+
+        if "executed" in a and a["executed"]:
+            logger.error("Cannot drop %s. %s is executed" % (comName, a["name"]))
+            return
+        
+        logger.info("Dropping communication : %s" % a["name"])
+
+        if not a["name"] in self.droppedComs:
+            self.droppedComs.append(a["name"])
+
+        planJson = plan.Plan.removeAction(planJson, k)
+        planJson["current-time"] = self.getCurrentTime()
+
+        self.init(json.dumps(planJson), self.agent)
+        
+        logger.info("Finished importing the new plan when deleting the com-meta action")
+        if not self.plan.stn.isConsistent():
+            logger.error("Removing the com-meta action invalidated the stn")
+        
 
     def isExecuted(self):
         return all([tp[1] == "past" for tp in self.tp.values()])

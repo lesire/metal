@@ -12,3 +12,6 @@ rosservice call /ressac1/alea targetFound '!!str "{\"position\":{\"x\":12, \"y\"
 
 # Pour forcer le status de la prochaine action
 rosservice call /r1/executor/alea nextReport '!!str "{\"report\":\"broken\"}"' 
+
+# Pour retarder la fin d'une action (avec l'executeur ros)
+rosservice call /r1/executor/alea delay '!!str "{\"delay\":10}"'

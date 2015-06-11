@@ -182,12 +182,20 @@ class SupervisorRos(Supervisor):
                 u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
 
             u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
-            rospy.logdebug("Executed frontier nodes: %s" % str(u.executedNodes))
-            self.mastn_pub.publish(u)
             
+            u.droppedComs = self.droppedComs
+
+            self.mastn_pub.publish(u)
+
     def mastnUpdate(self, data):
         if data._connection_header["callerid"] == rospy.get_name():
             return
+
+        # Check if a com was cancelled
+        logger.debug("%s received with dropped coms %s" % (self.agent, data.droppedComs))
+        for c in data.droppedComs:
+            if c not in self.droppedComs:
+                self.dropCommunication(c)
 
         cl = pystn.ConstraintListL()
         for a in data.arcs:

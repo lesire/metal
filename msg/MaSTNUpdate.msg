@@ -1,3 +1,4 @@
 Header header
 StnArc[] arcs
 string[] executedNodes
+string[] droppedComs
