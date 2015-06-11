@@ -56,21 +56,26 @@ try:
                     r["type"] = r["report"]
 
                     if r["type"] == "blocked":
-                        self._sendCommand(action)
+                        self._sendCommand(self.currentAction)
                         return
                     elif "target" in r["type"]:
                         self.hasSeenTarget = True
+                        if self.isTracking:
+                            logger.info("Hyper saw the target and I'm supposed to track it.")
+                            action = {'action': 'track'}
+                            logger.info("Request action " + json.dumps(action))
+                            self._sendCommand(action)
+
                     self._cb(r)
             except Exception as e:
                 logger.warning(e)
 
-        def track(self, x, y, *args, **kwargs):
+        def track(self, x, y, cb, *args, **kwargs):
             self.isTracking = True
             self._cb = cb
             if not self.hasSeenTarget:
-                #TODO goto_target and track ?
-                logger.info("moving to target".format(w=who,a=a,b=str(coords)))
-                action = {'action': 'goto_target', 'waypoint': {'x': int(x)/100, 'y': int(y)/100}}
+                logger.info("moving to target")
+                action = {'action': 'goto_target', 'waypoint': {'x': int(x), 'y': int(y)}}
                 self._sendCommand(action)            
                 logger.info("Request action " + json.dumps(action))
             else:
