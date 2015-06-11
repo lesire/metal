@@ -3,7 +3,6 @@ from __future__ import division
 
 from copy import copy
 from math import floor
-import itertools
 import json
 import math
 import os
@@ -25,6 +24,17 @@ def enum(*sequential, **named):
     return type('Enum', (), enums)
 
 State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE", "ERROR")
+
+
+#re-implement the subprocess.call method with a timeout for compatibilty with Python3.2. Taken from Python3.4 source code
+def call(*popenargs, timeout=None, **kwargs):
+    with subprocess.Popen(*popenargs, **kwargs) as p:
+        try:
+            return p.wait(timeout=timeout)
+        except:
+            p.kill()
+            p.wait()
+            raise
 
 class ExecutionFailed(Exception):
     def __init__(self, msg):
@@ -654,7 +664,7 @@ class Supervisor(threading.Thread):
         command = "hipop -L error -u --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
         logger.info("Launching hipop with %s" % command)
         try:
-            r = subprocess.call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT)
+            r = call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
         except OSError as e:
             if e.errno == os.errno.ENOENT:
                 # handle file not found error.
