@@ -7,10 +7,10 @@
     <arg name="vnet" default="false"/>
     <arg name="auto_start" default="false"/>
     
-    <param name="hidden/plan"        type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple.plan" />
-    <param name="hidden/pddl/domain" type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-domain.pddl" />
-    <param name="hidden/pddl/prb"    type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-prb.pddl" />
-    <param name="hidden/pddl/helper" type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-prb-helper.pddl" />
+    <param name="hidden/plan"        type="str" textfile="$(find metal)/data/simple2-mission/hipop-files/simple.plan" />
+    <param name="hidden/pddl/domain" type="str" textfile="$(find metal)/data/simple2-mission/hipop-files/simple-domain.pddl" />
+    <param name="hidden/pddl/prb"    type="str" textfile="$(find metal)/data/simple2-mission/hipop-files/simple-prb.pddl" />
+    <param name="hidden/pddl/helper" type="str" textfile="$(find metal)/data/simple2-mission/hipop-files/simple-prb-helper.pddl" />
 
 
     <node name="visu" pkg="metal" type="onlineTimeline.py" ns="visu"  if="$(arg visu)" />
@@ -30,6 +30,28 @@
     </node>
 
     <node name="r2" pkg="metal" type="hidden-ros.py" ns="r2" args="--executor=$(arg executor) --agentName=r2 --waitSignal" if="$(arg simu)" >
+        <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/in" to="/hidden/executedTp" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/out" to="/hidden/executedTp" unless="$(arg vnet)"/>
+    </node>
+
+    <node name="r3" pkg="metal" type="hidden-ros.py" ns="r3" args="--executor=$(arg executor) --agentName=r3 --waitSignal" if="$(arg simu)" >
+        <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/in" to="/hidden/executedTp" unless="$(arg vnet)"/>
+        <remap from="hidden/executedTp/out" to="/hidden/executedTp" unless="$(arg vnet)"/>
+    </node>
+
+    <node name="r4" pkg="metal" type="hidden-ros.py" ns="r4" args="--executor=$(arg executor) --agentName=r4 --waitSignal" if="$(arg simu)" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
