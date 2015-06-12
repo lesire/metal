@@ -114,6 +114,7 @@ def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = F
 
     #run the rolaunch command
     os.environ["ROS_LOG_DIR"] = outputDir
+    os.environ["ROS_HOME"] = outputDir
     os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:%d" %  port
     logger.info("Launching a simulation on port %s" % port)
     p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea}".format(alea=aleaFile).split(" "), stdout=stdout, stderr=stderr)
@@ -154,17 +155,17 @@ def runParallelSimu(inputs, maxJobs = 1):
         #still work to do. First launch new processes
         if len(processes) < maxJobs and len(simuToLaunch) > 0 and not sigusrReceived:
             input = simuToLaunch[0]
-            processes.append(launchSimu(input["missionDir"], input["aleaFile"], input["outputDir"], port=input["port"], redirectOutput=True))
+            processes.append((input["outputDir"], launchSimu(input["missionDir"], input["aleaFile"], input["outputDir"], port=input["port"], redirectOutput=True)))
             del simuToLaunch[0]
 
         # Now check for the end of the launched processes
         # Iterate backward to remove elements while iterating
         for i in reversed(range(len(processes))):
-            p = processes[i]
+            name,p = processes[i]
             p.poll()
             if(p.returncode != None):
                 #process finished
-                logger.info("Process finished with error code %s" % p.returncode)
+                logger.info("Process %s finished with error code %s" % (name,p.returncode))
                 del processes[i]
 
         time.sleep(1)
