@@ -1,0 +1,7 @@
+
+<launch>
+    <param name="hidden/plan"        type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple.plan" />
+    <param name="hidden/pddl/domain" type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-domain.pddl" />
+    <param name="hidden/pddl/prb"    type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-prb.pddl" />
+    <param name="hidden/pddl/helper" type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-prb-helper.pddl" /> 
+</launch>
