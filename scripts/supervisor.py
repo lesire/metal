@@ -74,11 +74,18 @@ class Supervisor(threading.Thread):
         
     def init(self, planStr, agent):
         with self.mutex:
-            if agent is None:
-                self.plan = plan.Plan(planStr)
-            else:
-                self.plan = plan.Plan(planStr, agent)
             self.agent = agent
+
+            try:
+                if agent is None:
+                    self.plan = plan.Plan(planStr)
+                else:
+                    self.plan = plan.Plan(planStr, agent)
+            except plan.PlanImportError as e:
+                self.state = State.ERROR
+                self.stnUpdated()
+                logger.error(str(e))
+                logger.error("Error when trying to import this plan : %s" % planStr)
             
             self.executedTp = {}
             self.tp = {}
@@ -502,7 +509,9 @@ class Supervisor(threading.Thread):
         
 
     def isExecuted(self):
-        return all([tp[1] == "past" for tp in self.tp.values()])
+        with self.mutex:
+            result = all([tp[1] == "past" for tp in self.tp.values()])
+            return result
         
     def printPlan(self):
         info = [(a["name"], self.tp[a["tStart"]][1], self.plan.stn.getBounds(str(a["tStart"])).lb, self.plan.stn.getBounds(str(a["tEnd"])).lb) for a in self.plan.actions if a["name"] != "dummy init"]
@@ -743,12 +752,34 @@ class Supervisor(threading.Thread):
         planStr = self.repairPlan(planJson)
         
         if planStr is None:
-            logger.error("Reparation failed")
-            #TODO : implement a default strategy ? Notify other agents ?
-            self.state = State.ERROR
-            self.stnUpdated()
-            sys.exit(1)
-
+            logger.warning("Reparation failed. Trying to remove deadlines.")
+            
+            #Try to remove the furure deadlines
+            futureComs = []
+            for a in self.plan.actions.values():
+                if "communicate-meta" in a["name"] and self.agent in a["name"] and not a["executed"]:
+                    futureComs.append(a["name"])
+                    
+            if len(futureComs) > 0:
+                logger.info("Found some coms to drop : %s" % futureComs)
+                for c in futureComs:
+                    self.dropCommunication(c)
+                    
+                planStr = self.repairPlan(planJson)
+                
+                if planStr is None:
+                    logger.error("Even after dropping communication, cannot repair")
+                    logger.error(self.plan.stn.export())
+                    #TODO : implement a default strategy ? Notify other agents ?
+                    self.state = State.ERROR
+                    self.stnUpdated()
+                    sys.exit(1)
+            else:
+                logger.error("Found no deadlines to remove. Cannot repair")
+                #TODO : implement a default strategy ? Notify other agents ?
+                self.state = State.ERROR
+                self.stnUpdated()
+                sys.exit(1)
 
         #We have a new plan
         self.sendNewStatusMessage("repairDone", planStr)
@@ -785,25 +816,27 @@ class Supervisor(threading.Thread):
         hasFailed = False
         try:
             while not self.isExecuted() and self.state != State.DEAD and not self.stopEvent.is_set():
-                if self.state == State.RUNNING:
-                    while not self.inQueue.empty():
-                        msg = self.inQueue.get()
-        
-                        if not isinstance(msg, dict) or "type" not in msg:
-                            logger.error("Supervisor received an ill-formated message : %s" % msg)
-                            continue
-                        
-                        elif msg["type"] == "endAction":
-                            self.endAction(msg)
-                        elif msg["type"] == "alea":
-                            self.dealAlea(msg.get("aleaType"), msg)
-                        elif msg["type"] == "ubAction":
-                            self.checkActionUB(msg)
-                        else:
-                            logger.warning("Supervisor received unknown message %s" % msg)
-                        
-                if self.state != State.DEAD:
-                    self.update()
+                with self.mutex:
+                    if self.state == State.RUNNING:
+                        while not self.inQueue.empty():
+                            msg = self.inQueue.get()
+            
+                            if not isinstance(msg, dict) or "type" not in msg:
+                                logger.error("Supervisor received an ill-formated message : %s" % msg)
+                                continue
+                            
+                            elif msg["type"] == "endAction":
+                                self.endAction(msg)
+                            elif msg["type"] == "alea":
+                                self.dealAlea(msg.get("aleaType"), msg)
+                            elif msg["type"] == "ubAction":
+                                self.checkActionUB(msg)
+                            else:
+                                logger.warning("Supervisor received unknown message %s" % msg)
+                            
+                    if self.state != State.DEAD:
+                        self.update()
+
                 self.stopEvent.wait(0.1)
         except ExecutionFailed as e:
             hasFailed = True
@@ -814,3 +847,6 @@ class Supervisor(threading.Thread):
         else:
             self.outQueue.put({"type":"stop"})
             logger.info("Supervisor dead")
+            logger.info("Is stop event set ? : %s" % self.stopEvent.is_set())
+            logger.info("Is executed ? : %s" % self.isExecuted())
+            logger.info("state ? : %s" % self.state)

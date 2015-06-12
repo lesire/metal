@@ -135,9 +135,7 @@ class Plan:
                     self.stn.addConstraint(a["tStart"], a["tEnd"], int(round(timeFactor*a["dMin"])))
                 else:
                     logger.warning("Action %s does not have a dMin ?" % a["name"])
-                    
-                if False and isActionControllable(a["name"]):
-                    self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
+      
             elif a["tStart"] != a["tEnd"]:
                     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), 1)
 
@@ -178,6 +176,7 @@ class Plan:
                 #as soon as possible.
                 if "start-communicate" in self.tpName[time]:
                     if "current-time" not in d or value > d["current-time"]:
+                        self.jsonDescr["absolute-time"].remove([time, value])
                         continue
 
                 t = time
@@ -193,6 +192,8 @@ class Plan:
                 logger.debug("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
                 if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
                     logger.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
+                    logger.error("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
+                    logger.error("Stn is %s" % self.stn.export())
                     raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
 
                 self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)
@@ -251,7 +252,18 @@ class Plan:
         return True
     
     def getJsonDescription(self):
-        return deepcopy(self.jsonDescr)
+        result = deepcopy(self.jsonDescr)
+        
+        if "absolute-time" in result:
+            execuptedTps = {l[0]:l[1] for l in result["absolute-time"]}
+            
+            for a in result["actions"].values():
+                if a["startTp"] in execuptedTps and a["endTp"] in execuptedTps:
+                    if "dMin" in a:
+                        a["dMin"] = min(abs(a["dMin"]), execuptedTps[a["endTp"]] - execuptedTps[a["startTp"]])
+                    if "dMax" in a:
+                        a["dMax"] = max(abs(a["dMax"]), execuptedTps[a["endTp"]] - execuptedTps[a["startTp"]])
+        return result
     
     # Add a temporal constraint to the plan.
     # Will be exported into Json to be included during the repair attemps

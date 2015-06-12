@@ -210,6 +210,7 @@ class SupervisorRos(Supervisor):
             if not self.plan.stn.isConsistent():
                 logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
                 logger.error(data.arcs)
+                return
     
             for n in data.executedNodes:
                 self.tp[n][1] = "past"
