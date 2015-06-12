@@ -102,7 +102,7 @@ def configureSimu(missionDir, aleaFile, outputDir = None):
 """
 Launch a simuation and returns a Popen object
 """
-def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = False):
+def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = False, visu = False):
     os.chdir(missionDir)
     
     stdout = None
@@ -117,7 +117,7 @@ def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = F
     os.environ["ROS_HOME"] = outputDir
     os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:%d" %  port
     logger.info("Launching a simulation on port %s" % port)
-    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea}".format(alea=aleaFile).split(" "), stdout=stdout, stderr=stderr)
+    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea} visu:={visu}".format(alea=aleaFile, visu="true" if visu else "false").split(" "), stdout=stdout, stderr=stderr)
 
     time.sleep(5)
 
@@ -126,10 +126,10 @@ def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = F
 
     return p
 
-def runSimu(missionDir, aleaFile, outputDir = None):
+def runSimu(missionDir, aleaFile, outputDir = None, visu = False):
     outputDir = configureSimu(missionDir, aleaFile, outputDir)
 
-    p = launchSimu(missionDir, aleaFile, outputDir)
+    p = launchSimu(missionDir, aleaFile, outputDir, visu=visu)
     p.wait()
 
     parseSimu(outputDir)
@@ -360,6 +360,7 @@ def main(argv):
     parser.add_argument("-j", "--jobs"     , type=int, default=1)
     parser.add_argument("--parseOnly"      , action="store_true")
     parser.add_argument("--outputFolder"   , type=os.path.abspath)
+    parser.add_argument("--visu"           , action="store_true")
     parser.add_argument("--logLevel"       , type=str, default="info")
     args = parser.parse_args(argv)
 
@@ -399,15 +400,26 @@ def main(argv):
         logger.error("The mission folder does not exists : %s" % args.mission)
         sys.exit(1)
 
-    for alea in args.aleaFiles:
+    if len(args.aleaFiles) == 1 and not os.path.isdir(args.aleaFiles[0]):
+        #run simu with this single alea file
+        alea = args.aleaFiles[0]
         if not os.access(alea, os.R_OK):
             logger.error("Cannot open a given alea file : %s" % alea)
             sys.exit(1)
-
-    if len(args.aleaFiles) == 1:
-        runSimu(args.mission, args.aleaFiles[0], args.outputFolder)
+        runSimu(args.mission, args.aleaFiles[0], args.outputFolder, visu=args.visu)
     else:
-        runBenchmark(args.mission, args.aleaFiles, args.outputFolder, maxJobs=args.jobs)
+        if len(args.aleaFiles) == 1 and os.path.isdir(args.aleaFiles[0]):
+            #run benchmark on all json files in this directory
+            aleaFiles = [os.path.join(args.aleaFiles[0], f) for f in os.listdir(args.aleaFiles[0])]
+        else:
+            aleaFiles = args.aleaFiles
+
+        for alea in aleaFiles:
+            if not os.access(alea, os.R_OK):
+                logger.error("Cannot open a given alea file : %s" % alea)
+                sys.exit(1)
+
+        runBenchmark(args.mission, aleaFiles, args.outputFolder, maxJobs=args.jobs)
 
 if __name__=="__main__":
     main(sys.argv[1:])
