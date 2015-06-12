@@ -325,7 +325,7 @@ class Plan:
                 
             #The action ends with this tp : update the action lengths
             if  int(tpName.split("-")[0]) == action["endTp"] and "dummy" not in action["name"]:
-                if "dMax" in action:
+                if "dMax" in action and self.stn.isConsistent():
                     start = self.stn.getBounds(str(self.actions[index]["tStart"]))
                     if start.ub != start.lb:
                         logger.error(tpName)

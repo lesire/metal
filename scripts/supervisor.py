@@ -55,6 +55,8 @@ class Supervisor(threading.Thread):
         self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
         self.ubForCom = True # If true, set an upper bound for communications
 
+        self.mutex = threading.RLock() #Prevent concurent modifications of the plan
+
         self.agentsDead = []
         self.droppedComs = []
 
@@ -71,93 +73,94 @@ class Supervisor(threading.Thread):
     
         
     def init(self, planStr, agent):
-        if agent is None:
-            self.plan = plan.Plan(planStr)
-        else:
-            self.plan = plan.Plan(planStr, agent)
-        self.agent = agent
-        
-        self.executedTp = {}
-        self.tp = {}
-        
-        logger.info("Building Macro-STN")
-        stn = open(str(self.agent) + "_STN.json", "w")
-        stn.write(self.plan.stn.export())
-        self.plan.stn.toMacroSTN()
-        macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
-        macro_stn.write(self.plan.stn.export())
-
-        for a in self.plan.actions.values():
-            if a["name"] == "dummy init":
-                self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
-            elif a["name"] == "dummy end":
-                self.tp[a["tStart"]] = [a["name"], "controllable"]
-            elif ("dummy" in a["name"]):
-                pass
-            elif a["agent"] != self.agent:
-                if a["tStart"] in self.plan.stn.getNodeIds():
+        with self.mutex:
+            if agent is None:
+                self.plan = plan.Plan(planStr)
+            else:
+                self.plan = plan.Plan(planStr, agent)
+            self.agent = agent
+            
+            self.executedTp = {}
+            self.tp = {}
+            
+            logger.info("Building Macro-STN")
+            stn = open(str(self.agent) + "_STN.json", "w")
+            stn.write(self.plan.stn.export())
+            self.plan.stn.toMacroSTN()
+            macro_stn = open(str(self.agent) + "_macroSTN.json", "w")
+            macro_stn.write(self.plan.stn.export())
+    
+            for a in self.plan.actions.values():
+                if a["name"] == "dummy init":
                     self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
-                if a["tEnd"] in self.plan.stn.getNodeIds():
-                    self.tp[a["tEnd"]] = [a["name"], "uncontrollable"]
-            elif a["abstract"]:
-                self.tp[a["tStart"]] = [a["name"], "controllable"]
-                self.tp[a["tEnd"]] =   [a["name"], "controllable"]
-            elif a["controllable"]:
-                self.tp[a["tStart"]] = [a["name"], "controllable"]
-                self.tp[a["tEnd"]] =   [a["name"], "controllable"]
-            else:
-                self.tp[a["tStart"]] = [a["name"], "controllable"]
-                self.tp[a["tEnd"]] =   [a["name"], "uncontrollable"]
-        
-        for tp in self.plan.stn.getNodeIds():
-            if tp not in self.tp:
-                
-                if tp.startswith("1-end-"):
-                    self.tp[tp] = [tp, "uncontrollable"] #end of the local plan of another agent
-                elif tp == "1-endglobal-" + self.agent:
-                    self.tp[tp] = ["dummy end", "controllable"] # my end of the global plan
-                elif tp.startswith("1-endglobal-"):
-                    self.tp[tp] = [tp, "uncontrollable"] #end of the global plan of another agent
-                else:
-                    logger.error("There is a tp that I do not know about : %s" % tp)
-                
-        
-        for tpName,value in self.plan.absTimes:
-            #Ignore nodes that belongs to another robot
-            if tpName not in self.plan.stn.getNodeIds(): continue
-
-            action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
-
-            if action["executed"]:
-                #action was executed, this is a past action
-                self.executedTp[tpName] = value
-                self.tp[tpName][1] = "past"
-            else:
-                self.tp[tpName][1] = "future"
-
-            #TODO if this is an action being executed, send a message to the executor
-    
-        for tpName,value in self.plan.absTimes:
-            #Ignore nodes that belongs to another robot
-            if tpName not in self.plan.stn.getNodeIds(): continue
-
-            action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
-                
-            if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
-                logger.info("When importing, setting the end time of %s" % action["name"])
-                self.tp[action["tEnd"]][1] = "future"
-                if action["abstract"]:
+                elif a["name"] == "dummy end":
+                    self.tp[a["tStart"]] = [a["name"], "controllable"]
+                elif ("dummy" in a["name"]):
                     pass
-                elif action["controllable"]:
-                    self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
+                elif a["agent"] != self.agent:
+                    if a["tStart"] in self.plan.stn.getNodeIds():
+                        self.tp[a["tStart"]] = [a["name"], "uncontrollable"]
+                    if a["tEnd"] in self.plan.stn.getNodeIds():
+                        self.tp[a["tEnd"]] = [a["name"], "uncontrollable"]
+                elif a["abstract"]:
+                    self.tp[a["tStart"]] = [a["name"], "controllable"]
+                    self.tp[a["tEnd"]] =   [a["name"], "controllable"]
+                elif a["controllable"]:
+                    self.tp[a["tStart"]] = [a["name"], "controllable"]
+                    self.tp[a["tEnd"]] =   [a["name"], "controllable"]
                 else:
-                    #logger.info("Setting the end to %s" % int(value + round(1000 * (action["dMin"]))))
-                    self.setTimePoint(action["tEnd"], int(value + round(1000 * (action["dMin"]))))
+                    self.tp[a["tStart"]] = [a["name"], "controllable"]
+                    self.tp[a["tEnd"]] =   [a["name"], "uncontrollable"]
+            
+            for tp in self.plan.stn.getNodeIds():
+                if tp not in self.tp:
                     
-            if not self.plan.stn.isConsistent():
-                logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
-                raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
+                    if tp.startswith("1-end-"):
+                        self.tp[tp] = [tp, "uncontrollable"] #end of the local plan of another agent
+                    elif tp == "1-endglobal-" + self.agent:
+                        self.tp[tp] = ["dummy end", "controllable"] # my end of the global plan
+                    elif tp.startswith("1-endglobal-"):
+                        self.tp[tp] = [tp, "uncontrollable"] #end of the global plan of another agent
+                    else:
+                        logger.error("There is a tp that I do not know about : %s" % tp)
+                    
+            
+            for tpName,value in self.plan.absTimes:
+                #Ignore nodes that belongs to another robot
+                if tpName not in self.plan.stn.getNodeIds(): continue
     
+                action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+    
+                if action["executed"]:
+                    #action was executed, this is a past action
+                    self.executedTp[tpName] = value
+                    self.tp[tpName][1] = "past"
+                else:
+                    self.tp[tpName][1] = "future"
+    
+                #TODO if this is an action being executed, send a message to the executor
+        
+            for tpName,value in self.plan.absTimes:
+                #Ignore nodes that belongs to another robot
+                if tpName not in self.plan.stn.getNodeIds(): continue
+    
+                action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+                    
+                if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
+                    logger.info("When importing, setting the end time of %s" % action["name"])
+                    self.tp[action["tEnd"]][1] = "future"
+                    if action["abstract"]:
+                        pass
+                    elif action["controllable"]:
+                        self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
+                    else:
+                        #logger.info("Setting the end to %s" % int(value + round(1000 * (action["dMin"]))))
+                        self.setTimePoint(action["tEnd"], int(value + round(1000 * (action["dMin"]))))
+                        
+                if not self.plan.stn.isConsistent():
+                    logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
+                    raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
+        
         self.visuUpdate()
     
     def visuUpdate(self):

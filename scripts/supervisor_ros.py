@@ -138,32 +138,37 @@ class SupervisorRos(Supervisor):
 
     def stnUpdated(self, onlyPast = False):
         data = []
-        j = self.plan.getJsonDescription()
-        for k,a in self.plan.actions.items():
-            if "dummy" in a["name"]:
-                continue
-            if self.isResponsibleForAction(a):
-                
-                executed = (self.tp[a["tEnd"]][1] == "past")
-                executing = (self.tp[a["tStart"]][1] == "past")
-                
-                if onlyPast and not executed and not executing:
-                    continue
-                
-                if k in j["actions"] and "children" in j["actions"][k] and len(j["actions"][k]["children"])>0:
-                    hierarchical = True
-                else:
-                    hierarchical = False
-                
-                timeStart = self.plan.stn.getBounds(a["tStart"])
-                timeEnd = self.plan.stn.getBounds(a["tEnd"])
-
-                m = ActionVisu(a["name"], timeStart.lb, timeStart.ub, timeEnd.lb, timeEnd.ub, executed, executing, hierarchical)
-                data.append(m)
         
-        currentTime = 0
-        if self.beginDate >= 0:
-            currentTime = self.getCurrentTime()
+        with self.mutex:
+            if not self.plan.stn.isConsistent():
+                return
+            
+            j = self.plan.getJsonDescription()
+            for k,a in self.plan.actions.items():
+                if "dummy" in a["name"]:
+                    continue
+                if self.isResponsibleForAction(a):
+                    
+                    executed = (self.tp[a["tEnd"]][1] == "past")
+                    executing = (self.tp[a["tStart"]][1] == "past")
+                    
+                    if onlyPast and not executed and not executing:
+                        continue
+                    
+                    if k in j["actions"] and "children" in j["actions"][k] and len(j["actions"][k]["children"])>0:
+                        hierarchical = True
+                    else:
+                        hierarchical = False
+                    
+                    timeStart = self.plan.stn.getBounds(a["tStart"])
+                    timeEnd = self.plan.stn.getBounds(a["tEnd"])
+    
+                    m = ActionVisu(a["name"], timeStart.lb, timeStart.ub, timeEnd.lb, timeEnd.ub, executed, executing, hierarchical)
+                    data.append(m)
+            
+            currentTime = 0
+            if self.beginDate >= 0:
+                currentTime = self.getCurrentTime()
         self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
     def setTimePoint(self, tp, value):
@@ -189,22 +194,23 @@ class SupervisorRos(Supervisor):
         if data._connection_header["callerid"] == rospy.get_name():
             return
 
-        # Check if a com was cancelled
-        logger.debug("%s received with dropped coms %s" % (self.agent, data.droppedComs))
-        for c in data.droppedComs:
-            if c not in self.droppedComs:
-                self.dropCommunication(c)
-
-        cl = pystn.ConstraintListL()
-        for a in data.arcs:
-            cl.append(pystn.ConstraintInt(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue))
-
-        self.plan.stn.setConstraints(cl)
-
-        if not self.plan.stn.isConsistent():
-            logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
-            logger.error(data.arcs)
-
-        for n in data.executedNodes:
-            self.tp[n][1] = "past"
-            self.executedTp[n] = self.plan.stn.getBounds(n).lb
+        with self.mutex:
+            # Check if a com was cancelled
+            logger.debug("%s received with dropped coms %s" % (self.agent, data.droppedComs))
+            for c in data.droppedComs:
+                if c not in self.droppedComs:
+                    self.dropCommunication(c)
+    
+            cl = pystn.ConstraintListL()
+            for a in data.arcs:
+                cl.append(pystn.ConstraintInt(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue))
+    
+            self.plan.stn.setConstraints(cl)
+    
+            if not self.plan.stn.isConsistent():
+                logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
+                logger.error(data.arcs)
+    
+            for n in data.executedNodes:
+                self.tp[n][1] = "past"
+                self.executedTp[n] = self.plan.stn.getBounds(n).lb
