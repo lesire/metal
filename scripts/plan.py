@@ -41,6 +41,7 @@ def getAgentFromAction(l):
 class Plan:
     def __init__(self, planStr, agent=None):
         d = json.loads(planStr)
+        d = Plan.preprocessPlanDict(d, agent)
         self.jsonDescr = deepcopy(d)
 
         self.mastnMsg = []
@@ -239,6 +240,29 @@ class Plan:
             
             if position == "start":
                 logger.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
+
+    # Called before the plan is used.
+    # Do some checks and modification of the initial plan.
+    @staticmethod
+    def preprocessPlanDict(data, agent):
+        for a in data["actions"].values():
+            if "agent" not in a:
+                if a["name"] == "dummy init" or a["name"] == "dummy end":
+                    a["agent"] = agent
+                else:
+                    logger.error("Processing a plan with no agent defined for action : %s" % a["name"])
+
+        if "absolute-time" in data:
+            for a in data["actions"].values():
+                if "communicate" in a["name"]:
+                    for i in reversed(range(len(data["absolute-time"]))):
+                        t = data["absolute-time"][i][0]
+                        if t == a["startTp"] or t == a["endTp"]:
+                            a["locked"] = True
+                            del data["absolute-time"][i]
+    
+        return data
+    
 
     def getLength(self):
         return self.stn.getLength()/timeFactor
