@@ -712,45 +712,22 @@ class Supervisor(threading.Thread):
 
     
     def executionFail(self):
-        
-        self.state = State.REPAIRINGACTIVE
-        
-        planJson = self.computeGlobalPlan()
-        
-        #Assume failure because of a deadline
-        #Find the next deadline and if possible (action not locked) iteratively shift it
-        """
-        if not self.plan.stn.isConsistent():
-            logger.info("Trying to shift deadlines")
-            comMetaKeys = [k for k,a in planJson["actions"].items() if "communicate-meta" in a["name"] and self.agent in a["name"] and ("locked" not in a or not a["locked"])]
-            
-            if len(comMetaKeys) == 0:
-                logger.error("Failed because of a deadline : no communicate-meta action to shift")
-                logger.error(planJson["actions"])
-                self.state = State.ERROR
-                self.stnUpdated()
-                sys.exit(1)
-            else:
-                logger.info("I can shift : %s" % [planJson["actions"][k]["name"] for k in comMetaKeys])
-            
-            tps = set(itertools.chain.from_iterable((planJson["actions"][k]["startTp"], planJson["actions"][k]["endTp"]) for k in comMetaKeys))
-            logger.info("I can move tps : %s" % tps)
-            
-            for i in range(5): #number of repair tries
-                shift = 10 # in seconds
-                for i in range(len(planJson["absolute-time"])):
-                    tp,value = planJson["absolute-time"][i]
-                    if tp in tps:
-                        planJson["absolute-time"][i] = [tp, value + shift]
-                
-                planStr = self.sendNewStatusMessage("repairDone", json.dumps(planJson))
-                if planStr is not None:
-                    break
 
-        else:
-        """
+        self.state = State.REPAIRINGACTIVE
+
+        planJson = self.computeGlobalPlan()
+
+        # If a robot is dead, remove the coms
+        for a in self.plan.actions.values():
+            if "communicate-meta" in a["name"] and not a["executed"]:
+                if any([n in self.agentsDead for n in a["name"].split(" ")]):
+                    logger.warning("Dropping %s because a robot is dead" % a["name"])
+                    self.dropCommunication(a["name"])
+
         planStr = self.repairPlan(planJson)
-        
+
+
+
         if planStr is None:
             logger.warning("Reparation failed. Trying to remove deadlines.")
             
