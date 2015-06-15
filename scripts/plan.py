@@ -252,6 +252,11 @@ class Plan:
                 else:
                     logger.error("Processing a plan with no agent defined for action : %s" % a["name"])
 
+        for a in data["actions"].values():
+            if isActionControllable(a["name"]):
+                if "dMax" in a:
+                    del a["dMax"]
+
         if "absolute-time" in data:
             for a in data["actions"].values():
                 if "communicate" in a["name"]:
