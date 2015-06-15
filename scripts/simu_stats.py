@@ -117,12 +117,9 @@ def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = F
     os.environ["ROS_HOME"] = outputDir
     os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:%d" %  port
     logger.info("Launching a simulation on port %s" % port)
-    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea} visu:={visu}".format(alea=aleaFile, visu="true" if visu else "false").split(" "), stdout=stdout, stderr=stderr)
+    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea} visu:={visu} auto_start:=true".format(alea=aleaFile, visu="true" if visu else "false").split(" "), stdout=stdout, stderr=stderr)
 
     time.sleep(5)
-
-    logger.info("Starting simulation on port %s" % port)
-    subprocess.call("rostopic pub /hidden/start std_msgs/Empty -1".split(" "))
 
     return p
 
