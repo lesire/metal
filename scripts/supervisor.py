@@ -490,8 +490,7 @@ class Supervisor(threading.Thread):
             comMetaName = comName.replace("communicate", "communicate-meta")
         l = [(k,a) for k,a in planJson["actions"].items() if set(a["name"].split(" ")) == set(comMetaName.split(" "))]
         if len(l) != 1:
-            logger.error("Could not find a single meta action when dropping a com action")
-            logger.error(len(l))
+            logger.error("Could not find a single meta action when dropping a com action : %d" % len(l))
             return
 
         k,a = l[0]
@@ -763,6 +762,8 @@ class Supervisor(threading.Thread):
                 #TODO : implement a default strategy ? Notify other agents ?
                 self.state = State.ERROR
                 self.stnUpdated()
+                time.sleep(1)
+                logger.error("Exiting")
                 sys.exit(1)
 
         #We have a new plan

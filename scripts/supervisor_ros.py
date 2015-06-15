@@ -138,9 +138,15 @@ class SupervisorRos(Supervisor):
 
     def stnUpdated(self, onlyPast = False):
         data = []
+
+        currentTime = 0
+        if self.beginDate >= 0:
+            currentTime = self.getCurrentTime()
         
         with self.mutex:
             if not self.plan.stn.isConsistent():
+                if self.state == State.ERROR:
+                    self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
                 return
             
             j = self.plan.getJsonDescription()
@@ -165,10 +171,7 @@ class SupervisorRos(Supervisor):
     
                     m = ActionVisu(a["name"], timeStart.lb, timeStart.ub, timeEnd.lb, timeEnd.ub, executed, executing, hierarchical)
                     data.append(m)
-            
-            currentTime = 0
-            if self.beginDate >= 0:
-                currentTime = self.getCurrentTime()
+
         self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
     def setTimePoint(self, tp, value):
