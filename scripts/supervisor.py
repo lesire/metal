@@ -302,9 +302,11 @@ class Supervisor(threading.Thread):
             # Compute an upper bound for this action
 
             s = copy(self.plan.stn)
+            s.addConstraint(s.getStartId(), action["tStart"], currentTime, currentTime)
             endNode = "1-end-%s" %  self.agent if self.agent is not None else "1-end"
-            c = s.getBounds(endNode)
-            s.addConstraint(s.getStartId(), endNode, 0, c.lb + 60000) #Aim to finish the plan within 1 minute of its lower bound
+            if s.isConsistent():
+                c = s.getBounds(endNode)
+                s.addConstraint(s.getStartId(), endNode, 0, c.lb + 2 * 1000) #Aim to finish the plan within 1 minute of its lower bound
             if not s.isConsistent():
                 logger.error("When trying to constrain the end timepoint, the stn became inconsistent")
                 logger.error("I did not set a deadline for this action")
@@ -480,6 +482,8 @@ class Supervisor(threading.Thread):
 
     # Remove the synchronising action of a communication.
     def dropCommunication(self, comName):
+        #if comName in self.droppedComs: return #already done it
+    
         # remove the communicate meta from the pla
         planJson = self.plan.getJsonDescription()
         
@@ -646,6 +650,11 @@ class Supervisor(threading.Thread):
         for i in reversed(range(len(planJson["absolute-time"]))):
             if planJson["absolute-time"][i][0] in deletedTps:
                 del planJson["absolute-time"][i]
+
+        for agent in self.agentsDead:
+            for a in planJson["actions"].values():
+                if a.get("agent", None) == agent and not a.get("executed", False) and a.get("locked", False):
+                    a["locked"] = False
 
         return planJson
         
