@@ -831,7 +831,7 @@ class Supervisor(threading.Thread):
                     if self.state != State.DEAD:
                         self.update()
 
-                self.stopEvent.wait(0.1)
+                self.stopEvent.wait(0.01)
         except ExecutionFailed as e:
             hasFailed = True
             logger.error("Execution failed : %s" % str(e))
