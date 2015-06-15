@@ -318,6 +318,13 @@ class Supervisor(threading.Thread):
 
                 self.plan.addTemporalConstraint(None, action["tEnd"], 0, ub)
 
+                for a in self.plan.jsonDescr["actions"].values():
+                    if a["startTp"] == action["startTp"] and a["endTp"] == action["endTp"]:
+                        #set its dmax here in case of reparaiton before its end.
+                        if "dMax" in a:
+                            logger.warning("Setting dMax of %s to %s" % (a["name"], (ub - currentTime)/1000))
+                            a["dMax"] = max(a["dMax"], (ub - currentTime)/1000)
+
                 if not self.plan.stn.isConsistent():
                     logger.error("When constraining the end of %s before %d, stn became inconsistent" % (action["name"], ub))
                     self.state = State.ERROR
