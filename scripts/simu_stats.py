@@ -315,12 +315,15 @@ def parseSimu(outputDir):
         for agent,d in agents.items():
             if "finishTime" not in d:
                 logger.error("Cannot determine the end time of %s" % agent)
+                hasError = True
 
         result["success"] = not hasError
         result["trackingRobots"] = list(trackingRobots)
         result["trackingRobotsNbr"] = len(trackingRobots)
-        result["finishTime"] = max([d["finishTime"]/1000. for d in agents.values() if "finishTime" in d])
-        
+
+        l = [d["finishTime"]/1000. for d in agents.values() if "finishTime" in d]
+        if l:
+            result["finishTime"] = max(l)
 
         repairRequestNbr = 0
         repairDoneNbr = 0
@@ -343,6 +346,12 @@ def parseSimu(outputDir):
         result["repair"]["lengths"] = repairLengths
         result["repair"]["totalTime"] = sum(repairLengths)
 
+
+        droppedComs = set()
+        for _,msg,_ in bag.read_messages(topics="/hidden/mastnUpdate"):
+            droppedComs = droppedComs.union(set(msg.droppedComs))
+
+        result["droppedComs"] = len(droppedComs)
 
     finally:
         bag.close()
