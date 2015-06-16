@@ -102,7 +102,7 @@ def configureSimu(missionDir, aleaFile, outputDir = None):
 """
 Launch a simuation and returns a Popen object
 """
-def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = False, visu = False):
+def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = False, visu = False, vnet = False):
     os.chdir(missionDir)
     
     stdout = None
@@ -117,16 +117,20 @@ def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = F
     os.environ["ROS_HOME"] = outputDir
     os.environ["ROS_MASTER_URI"] = "http://127.0.0.1:%d" %  port
     logger.info("Launching a simulation on port %s" % port)
-    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea} visu:={visu} auto_start:=true".format(alea=aleaFile, visu="true" if visu else "false").split(" "), stdout=stdout, stderr=stderr)
+    p = subprocess.Popen("roslaunch --run_id=roslaunch stats_simu.launch alea_file:={alea} vnet:={vnet} visu:={visu} auto_start:=true"
+                         .format(alea=aleaFile,
+                                 visu="true" if visu else "false",
+                                 vnet="true" if vnet else "false").split(" "),
+                                 stdout=stdout, stderr=stderr)
 
     time.sleep(5)
 
     return p
 
-def runSimu(missionDir, aleaFile, outputDir = None, visu = False):
+def runSimu(missionDir, aleaFile, outputDir = None, visu = False, vnet = False):
     outputDir = configureSimu(missionDir, aleaFile, outputDir)
 
-    p = launchSimu(missionDir, aleaFile, outputDir, visu=visu)
+    p = launchSimu(missionDir, aleaFile, outputDir, visu=visu, vnet=vnet)
     p.wait()
 
     parseSimu(outputDir)
@@ -136,7 +140,7 @@ def runSimu(missionDir, aleaFile, outputDir = None, visu = False):
 """
 Inputs is a list of dictionnaries, each containing the missionDir, aleaFile and an option outputDir
 """
-def runParallelSimu(inputs, maxJobs = 1):
+def runParallelSimu(inputs, maxJobs = 1, vnet=False):
 
     # Configure all the simus
     nextPort = 11312
@@ -152,7 +156,7 @@ def runParallelSimu(inputs, maxJobs = 1):
         #still work to do. First launch new processes
         if len(processes) < maxJobs and len(simuToLaunch) > 0 and not sigusrReceived:
             input = simuToLaunch[0]
-            processes.append((input["outputDir"], launchSimu(input["missionDir"], input["aleaFile"], input["outputDir"], port=input["port"], redirectOutput=True)))
+            processes.append((input["outputDir"], launchSimu(input["missionDir"], input["aleaFile"], input["outputDir"], port=input["port"], redirectOutput=True, vnet=vnet)))
             del simuToLaunch[0]
 
         # Now check for the end of the launched processes
@@ -175,7 +179,7 @@ def runParallelSimu(inputs, maxJobs = 1):
 """
 Run a succession of simulations. For now, sequentially.
 """
-def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1):
+def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1, vnet = False):
 
     #create the output dir
     if outputDir is None:
@@ -190,7 +194,7 @@ def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1):
     inputs = []
     for i,alea in enumerate(aleaFiles):
         inputs.append({"missionDir" : missionDir, "aleaFile" :  alea, "outputDir":os.path.join(outputDir, "simu_%d" % i)})
-    runParallelSimu(inputs, maxJobs=maxJobs)
+    runParallelSimu(inputs, maxJobs=maxJobs, vnet=vnet)
     
     logger.info("Done with this benchmark : %s" % outputDir)
 
@@ -367,6 +371,7 @@ def main(argv):
     parser.add_argument("--parseOnly"      , action="store_true")
     parser.add_argument("--outputFolder"   , type=os.path.abspath)
     parser.add_argument("--visu"           , action="store_true")
+    parser.add_argument("--vnet"           , action="store_true")
     parser.add_argument("--logLevel"       , type=str, default="info")
     args = parser.parse_args(argv)
 
@@ -412,7 +417,7 @@ def main(argv):
         if not os.access(alea, os.R_OK):
             logger.error("Cannot open a given alea file : %s" % alea)
             sys.exit(1)
-        runSimu(args.mission, args.aleaFiles[0], args.outputFolder, visu=args.visu)
+        runSimu(args.mission, args.aleaFiles[0], args.outputFolder, visu=args.visu, vnet=args.vnet)
     else:
         if len(args.aleaFiles) == 1 and os.path.isdir(args.aleaFiles[0]):
             #run benchmark on all json files in this directory
@@ -425,7 +430,7 @@ def main(argv):
                 logger.error("Cannot open a given alea file : %s" % alea)
                 sys.exit(1)
 
-        runBenchmark(args.mission, aleaFiles, args.outputFolder, maxJobs=args.jobs)
+        runBenchmark(args.mission, aleaFiles, args.outputFolder, maxJobs=args.jobs, vnet=args.vnet)
 
 if __name__=="__main__":
     main(sys.argv[1:])

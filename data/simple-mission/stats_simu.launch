@@ -27,8 +27,8 @@
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
-        <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
-        <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
     </node>
 
     <node name="r2" pkg="metal" type="hidden-ros.py" ns="r2" args="--executor=$(arg executor) --agentName=r2 --waitSignal" >
@@ -36,8 +36,10 @@
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
         <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
-        <remap from="communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
-        <remap from="communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
     </node>
+
+    <node name="vnet" pkg="vnet" type="vnet_ros.py" if="$(arg vnet)"/>
 
 </launch>

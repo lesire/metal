@@ -1,0 +1,16 @@
+communicate:
+  r1: {in: /r1/hidden/communicate/in, out: /r1/hidden/communicate/out}
+  r2: {in: /r2/hidden/communicate/in, out: /r2/hidden/communicate/out}
+  r3: {in: /r3/hidden/communicate/in, out: /r3/hidden/communicate/out}
+  r4: {in: /r4/hidden/communicate/in, out: /r4/hidden/communicate/out}
+mastnUpdate:
+  r1: {in: /r1/hidden/mastnUpdate/in, out: /r1/hidden/mastnUpdate/out}
+  r2: {in: /r2/hidden/mastnUpdate/in, out: /r2/hidden/mastnUpdate/out}
+  r3: {in: /r3/hidden/mastnUpdate/in, out: /r3/hidden/mastnUpdate/out}
+  r4: {in: /r4/hidden/mastnUpdate/in, out: /r4/hidden/mastnUpdate/out}
+repair:
+  r1: {in: /r1/hidden/repair/in, out: /r1/hidden/repair/out}
+  r2: {in: /r2/hidden/repair/in, out: /r2/hidden/repair/out}
+  r3: {in: /r3/hidden/repair/in, out: /r3/hidden/repair/out}
+  r4: {in: /r4/hidden/repair/in, out: /r4/hidden/repair/out}
+
