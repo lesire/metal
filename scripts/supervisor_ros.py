@@ -211,15 +211,25 @@ class SupervisorRos(Supervisor):
     
             cl = pystn.ConstraintListL()
             for a in data.arcs:
+                if a.nodeSource not in self.plan.stn.getNodeIds() and a.nodeSource != "_origin":
+                    logger.error("Cannot find %s in stn. Ignoring this constraint" % a.nodeSource)
+                    continue
+                if a.nodeTarget not in self.plan.stn.getNodeIds() and a.nodeTarget != "_origin":
+                    logger.error("Cannot find %s in stn. Ignoring this constraint" % a.nodeTarget)
+                    continue
+
                 cl.append(pystn.ConstraintInt(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue))
-    
+
             self.plan.stn.setConstraints(cl)
-    
+
             if not self.plan.stn.isConsistent():
                 logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
                 logger.error(data.arcs)
                 return
-    
+
             for n in data.executedNodes:
-                self.tp[n][1] = "past"
-                self.executedTp[n] = self.plan.stn.getBounds(n).lb
+                if n in self.tp:
+                    self.tp[n][1] = "past"
+                    self.executedTp[n] = self.plan.stn.getBounds(n).lb
+                else:
+                    logger.error("Cannot find %s in tps. Ignoring this mastn update" % n)

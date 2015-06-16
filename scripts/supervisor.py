@@ -146,28 +146,7 @@ class Supervisor(threading.Thread):
                     self.tp[tpName][1] = "future"
     
                 #TODO if this is an action being executed, send a message to the executor
-        
-            for tpName,value in self.plan.absTimes:
-                #Ignore nodes that belongs to another robot
-                if tpName not in self.plan.stn.getNodeIds(): continue
-    
-                action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
-                    
-                if action["executed"] and action["tStart"] == tpName and not self.isResponsibleForAction(action) and self.tp[action["tEnd"]][1] != "past":
-                    logger.info("When importing, setting the end time of %s" % action["name"])
-                    self.tp[action["tEnd"]][1] = "future"
-                    if action["abstract"]:
-                        pass
-                    elif action["controllable"]:
-                        self.setTimePoint(action["tEnd"], self.plan.stn.getBounds(action["tEnd"]).lb)
-                    else:
-                        #logger.info("Setting the end to %s" % int(value + round(1000 * (action["dMin"]))))
-                        self.setTimePoint(action["tEnd"], int(value + round(1000 * (action["dMin"]))))
-                        
-                if not self.plan.stn.isConsistent():
-                    logger.error("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
-                    raise ExecutionFailed("Error : Invalid stn when setting the time of an absolute tp of the end of an half-executed action : %s" % action["name"])
-        
+
         self.visuUpdate()
     
     def visuUpdate(self):
