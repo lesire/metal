@@ -53,7 +53,7 @@ class Supervisor(threading.Thread):
         self.repairRos = False
         
         self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
-        self.ubForCom = True # If true, set an upper bound for communications
+        self.ubForCom = False # If true, set an upper bound for communications
 
         self.mutex = threading.RLock() #Prevent concurent modifications of the plan
 
@@ -831,7 +831,7 @@ class Supervisor(threading.Thread):
                     if self.state != State.DEAD:
                         self.update()
 
-                self.stopEvent.wait(0.01)
+                self.stopEvent.wait(0.1)
         except ExecutionFailed as e:
             hasFailed = True
             logger.error("Execution failed : %s" % str(e))

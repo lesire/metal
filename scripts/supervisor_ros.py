@@ -33,6 +33,11 @@ class SupervisorRos(Supervisor):
        
         self.repairRos = True
 
+        if rospy.has_param("/hidden/ubForCom"):
+            b = rospy.get_param("/hidden/ubForCom")
+            logger.info("Setting ubForCom to %s from the parameter server" % b)
+            self.ubForCom = b
+
     def aleaReceived(self,msg):
         #logger.warning(msg)
         try:
