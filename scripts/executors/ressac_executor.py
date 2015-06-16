@@ -52,7 +52,7 @@ try:
             except Exception as e:
                 logger.warning(e)
 
-        def track(self, *args, **kwargs):
+        def track(self, x, y, cb, *args, **kwargs):
             import json
             logger.info("tracking")
             action = {'action': 'track'}
