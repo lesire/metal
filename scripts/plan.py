@@ -259,7 +259,7 @@ class Plan:
 
         if "absolute-time" in data:
             for a in data["actions"].values():
-                if "communicate" in a["name"]:
+                if "communicate" in a["name"] and not a.get("executed", False): #remove deadline on past communicate action
                     for i in reversed(range(len(data["absolute-time"]))):
                         t = data["absolute-time"][i][0]
                         if t == a["startTp"] or t == a["endTp"]:
