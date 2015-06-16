@@ -52,5 +52,18 @@ try:
             except Exception as e:
                 logger.warning(e)
 
+        def track(self, *args, **kwargs):
+            import json
+            logger.info("tracking")
+            action = {'action': 'track'}
+            b = self.output_port.prepare()
+            b.clear()
+            b.addString(json.dumps(action))
+            self.output_port.write()
+            logger.info("Request action " + json.dumps(action))
+            self._cb = cb
+
+
+
 except ImportError:
     pass
