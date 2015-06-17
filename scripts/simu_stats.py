@@ -421,7 +421,7 @@ def main(argv):
     else:
         if len(args.aleaFiles) == 1 and os.path.isdir(args.aleaFiles[0]):
             #run benchmark on all json files in this directory
-            aleaFiles = [os.path.join(args.aleaFiles[0], f) for f in sorted(os.listdir(args.aleaFiles[0]))]
+            aleaFiles = [os.path.join(args.aleaFiles[0], f) for f in sorted(os.listdir(args.aleaFiles[0])) if f.endswith(".json")]
         else:
             aleaFiles = args.aleaFiles
 

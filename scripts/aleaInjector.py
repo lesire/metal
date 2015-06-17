@@ -14,13 +14,15 @@ import sys
 
 import rospy
 import rosgraph
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty,String
 from metal.srv import AleaAction
 
 aleaServices = {}
+aleaSupServices = {}
 
 def getServices():
     global aleaServices
+    global aleaSupServices
     #get all services
     services = [x[0] for x in rosgraph.masterapi.Master('/mynode').getSystemState()[2]]
     for s in services:
@@ -28,6 +30,7 @@ def getServices():
         if m:
             agent = m.groups()[0]
             aleaServices[agent] = rospy.ServiceProxy("/%s/executor/alea" % agent, AleaAction)
+            aleaSupServices[agent] = rospy.ServiceProxy("/%s/alea" % agent, AleaAction)
 
 #assume each field has type, date, to and data
 data = {}
@@ -44,14 +47,30 @@ def launch(m):
         return
     
     for d in data.values():
-        if d["to"] not in aleaServices:
+        if d["to"] == "vnet":
+            #assume d is like {"to":"vnet", "type":"add", "date":10, data":{"src":"mana", "tgt":"minnie", ...}}
+
+            def cb(d):
+                logger.info("Calling /vnet/%s with %s" % (d["type"], d["data"]))
+                pub = rospy.Publisher("/vnet/%s" % d["type"], String, queue_size=10, latch=True)
+                pub.publish(json.dumps(d["data"]))
+            Timer(d["date"], partial(cb, copy(d))).start()
+
+        elif d["to"] not in aleaServices:
             logger.error("Unknown robot : %s. I know %s" % (d["to"], " ".join(aleaServices.keys())))
             continue
+        else:
 
-        def cb(d):
-            logger.info("Calling %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
-            aleaServices[d["to"]](d["type"], json.dumps(d["data"]))
-        Timer(d["date"], partial(cb, copy(d))).start()
+            if d["type"] in ["sendMastn", "repair"]:
+                def cb(d):
+                    logger.info("Calling sup %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
+                    aleaSupServices[d["to"]](d["type"], json.dumps(d["data"]))
+                Timer(d["date"], partial(cb, copy(d))).start()
+            else:
+                def cb(d):
+                    logger.info("Calling exec %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
+                    aleaServices[d["to"]](d["type"], json.dumps(d["data"]))
+                Timer(d["date"], partial(cb, copy(d))).start()
         
     maxTime = max([d["date"] for d in data.values()])
     Timer(maxTime + 1, lambda: rospy.signal_shutdown("Done")).start()

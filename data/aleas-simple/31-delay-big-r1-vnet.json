@@ -1,0 +1,7 @@
+{"0":{"type" : "delay", "date":10, "to":"r1", "data":{"delay" : 5}},
+ "1":{"type" : "add", "date":5, "to":"vnet", "data":{"src":"*", "tgt":"*", "filter":"block"}},
+ "2":{"type" : "del", "date":25, "to":"vnet", "data":{"src":"*", "tgt":"*", "index":"*"}},
+ "3":{"type" : "sendMastn", "date":26, "to":"r1", "data":{}},
+ "4":{"type" : "sendMastn", "date":26, "to":"r2", "data":{}},
+ "5":{"type" : "sendMastn", "date":26, "to":"r3", "data":{}},
+ "6":{"type" : "sendMastn", "date":26, "to":"r4", "data":{}}}
