@@ -545,6 +545,9 @@ class Supervisor(threading.Thread):
         elif aleaType == "targetFound":
             targetPos = data.get("position", None)
             self.targetFound(targetPos)
+        elif aleaType == "repair":
+            logger.error("Repair trigger by an alea received, probably from the operator")
+            raise ExecutionFailed("Repair trigger by an alea received, probably from the operator")
         else:
             logger.error("Cannot deal with an alea of unknown type : %s" % aleaType)
             return

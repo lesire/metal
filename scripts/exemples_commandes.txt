@@ -15,3 +15,9 @@ rosservice call /r1/executor/alea nextReport '!!str "{\"report\":\"broken\"}"'
 
 # Pour retarder la fin d'une action (avec l'executeur ros)
 rosservice call /r1/executor/alea delay '!!str "{\"delay\":10}"'
+
+# Pour envoyer une mise à jour complète du stn
+rosservice call /minnie/alea sendMastn '!!str "{}"'
+
+# Pour forcer une réparation
+rosservice call /minnie/alea repair '!!str "{}"'

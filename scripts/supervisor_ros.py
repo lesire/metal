@@ -62,6 +62,12 @@ class SupervisorRos(Supervisor):
                 return False
             self.state = getattr(State, s)
             return True
+        elif msg.aleaType == "sendMastn":
+            if not self.plan.stn.isConsistent():
+                logger.error("Cannot send a mastn update : the stn is incoherent")
+            else:
+                self.sendFullMastnUpdate()
+                return True
 
         logger.info("Injecting an alea from ROS into the queue")
         data["type"] = "alea"
@@ -197,6 +203,24 @@ class SupervisorRos(Supervisor):
             u.droppedComs = self.droppedComs
 
             self.mastn_pub.publish(u)
+
+    def sendFullMastnUpdate(self):
+        with self.mutex:
+            #only send a MaSTN update if the stn is consistent
+            if self.plan.stn.isConsistent():
+                logger.info("Sending a full MaSTN update")
+
+                u = MaSTNUpdate()
+                u.header.stamp = rospy.Time.now()
+
+                for a in self.plan.stn.getMaSTNConstraints():
+                    u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
+
+                u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+
+                u.droppedComs = self.droppedComs
+
+                self.mastn_pub.publish(u)
 
     def mastnUpdate(self, data):
         if data._connection_header["callerid"] == rospy.get_name():
