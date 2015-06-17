@@ -397,13 +397,17 @@ class Supervisor(threading.Thread):
             else:
                 logger.info("Ignoring it")
         
-        if action["controllable"]:
+        if action.get("controllable", False):
             logger.info("Notified of the end of controllable action %s." % action["name"])
             if self.tp[tp][1] != "past":
                 logger.error("Notified of the end of controllable action %s." % action["name"])
                 logger.error("But the timepoint is not past : %s" % self.tp[tp][1])
             return
         
+        if tp not in self.tp:
+            logger.error("Notified of the end of an action that is not in self.tp anymore ?!?")
+            return #probably a com action that was cancelled
+
         logger.info("End of action %s at %s. Status of the tp : %s" % (action["name"], value, self.tp[tp][1]))
         
         #check the scheduled duration of the action
@@ -478,7 +482,22 @@ class Supervisor(threading.Thread):
 
         k,a = l[0]
 
-        if "executed" in a and a["executed"]:
+        if (a["name"], a["startTp"], a["endTp"]) in self.ongoingActions:
+            # I'm trying to communicate but the other already dropped it
+
+            # TODO : set it as controllable to stop it properly. But at the next repair the plan will
+            # not be consistent : the com-meta action will not be concurent with the coms.
+            """
+            logger.warning("Setting the communicate-meta action to controllable")
+            self.tp[a["tEnd"]][1] = "controllable"
+            """
+
+            logger.warning("For now, allowing the removing of a action already in progress")
+            #stopping it before removing it
+            msg = {"type":"stopAction", "action":copy(a), "time":self.getCurrentTime()}
+            self.outQueue.put(msg)
+
+        elif "executed" in a and a["executed"]:
             logger.error("Cannot drop %s. %s is executed" % (comName, a["name"]))
             return
         
@@ -513,6 +532,10 @@ class Supervisor(threading.Thread):
     def update(self):
         if not self.state == State.RUNNING:
             return # do not execute the plan if not running
+
+        if not self.plan.stn.isConsistent():
+            logger.error("Stn became inconsistent before an update")
+            raise ExecutionFailed("Stn became inconsistent before an update")
 
         l = next(self.getExecutableTps(), False)
 

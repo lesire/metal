@@ -24,15 +24,15 @@ class AbstractActionExecutor:
         method(*args, cb=partial(self.report, action, cb), actionJson=action, time=time)
 
     def stop(self, action):
-        if not action["controllable"]:
+        if not action.get("controllable", False):
             logger.error("Stopping an uncontrollable action : %s" % action)
 
         if "_stop" in dir(self):
+
             self._stop(action)
         else:
             logger.info("Stopping %s" % action["name"])
 
-        pass
 
     def report(self, action, cb, report):
         logger.info("Reporting for action {a}: {r}".format(a=action["name"],r=report))
