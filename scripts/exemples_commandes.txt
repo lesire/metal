@@ -21,3 +21,14 @@ rosservice call /minnie/alea sendMastn '!!str "{}"'
 
 # Pour forcer une réparation
 rosservice call /minnie/alea repair '!!str "{}"'
+
+### vNet ###
+
+# Pour interdire toute communication
+rostopic pub /vnet/add std_msgs/String '!!str "{\"src\":\"*\", \"tgt\":\"*\", \"filter\":\"block\"}"' -1
+
+# Pour interdire toute communication entre deux robots
+rostopic pub /vnet/add std_msgs/String '!!str "{\"src\":\"r1\", \"tgt\":\"r2\", \"filter\":\"block\", \"bidir\":true}"' -1
+
+# Pour autoriser toute communication
+rostopic pub /vnet/del std_msgs/String '!!str "{\"src\":\"*\", \"tgt\":\"*\", \"index\":\"*\"}"' -1

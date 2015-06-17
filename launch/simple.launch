@@ -7,16 +7,13 @@
     <arg name="vnet" default="false"/>
     <arg name="auto_start" default="false"/>
     
-    <param name="hidden/plan"        type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple.plan" />
-    <param name="hidden/pddl/domain" type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-domain.pddl" />
-    <param name="hidden/pddl/prb"    type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-prb.pddl" />
-    <param name="hidden/pddl/helper" type="str" textfile="$(find metal)/data/simple-mission/hipop-files/simple-prb-helper.pddl" />
-
+    <include file="$(find metal)/data/simple-mission/hidden-params.launch" />
 
     <node name="visu" pkg="metal" type="onlineTimeline.py" ns="visu"  if="$(arg visu)" />
 
     <node name="$(anon autoStart)" pkg="metal" type="autoStart.py" ns="autoStart" if="$(arg auto_start)" />
 
+    <node name="vnet" pkg="vnet" type="vnet_ros.py" if="$(arg vnet)"/>
 
     <node name="r1" pkg="metal" type="hidden-ros.py" ns="r1" args="--executor=$(arg executor) --agentName=r1 --waitSignal" if="$(arg simu)" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>

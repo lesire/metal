@@ -5,5 +5,5 @@
     <param name="hidden/pddl/prb"    type="str" textfile="$(find metal)/data/simple2-mission/hipop-files/simple-prb.pddl" />
     <param name="hidden/pddl/helper" type="str" textfile="$(find metal)/data/simple2-mission/hipop-files/simple-prb-helper.pddl" /> 
 
-    <rosparam command="load" param="vnet/config" file="$(find metal)/data/simple-mission/vnet_config.yaml" />
+    <rosparam command="load" param="vnet/config" file="$(find metal)/data/simple2-mission/vnet_config.yaml" />
 </launch>
