@@ -30,7 +30,8 @@ State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING
 def call(*popenargs, timeout=None, **kwargs):
     with subprocess.Popen(*popenargs, **kwargs) as p:
         try:
-            return p.wait(timeout=timeout)
+            logger.warning("Ignoring timeout")
+            return p.wait()
         except:
             p.kill()
             p.wait()
@@ -711,7 +712,7 @@ class Supervisor(threading.Thread):
                     logger.error(l.replace("\n",""))
                 return None
 
-        except subprocess.TimeoutExpired as e:
+        except:
             logger.error("During reparation : hipop timeout")
             return None
         
