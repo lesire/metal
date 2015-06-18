@@ -27,10 +27,15 @@ try:
             self.input_port.close()
 
         def _sendCommand(self, action):
+            logger.info("Calling sendCommand")
             b = self.output_port.prepare()
+            logger.info("Preparation done")
             b.clear()
+            logger.info("Cleared")
             b.addString(json.dumps(action))
+            logger.info("String added")
             self.output_port.write()
+            logger.info("Write done")
 
         # move mana agv_pt_-726_2375 agv_pt_3323_175
         def move(self, who, a, b, cb, **kwargs):
@@ -76,6 +81,7 @@ try:
             if not self.hasSeenTarget:
                 logger.info("moving to target")
                 action = {'action': 'goto_target', 'waypoint': {'x': int(x), 'y': int(y)}}
+                logger.info("Sending %s" % json.dumps(action))
                 self._sendCommand(action)            
                 logger.info("Request action " + json.dumps(action))
             else:
