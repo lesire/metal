@@ -60,10 +60,10 @@ try:
                     r = json.loads(b.get(0).toString())
                     r["type"] = r["report"]
 
-                    if r["type"] == "blocked":
-                        self._sendCommand(self.currentAction)
-                        return
-                    elif "target" in r["type"]:
+                    #if r["type"] == "blocked":
+                    #    self._sendCommand(self.currentAction)
+                    #    return
+                    if "target" in r["type"]:
                         self.hasSeenTarget = True
                         if self.isTracking:
                             logger.info("Hyper saw the target and I'm supposed to track it.")

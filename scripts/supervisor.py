@@ -392,7 +392,7 @@ class Supervisor(threading.Thread):
             if "target" in report["type"]:
                 targetPos = report.get("position", None)
                 self.targetFound(targetPos)
-            elif report["type"] in ["ko", "broken"]:
+            elif report["type"] in ["ko", "broken", "blocked"]:
                 self.state = State.DEAD
                 logger.warning("End of the action %s with status %s. Killing myself" % (action["name"], report["type"]))
                 return
