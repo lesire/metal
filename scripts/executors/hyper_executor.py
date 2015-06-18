@@ -79,6 +79,10 @@ try:
             self.isTracking = True
             self._cb = cb
             if not self.hasSeenTarget:
+                logger.info("Stopping current action")
+                action = {"action":"stop"}
+                self._sendCommand(action)
+                logger.info("Stop done")
                 logger.info("moving to target")
                 action = {'action': 'goto_target', 'waypoint': {'x': int(x), 'y': int(y)}}
                 logger.info("Sending %s" % json.dumps(action))
