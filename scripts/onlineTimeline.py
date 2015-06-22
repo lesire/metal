@@ -10,6 +10,7 @@ import rospy
 from metal.msg import StnVisu
 from std_msgs.msg import Empty
 
+import argparse
 import functools
 import itertools
 import json
@@ -17,11 +18,12 @@ import time
 import sys, random
 import os
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
 class OnlineTimeline(PlotWindow):
-    def __init__(self):
+    def __init__(self, missionFile = None):
         PlotWindow.__init__(self)
 
         self.window_size=20
@@ -35,6 +37,12 @@ class OnlineTimeline(PlotWindow):
         self.subscriber = rospy.Subscriber("/hidden/stnvisu", StnVisu, self.getInput, queue_size = 1 )
 
         self.subscriber = rospy.Subscriber("/hidden/start", Empty, self.start, queue_size = 1 )
+        
+        if missionFile is not None:
+            with open(missionFile) as f:
+                self.mission = json.load(f)
+        else:
+            self.mission = None
         
         logger.info("Init done for onlineTimeline")
 
@@ -68,7 +76,16 @@ class OnlineTimeline(PlotWindow):
     def getInput(self, data):
         if data is not None:
             if data.agent not in self.data:
-                self.data[data.agent] = {"color" : next(self.colors), "index":1+len(self.data)}
+                if self.mission is not None and data.agent in self.mission["agents"]:
+                    c = self.mission["agents"][data.agent]["color"]
+                else:
+                    c = next(self.colors)
+
+                self.data[data.agent] = {"color" : c, "index":1+len(self.data)}
+                
+                #sort robot alphabetically
+                for i,r in enumerate(sorted(self.data.keys(), reverse=True)):
+                    self.data[r]["index"] = i+1
 
             self.data[data.agent]["actions"] = []
             for m in data.actions:
@@ -143,6 +160,11 @@ class OnlineTimeline(PlotWindow):
         self.mutex = True
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Create a visualisation for PDDL plans')
+    parser.add_argument('--missionFile', type=str, default=None)
+    args = parser.parse_args(rospy.myargv(argv=sys.argv)[1:])
+    
     app = QApplication(sys.argv)
     
     sh = logging.StreamHandler()
@@ -153,7 +175,7 @@ if __name__ == "__main__":
     if os.access(iconePath, os.R_OK):
         app.setWindowIcon(QIcon(iconePath))
 
-    window = OnlineTimeline()
+    window = OnlineTimeline(args.missionFile)
     window.show()
 
     if "raise_" in dir(window):
