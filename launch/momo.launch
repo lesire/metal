@@ -1,0 +1,15 @@
+<launch>
+
+    <arg name="executor" default="hyper"/>
+    <arg name="vnet" default="false"/>
+
+    <node name="momo" pkg="metal" type="hidden-ros.py" ns="momo" args="--executor=$(arg executor) --agentName=momo --waitSignal" >
+        <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
+        <remap from="hidden/communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/communicate/out" to="/hidden/communicate" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/in" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+        <remap from="hidden/mastnUpdate/out" to="/hidden/mastnUpdate" unless="$(arg vnet)"/>
+    </node>
+
+</launch>
