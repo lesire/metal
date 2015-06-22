@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 import sys
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
 
 import matplotlib
-matplotlib.use("Qt5Agg")
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+matplotlib.use("Qt4Agg")
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 #from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as  NavigationToolbar
-from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as  NavigationToolbar
+from matplotlib.backends.backend_qt4 import NavigationToolbar2QT as  NavigationToolbar
 from matplotlib.figure import Figure
 
 class PlotWindow(QMainWindow):

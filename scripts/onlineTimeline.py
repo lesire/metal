@@ -18,9 +18,8 @@ import time
 import sys, random
 import os
 
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
 
 class OnlineTimeline(PlotWindow):
     def __init__(self, missionFile = None):
