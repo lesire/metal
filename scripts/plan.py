@@ -271,14 +271,6 @@ class Plan:
 
     def getLength(self):
         return self.stn.getLength()/timeFactor
-
-    def setDeadline(self, deadline):
-        self.stn.setHorizon(int(round(deadline*timeFactor)))
-        
-        if not self.stn.isConsistent():
-            logger.warning("STN not valid after the set up of the deadline")
-            return False
-        return True
     
     def getJsonDescription(self):
         result = deepcopy(self.jsonDescr)
@@ -296,7 +288,7 @@ class Plan:
     
     # Add a temporal constraint to the plan.
     # Will be exported into Json to be included during the repair attemps
-    def addTemporalConstraint(self, startTp, endTp, lb, ub = None):
+    def addTemporalConstraint(self, startTp, endTp, lb, ub = None, cbStnUpdated = (lambda x: logger.error("toto"))):
         if startTp is None:
             startTp = self.stn.getStartId()
             startTpIndex = 0
@@ -305,8 +297,11 @@ class Plan:
 
         if ub is None:
             l = self.stn.addConstraint(startTp, endTp, lb)
+            cbStnUpdated({"type":"add", "start" : startTp, "end" : endTp, "lb" : lb})
         else:
             l = self.stn.addConstraint(startTp, endTp, lb, ub)
+            cbStnUpdated({"type":"add", "start" : startTp, "end" : endTp, "lb" : lb, "ub" :ub})
+
 
         self.mastnMsg = l + self.mastnMsg
 
@@ -321,7 +316,7 @@ class Plan:
         self.jsonDescr["temporal-links"].append(tLink)
 
     #assume value in ms
-    def setTimePoint(self, tpName, value):
+    def setTimePoint(self, tpName, value, cbStnUpdated = (lambda x: logger.error("toto"))):
         logger.debug("plan.setTimpoint %s %s" % (tpName, value))
     
         c = self.stn.getBounds(tpName)
@@ -335,6 +330,7 @@ class Plan:
         #add this constraint in the STN
         logger.info("Executing %s at %s. Bounds are %s" % (tpName, value, c))
         l = self.stn.addConstraint(self.stn.getStartId(), tpName, value, value)
+        cbStnUpdated({"type":"add", "start" : self.stn.getStartId(), "end" : tpName, "lb" : value, "ub" : value})
         
         self.mastnMsg = self.mastnMsg + l
 

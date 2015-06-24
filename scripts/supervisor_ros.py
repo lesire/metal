@@ -24,8 +24,8 @@ class SupervisorRos(Supervisor):
         self.mastn_pub = rospy.Publisher('hidden/mastnUpdate/out', MaSTNUpdate, queue_size=10) 
         self.mastn_sub = rospy.Subscriber('hidden/mastnUpdate/in', MaSTNUpdate, self.mastnUpdate) 
         
-        #self.exectp_pub = rospy.Publisher('hidden/executedTp/out', ExecutedTp, queue_size=10)
-        #self.exectp_sub = rospy.Subscriber('hidden/executedTp/in', ExecutedTp, self.executedTp_cb)
+        self.stnupdate_pub = rospy.Publisher('hidden/stnupdate', String, queue_size=10)
+        self.stnupdate_pub_latched = rospy.Publisher('hidden/stnupdate', String, queue_size=10, latch=True)
 
         self.alea_srv = rospy.Service("alea", AleaAction, self.aleaReceived)
         
@@ -117,7 +117,7 @@ class SupervisorRos(Supervisor):
             
             logger.info("Received a repair request. Pausing the execution")
             self.state = State.REPAIRINGPASSIVE
-            self.stnUpdated()
+            self.sendVisuUpdate()
 
             self.sendNewStatusMessage("repairResponse", json.dumps(self.plan.getLocalJsonPlan(self.agent)))
 
@@ -141,13 +141,13 @@ class SupervisorRos(Supervisor):
             planStr = msg
             self.init(planStr, self.agent)
             self.state = State.RUNNING
-            self.stnUpdated()
+            self.sendVisuUpdate()
         elif type == "targetFound":
             self.targetFound(json.loads(msg), notifyTeam = False)
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
-    def stnUpdated(self, onlyPast = False):
+    def sendVisuUpdate(self, onlyPast = False):
         data = []
 
         currentTime = 0
@@ -185,6 +185,12 @@ class SupervisorRos(Supervisor):
 
         self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
+    def stnUpdated(self, data):
+        if "init" in data:
+            self.stnupdate_pub_latched.publish(json.dumps(data, sort_keys=True))
+        else:
+            self.stnupdate_pub.publish(json.dumps(data, sort_keys=True))
+    
     def setTimePoint(self, tp, value):
         Supervisor.setTimePoint(self, tp, value)
         
@@ -234,6 +240,7 @@ class SupervisorRos(Supervisor):
                     self.dropCommunication(c)
     
             cl = pystn.ConstraintListL()
+            dataStnUpdate = []
             for a in data.arcs:
                 if a.nodeSource not in self.plan.stn.getNodeIds() and a.nodeSource != "_origin":
                     logger.error("Cannot find %s in stn. Ignoring this constraint" % a.nodeSource)
@@ -243,8 +250,10 @@ class SupervisorRos(Supervisor):
                     continue
 
                 cl.append(pystn.ConstraintInt(a.nodeSource, a.nodeTarget, a.directValue, a.indirectValue))
+                dataStnUpdate.append({"start":a.nodeSource, "end":a.nodeTarget, "lb":a.directValue, "ub":a.indirectValue})
 
             self.plan.stn.setConstraints(cl)
+            self.stnUpdated({"mastnUpdate":dataStnUpdate})
 
             if not self.plan.stn.isConsistent():
                 logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))

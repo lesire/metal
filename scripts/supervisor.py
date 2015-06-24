@@ -84,7 +84,7 @@ class Supervisor(threading.Thread):
                     self.plan = plan.Plan(planStr, agent)
             except plan.PlanImportError as e:
                 self.state = State.ERROR
-                self.stnUpdated()
+                self.sendVisuUpdate()
                 logger.error(str(e))
                 logger.error("Error when trying to import this plan : %s" % planStr)
             
@@ -148,19 +148,20 @@ class Supervisor(threading.Thread):
     
                 #TODO if this is an action being executed, send a message to the executor
 
+        self.stnUpdated({"init" : self.plan.stn.export()})
         self.visuUpdate()
     
     def visuUpdate(self):
         if self.state == State.DEAD:
-            self.stnUpdated(onlyPast=True)
+            self.sendVisuUpdate(onlyPast=True)
             #stop sending messages
         else:
-            self.stnUpdated()
+            self.sendVisuUpdate()
             if not self.stopEvent.is_set():
                 threading.Timer(1, self.visuUpdate).start() #re-run it in 1 second
 
     def setTimePoint(self, tpName, value):
-        return self.plan.setTimePoint(tpName, value)
+        return self.plan.setTimePoint(tpName, value, cbStnUpdated=self.stnUpdated)
     
     def getExecutableTps(self, now = True):
         return filter(lambda tp: self.isTpExecutable(tp, now), self.tp.keys())
@@ -211,7 +212,7 @@ class Supervisor(threading.Thread):
 
             logger.info("finished the plan")
             self.state = State.DONE
-            self.stnUpdated()
+            self.sendVisuUpdate()
             return
 
         #Retrieve the corresponding action
@@ -299,7 +300,7 @@ class Supervisor(threading.Thread):
                 ub = self.plan.stn.getBounds(action["tEnd"]).lb + 30 * 1000 #30 seconds
                 logger.info("Executing a com action at %.2f. Set its upper bound to %.2f. Max duration : %.2f" % (currentTime/1000, ub/1000, (ub - currentTime)/1000))
 
-                self.plan.addTemporalConstraint(None, action["tEnd"], 0, ub)
+                self.plan.addTemporalConstraint(None, action["tEnd"], 0, ub, cbStnUpdated=self.stnUpdated)
 
                 for a in self.plan.jsonDescr["actions"].values():
                     if a["startTp"] == action["startTp"] and a["endTp"] == action["endTp"]:
@@ -311,7 +312,7 @@ class Supervisor(threading.Thread):
                 if not self.plan.stn.isConsistent():
                     logger.error("When constraining the end of %s before %d, stn became inconsistent" % (action["name"], ub))
                     self.state = State.ERROR
-                    self.stnUpdated()
+                    self.sendVisuUpdate()
                     return
 
                 threading.Timer((ub - currentTime)/1000, lambda : self.inQueue.put({"type":"ubAction", "action":action, "date":ub})).start()
@@ -421,6 +422,7 @@ class Supervisor(threading.Thread):
             if self.allowShorterAction:
                 logger.warning("An action finished early : %.2f instead of %.2f. Updating its dMin." % (dReal/1000, dMin/1000))
                 l = self.plan.stn.setConstraint(action["tStart"], tp, int(floor(dReal)))
+                self.stnUpdated({"type":"set", "start" : action["tStart"], "end" : tp, "lb" : int(floor(dReal))})
                 self.plan.mastnMsg = self.plan.mastnMsg + l
             else:
                 logger.warning("An action finished early : %.2f instead of %.2f. Will wait" % (dReal/1000, dMin/1000))
@@ -579,7 +581,7 @@ class Supervisor(threading.Thread):
 
 
     # Called when the STN is updated. Used to send data back to the mission center
-    def stnUpdated(self, onlyPast = False):
+    def sendVisuUpdate(self, onlyPast = False):
         pass
 
     #type can be repairRequest, repairDone, targetFound
@@ -590,6 +592,9 @@ class Supervisor(threading.Thread):
         pass
     
     def repairCallback(self, t, time, sender, msg):
+        pass
+
+    def stnUpdated(self, data):
         pass
 
     def computeGlobalPlan(self):
@@ -771,13 +776,13 @@ class Supervisor(threading.Thread):
                     logger.error(self.plan.stn.export())
                     #TODO : implement a default strategy ? Notify other agents ?
                     self.state = State.ERROR
-                    self.stnUpdated()
+                    self.sendVisuUpdate()
                     sys.exit(1)
             else:
                 logger.error("Found no deadlines to remove. Cannot repair")
                 #TODO : implement a default strategy ? Notify other agents ?
                 self.state = State.ERROR
-                self.stnUpdated()
+                self.sendVisuUpdate()
                 time.sleep(1)
                 logger.error("Exiting")
                 sys.exit(1)
