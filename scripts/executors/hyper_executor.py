@@ -86,7 +86,7 @@ try:
                 import time
                 time.sleep(1)
                 logger.info("moving to target")
-                action = {'action': 'goto', 'waypoint': {'x': int(x), 'y': int(y)}}
+                action = {'action': 'goto', 'waypoint': {'x': float(x), 'y': float(y)}}
                 logger.info("Sending %s" % json.dumps(action))
                 self._sendCommand(action)            
                 logger.info("Request action " + json.dumps(action))
