@@ -146,7 +146,7 @@ class Plan:
         for cl in (d["causal-links"] + d["temporal-links"]):
             start = self.tpName[cl["startTp"]]
 
-            # If end point is the endTp, then get the one correspondng to the agent executing the action            
+            # If end point is the endTp, then get the one corresponding to the agent executing the action
             end = self.tpName[cl["endTp"]]
             if cl["endTp"] == 1:
                 agent = self.tpAgent[cl["startTp"]]
@@ -240,6 +240,8 @@ class Plan:
             
             if position == "start":
                 logger.debug("\t%5.2f (%s): %s" % (time/1000, tpName, actionName))
+            elif tp.startswith("1-end"):
+                logger.debug("\t%5.2f (%s): %s" % (time/1000, tpName, tp))
 
     # Called before the plan is used.
     # Do some checks and modification of the initial plan.
