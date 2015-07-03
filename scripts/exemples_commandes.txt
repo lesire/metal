@@ -22,6 +22,9 @@ rosservice call /minnie/alea sendMastn '!!str "{}"'
 # Pour forcer une réparation
 rosservice call /minnie/alea repair '!!str "{}"'
 
+# Pour changer l'état d'un robot
+rosservice call /mana/alea state '!!str "{\"state\":\"running\"}"'
+
 ### vNet ###
 
 # Pour interdire toute communication
