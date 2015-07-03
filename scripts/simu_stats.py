@@ -65,7 +65,7 @@ def getNewOutputDir(prefix = "simu"):
 Check the input and configure the simulation : creates the output folder, 
 copy the input files, etc.
 """
-def configureSimu(missionDir, aleaFile, outputDir = None):
+def configureSimu(missionDir, aleaFile, outputDir = None, vnet=False):
     if not os.path.exists(missionDir):
         logger.error("The mission directory does not exists : %s" % missionDir)
         raise InputError("The mission directory does not exists : %s" % missionDir)
@@ -81,6 +81,13 @@ def configureSimu(missionDir, aleaFile, outputDir = None):
     if not os.path.exists(aleaFile):
         logger.error("Cannot find the alea file : %s" % aleaFile)
         raise InputError("Cannot find the alea file : %s" % aleaFile)
+        
+    if vnet is False:
+        with open(aleaFile) as f:
+            alea = json.load(f)
+        if any([d.get("to") == "vnet" for d in alea.values()]):
+            logger.error("Using an alea file with vnet command. You must pass the vnet arg.")
+            raise InputError("Using an alea file with vnet command. You must pass the vnet arg.")
         
     #create the output dir
     if outputDir is None:
@@ -128,7 +135,7 @@ def launchSimu(missionDir, aleaFile, outputDir, port = 11311, redirectOutput = F
     return p
 
 def runSimu(missionDir, aleaFile, outputDir = None, visu = False, vnet = False):
-    outputDir = configureSimu(missionDir, aleaFile, outputDir)
+    outputDir = configureSimu(missionDir, aleaFile, outputDir, vnet=vnet)
 
     p = launchSimu(missionDir, aleaFile, outputDir, visu=visu, vnet=vnet)
     p.wait()
@@ -145,7 +152,7 @@ def runParallelSimu(inputs, maxJobs = 1, vnet=False):
     # Configure all the simus
     nextPort = 11312
     for d in inputs:
-        d["outputDir"] = configureSimu(d["missionDir"], d["aleaFile"], d.get("outputDir", None))
+        d["outputDir"] = configureSimu(d["missionDir"], d["aleaFile"], d.get("outputDir", None), vnet=vnet)
         d["port"] = nextPort
         nextPort += 1
 
