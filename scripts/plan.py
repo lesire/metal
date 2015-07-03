@@ -129,7 +129,7 @@ class Plan:
                     self.stn.addPoint(a["tEnd"], a["agent"])
                 else:
                     self.stn.addPoint(a["tEnd"])
-                self.stn.addConstraint(a["tEnd"], endPoint, 0)  #prevent the end to be executed before any actions (for instance if the last action does not provide a goal)
+                self.stn.addConstraint(a["tEnd"], endPoint, 1)  #prevent the end to be executed before any actions (for instance if the last action does not provide a goal)
             
             if a["tStart"] != a["tEnd"] and not a["controllable"]:
                 if "dMin" in a:
