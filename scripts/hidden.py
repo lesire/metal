@@ -142,8 +142,8 @@ class Hidden:
         signal.signal(signal.SIGUSR1, self.startCallback)
         logger.info("Waiting for signal USR1 to start. Example : kill -USR1 %s" % os.getpid())
 
-    def createSupervisor(self, plan, agent, pddlFiles, useMaSTN=False):
-        return supervisor.Supervisor(self.q1, self.q2, plan, startEvent=self.startSupervisor, stopEvent=self.stopSupervisor, agent=agent, pddlFiles=pddlFiles, useMaSTN=useMaSTN)
+    def createSupervisor(self, plan, agent, pddlFiles):
+        return supervisor.Supervisor(self.q1, self.q2, plan, startEvent=self.startSupervisor, stopEvent=self.stopSupervisor, agent=agent, pddlFiles=pddlFiles)
 
     def launchAgentArchitecture(self, ex, planString, agentName, pddlFiles=None, repairRos = False):
         self.q1 = Queue.Queue() 
