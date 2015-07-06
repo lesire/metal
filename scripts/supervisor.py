@@ -744,6 +744,10 @@ class Supervisor(threading.Thread):
 
         planJson = self.computeGlobalPlan()
 
+        if self.state != State.REPAIRINGACTIVE:
+            logger.warning("When computing the plan to repair, my state changed to %s. Canceling my repair" % State.reverse_mapping[self.state])
+            self.mainLoop()
+
         # If a robot is dead, remove the coms
         for a in self.plan.actions.values():
             if "communicate-meta" in a["name"] and not a["executed"]:

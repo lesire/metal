@@ -111,7 +111,15 @@ class SupervisorRos(Supervisor):
             return
         
         if type == "repairRequest":
-            if self.state != State.RUNNING:
+            if self.state == State.REPAIRINGACTIVE:
+                #Another robot is trying to repair. Abort the repair for one of them
+                if self.agent < sender:
+                    logger.warning("%s is also trying to repair. He has priority. Canceling my repair" % sender)
+                    pass #cancel my reparation
+                else:
+                    logger.warning("%s is also trying to repair. I have priority. Ignoring its message")
+                    return
+            elif self.state != State.RUNNING:
                 logger.error("Received a repair request not when running. Ignoring it")
                 return
             
