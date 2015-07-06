@@ -34,6 +34,8 @@ class MORSEActionExecutor(AbstractActionExecutor):
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         if "ressac" in who:
             goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 2.0)
+        elif "effibot" in who:
+            goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 3, 1)
         else:
             goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 3, 0.5)
 
