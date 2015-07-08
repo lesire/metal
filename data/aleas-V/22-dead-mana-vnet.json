@@ -1,0 +1,11 @@
+{
+ "0":{"type" : "add", "date":275, "to":"vnet", "data":{"src":"*", "tgt":"ressac2", "filter":"block"}},
+ "1":{"type" : "robotDead", "date":280, "to":"mana", "data":{"robot" : "mana"}},
+ "2":{"type" : "robotDead", "date":285, "to":"ressac2", "data":{"robot" : "mana"}},
+ "3":{"type" : "del", "date":290, "to":"vnet", "data":{"src":"*", "tgt":"*", "index":"*"}},
+ "4":{"type" : "sendMastn", "date":295, "to":"mana", "data":{}},
+ "5":{"type" : "sendMastn", "date":295, "to":"minnie", "data":{}},
+ "6":{"type" : "sendMastn", "date":295, "to":"ressac1", "data":{}},
+ "7":{"type" : "sendMastn", "date":295, "to":"ressac2", "data":{}},
+ "8":{"type" : "repair", "date":300, "to":"ressac2", "data":{}}
+}
