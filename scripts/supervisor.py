@@ -481,7 +481,9 @@ class Supervisor(threading.Thread):
             comMetaName = comName.replace("communicate", "communicate-meta")
         l = [(k,a) for k,a in planJson["actions"].items() if set(a["name"].split(" ")) == set(comMetaName.split(" "))]
         if len(l) != 1:
-            logger.error("Could not find a single meta action when dropping a com action : %d" % len(l))
+            logger.warning("Tried to drop %s" % comName)
+            logger.warning("Could not find a single meta action when dropping a com action : %d" % len(l))
+            #This can be caused by a reparation that removed a communication so that I don't know about this com anymore
             return
 
         k,a = l[0]

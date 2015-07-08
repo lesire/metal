@@ -242,7 +242,7 @@ class SupervisorRos(Supervisor):
 
         with self.mutex:
             # Check if a com was cancelled
-            logger.debug("%s received with dropped coms %s" % (self.agent, data.droppedComs))
+            logger.debug("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))
             for c in data.droppedComs:
                 if c not in self.droppedComs:
                     self.dropCommunication(c)

@@ -69,6 +69,8 @@ class OnlineTimeline(PlotWindow):
                 return name
         elif "communicate" in name:
             return " ".join(name.split(" ")[1:3])
+        elif "init " in name:
+            return "init"
         else:
             return name
 
@@ -90,7 +92,7 @@ class OnlineTimeline(PlotWindow):
             for m in data.actions:
                 self.data[data.agent]["actions"].append({"name":m.name, "timeStart": m.timeStartLb/1000,  "timeEnd": m.timeEndLb/1000, "executed":m.executed, "executing":m.executing, "hierarchical":m.hierarchical})
                 
-                self.data[data.agent]["state"] = data.state
+            self.data[data.agent]["state"] = data.state
 
             #logger.info("Received message from %s" % data.agent)
 
@@ -98,15 +100,17 @@ class OnlineTimeline(PlotWindow):
         self.axes.clear()        
         self.axes.set_autoscaley_on(False)
         
-        if self.data:
-            xmax = max([a["timeEnd"] for d in self.data.values() for a in d["actions"]])
+        actions = [a["timeEnd"] for d in self.data.values() for a in d["actions"]]
+        if actions:
+            xmax = max(actions)
         else:
             xmax = 1
         self.axes.set_xlim(0, xmax)
         
         captions = [" " for _ in range(len(self.data)+2)]
         for robot in sorted(self.data.keys()):
-            index = None
+            
+            index = self.data[robot]["index"]
             posCycle = itertools.cycle([0.15,0.3,0.45,0.6,0.75])
             for action in sorted(self.data[robot]["actions"], key=lambda x: x["timeStart"]):
 
@@ -118,7 +122,6 @@ class OnlineTimeline(PlotWindow):
                     
                     continue
 
-                index = self.data[robot]["index"]
                 xstart = action["timeStart"]
                 xstop  = action["timeEnd"]
                 if action["executed"]:

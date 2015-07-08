@@ -60,7 +60,9 @@ class DummyActionExecutor(AbstractActionExecutor):
         logger.info("Init {w} at {a} in {d}".format(w=who,a=a,d=dur))
         
         currentTime = time.time()
-        self.nextEvents.append({"time":(currentTime + actionJson["dMin"]),"cb": cb, "actionJson":actionJson})
+        #duration = actionJson["dMin"]
+        duration = 1
+        self.nextEvents.append({"time":(currentTime + duration),"cb": cb, "actionJson":actionJson})
       
     def move(self, who, a, b, cb, actionJson, **kwargs):
         if(self.agent is not None and self.agent != who):
