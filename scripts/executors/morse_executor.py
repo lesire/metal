@@ -24,20 +24,27 @@ class MORSEActionExecutor(AbstractActionExecutor):
     def __del__(self):
         del self.morse
 
+    def _goto(self, x, y):
+        agent = getattr(self.morse, self.agent)
+        if "ressac" in self.agent:
+            goto_action = agent.waypoint.goto(x, y, 30.0, 3, 2.0)
+        elif "effibot" in self.agent:
+            goto_action = agent.waypoint.goto(x, y, 0.0, 3, 1)
+        else:
+            goto_action = agent.waypoint.goto(x, y, 0.0, 3, 0.5)
+        return goto_action
+
     def action_done(self, cb, evt):
         logger.debug("Action done {e}".format(e=evt))
         cb("ok")
     
     def move(self, who, a, b, cb, **kwargs):
-        agent = getattr(self.morse, who)
         coords = b.split("_")[1:]
+        if who != self.agent:
+            logger.error("Received an action that is not for me : %s %s" % (who, self.agent))
+        
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
-        if "ressac" in who:
-            goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 30.0, 3, 2.0)
-        elif "effibot" in who:
-            goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 3, 1)
-        else:
-            goto_action = agent.waypoint.goto(int(coords[0])/100, int(coords[1])/100, 0.0, 3, 0.5)
+        goto_action = self._goto(int(coords[0])/100, int(coords[1])/100)
 
         goto_action.add_done_callback(partial(self.action_done, cb))
 
@@ -46,6 +53,10 @@ class MORSEActionExecutor(AbstractActionExecutor):
 
     def communicate(self, dude, sweet, point_dude, point_sweet, cb, **kwargs):
         cb("ok")
+
+    def track(self, x, y, cb, *args, **kwargs):
+        if x is not None and y is not None:
+            goto_action = self._goto(float(x),float(y))
 
     def has_communicated(self, first_robot, second_robot, cb, **kwargs):
         cb("ok")
