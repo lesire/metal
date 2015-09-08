@@ -54,7 +54,8 @@ class Supervisor(threading.Thread):
         self.repairRos = False
         
         self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
-        self.ubForCom = False # If true, set an upper bound for communications
+        self.ubForCom = -1 # Set an upper bound for waiting for the communications. If <= 0, no bound
+        self.ubForTrack = -1 # Set an upper bound for track actions : if met the robot will drop its plan. If <= 0, no bound
 
         self.mutex = threading.RLock() #Prevent concurent modifications of the plan
 
@@ -150,6 +151,9 @@ class Supervisor(threading.Thread):
 
         self.stnUpdated({"init" : self.plan.stn.export()})
         self.visuUpdate()
+    
+    def onMissionStart(self):
+        pass
     
     def visuUpdate(self):
         if self.state == State.DEAD:
@@ -279,7 +283,7 @@ class Supervisor(threading.Thread):
         else:
             logger.debug("Starting %s at time %f. Not my action." % (action["name"], currentTime/1000))
 
-        if self.ubForCom and action["name"].startswith("communicate "):
+        if self.ubForCom > 0 and action["name"].startswith("communicate "):
             # Compute an upper bound for this action
 
             s = copy(self.plan.stn)
@@ -296,8 +300,8 @@ class Supervisor(threading.Thread):
                 logger.info("The bounds for the end of this com is : %s" % cCom)
                 ub =  math.ceil((cCom.ub + cCom.lb)/2)
 
-                logger.info("Ignoring previous computation : using a fixed value of 30 seconds")
-                ub = self.plan.stn.getBounds(action["tEnd"]).lb + 30 * 1000 #30 seconds
+                logger.info("Ignoring previous computation : using a fixed value of %f seconds" % self.ubForCom)
+                ub = self.plan.stn.getBounds(action["tEnd"]).lb + int(self.ubForCom) * 1000
                 logger.info("Executing a com action at %.2f. Set its upper bound to %.2f. Max duration : %.2f" % (currentTime/1000, ub/1000, (ub - currentTime)/1000))
 
                 self.plan.addTemporalConstraint(None, action["tEnd"], 0, ub, cbStnUpdated=self.stnUpdated)
@@ -812,6 +816,7 @@ class Supervisor(threading.Thread):
         if self.plan.initTime is None:
             #begining of the plan
             self.beginDate = time.time()
+            self.onMissionStart()
         else:
             logger.info("Executing an half-executed plan. Starting at %s" % self.plan.initTime)
             self.beginDate = time.time() - self.plan.initTime

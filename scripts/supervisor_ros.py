@@ -34,9 +34,25 @@ class SupervisorRos(Supervisor):
         self.repairRos = True
 
         if rospy.has_param("/hidden/ubForCom"):
-            b = rospy.get_param("/hidden/ubForCom")
-            logger.info("Setting ubForCom to %s from the parameter server" % b)
-            self.ubForCom = b
+            f = float(rospy.get_param("/hidden/ubForCom"))
+            logger.info("Setting ubForCom to %s from the parameter server" % f)
+            self.ubForCom = f
+            
+        if rospy.has_param("/hidden/ubForTrack"):
+            f = float(rospy.get_param("/hidden/ubForTrack"))
+            logger.info("Setting ubForTrack to %s from the parameter server" % f)
+            self.ubForTrack = f
+
+    def onMissionStart(self):
+        if rospy.has_param("/hidden/ubForCom"):
+            f = float(rospy.get_param("/hidden/ubForCom"))
+            logger.info("Setting ubForCom to %s from the parameter server" % f)
+            self.ubForCom = f
+            
+        if rospy.has_param("/hidden/ubForTrack"):
+            f = float(rospy.get_param("/hidden/ubForTrack"))
+            logger.info("Setting ubForTrack to %s from the parameter server" % f)
+            self.ubForTrack = f
 
     def aleaReceived(self,msg):
         #logger.warning(msg)
