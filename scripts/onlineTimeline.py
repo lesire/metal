@@ -15,6 +15,7 @@ import functools
 import itertools
 import json
 import time
+import signal
 import sys, random
 import os
 
@@ -182,6 +183,11 @@ if __name__ == "__main__":
 
     if "raise_" in dir(window):
         window.raise_()
+
+    #Exit when a SIGINT is received
+    def sigint_handler(*args):
+        QApplication.quit()
+    signal.signal(signal.SIGINT, sigint_handler)
 
     timer = QTimer()
     timer.timeout.connect(window.plotResults)
