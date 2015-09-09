@@ -194,7 +194,7 @@ class Plan:
                 if not self.stn.mayBeConsistent(self.stn.getStartId(), self.tpName[t], value, value):
                     logger.error("**  Error : invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
                     logger.error("Bounds are %s" % self.stn.getBounds(self.tpName[t]))
-                    logger.error("Stn is %s" % self.stn.export())
+                    #logger.error("Stn is %s" % self.stn.export())
                     raise PlanImportError("invalid STN when importing the plan and setting %s at %s" % (self.tpName[t], value))
 
                 self.stn.addConstraint(self.stn.getStartId(), self.tpName[t], value, value)

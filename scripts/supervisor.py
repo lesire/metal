@@ -87,7 +87,7 @@ class Supervisor(threading.Thread):
                 self.state = State.ERROR
                 self.sendVisuUpdate()
                 logger.error(str(e))
-                logger.error("Error when trying to import this plan : %s" % planStr)
+                #logger.error("Error when trying to import this plan : %s" % planStr)
             
             self.executedTp = {}
             self.tp = {}
@@ -783,7 +783,7 @@ class Supervisor(threading.Thread):
                 
                 if planStr is None:
                     logger.error("Even after dropping communication, cannot repair")
-                    logger.error(self.plan.stn.export())
+                    #logger.error(self.plan.stn.export())
                     #TODO : implement a default strategy ? Notify other agents ?
                     self.state = State.ERROR
                     self.sendVisuUpdate()
