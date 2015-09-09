@@ -678,11 +678,19 @@ class Supervisor(threading.Thread):
         
     def repairPlan(self, planJson):
     
+        fileBaseName = time.strftime("plan_broken_%Y_%m_%d_%H_%M_%S")
+        domainFile = fileBaseName + "_domain.pddl"
+        prbFile = fileBaseName + "_prb.pddl"
+        helperFile = fileBaseName + "_helper.pddl"
+        pinitFile = fileBaseName + "_init.plan"
+        planFile = fileBaseName + "_output.plan" #output
+        planPDDLFile = fileBaseName + "_output.pddl" #output
+    
         if self.pddlFiles is None:
             logger.error("No provided PDDL files. Cannot repair")
             return None
         
-        with open("plan-broken.plan", "w") as f:
+        with open(pinitFile, "w") as f:
             json.dump(planJson, f)
         
         #compute the list of available agents
@@ -695,19 +703,30 @@ class Supervisor(threading.Thread):
                     agents.remove(a)
 
         #Write the content of the pddl file to disk since hipop can only read files
-        with open("plan-broken-domain.pddl", "w") as f:
+        with open(domainFile, "w") as f:
             f.write(self.pddlFiles["domain"])
 
-        with open("plan-broken-prb.pddl", "w") as f:
+        with open(prbFile, "w") as f:
             f.write(self.pddlFiles["prb"])
 
-        with open("plan-broken-helper.pddl", "w") as f:
+        with open(helperFile, "w") as f:
             f.write(self.pddlFiles["helper"])
 
         outputFile = tempfile.NamedTemporaryFile("w+")
         
-        command = "hipop -L error -u --timing -H plan-broken-helper.pddl -I plan-broken.plan --agents {agents} -P hadd_time_lifo -A areuse_motion_nocostmotion -F local_openEarliestMostCostFirst_motionLast -O plan-repaired.pddl -o plan-repaired.plan plan-broken-domain.pddl plan-broken-prb.pddl".format(agents="_".join(agents))
-        logger.info("Launching hipop with %s" % command)
+        command = " ".join(["hipop",
+                           "-L error", "--timing",
+                           "-u",
+                           "-H " + helperFile,
+                           "-I " + pinitFile,
+                           "--agents {agents}".format(agents="_".join(agents)),
+                           "-P hadd_time_lifo",
+                           "-A areuse_motion_nocostmotion",
+                           "-F local_openEarliestMostCostFirst_motionLast",
+                           "-O " + planPDDLFile,
+                           "-o " + planFile,
+                           domainFile, prbFile])
+        logger.info("Launching hipop with : %s" % command)
         try:
             r = call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
         except OSError as e:
@@ -728,10 +747,10 @@ class Supervisor(threading.Thread):
             return None
         
         if(r == 0):
-            with open("plan-repaired.plan") as f:
+            with open(planFile) as f:
                 planStr = " ".join(f.readlines())
         
-            logger.info("reparation succes")
+            logger.info("reparation success")
             return planStr
 
         else:
