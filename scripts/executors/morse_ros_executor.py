@@ -1,6 +1,7 @@
 from .morse_executor import MORSEActionExecutor
 
 import logging; logger = logging.getLogger("hidden")
+import os
 
 try:
     from .ros_executor import ROSActionExecutor
@@ -11,6 +12,11 @@ try:
         def __init__(self, agentName, **kwargs):
             MORSEActionExecutor.__init__(self)
             ROSActionExecutor.__init__(self, agentName)
+
+        def _get_morse_host(self):
+            #Assume morse is running with roscore
+            url = os.environ["ROS_MASTER_URI"]
+            return url.split("//")[1].split(":")[0]
 
         def update(self):
             MORSEActionExecutor.update(self)

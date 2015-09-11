@@ -3,6 +3,7 @@ from .action_executor import AbstractActionExecutor
 import logging; logger = logging.getLogger("hidden")
 import re
 from functools import partial
+import os
 
 class MORSEActionExecutor(AbstractActionExecutor):
     _name = "morse"
@@ -11,14 +12,18 @@ class MORSEActionExecutor(AbstractActionExecutor):
         self._connected = False
         logger.info("MORSE executor initialized")
 
+    def _get_morse_host(self):
+        return "localhost"
+
     def update(self):
         try:
             if not self._connected:
                 import pymorse
-                self.morse = pymorse.Morse()
+                host = self._get_morse_host()
+                self.morse = pymorse.Morse(host=host)
                 logger.info("Connected to MORSE")
                 self._connected = True
-        except:
+        except Exception as e:
             pass
 
     def __del__(self):
