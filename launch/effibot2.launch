@@ -1,10 +1,14 @@
 <launch>
 
+    <!-- To have the localhost machine defined --> 
+    <include file="$(find metal)/launch/machines.launch"/>
+
     <arg name="executor" default="effibot"/>
     <arg name="vnet" default="false"/>
     <arg name="name" default="effibot2"/>
+    <arg name="machine" default="localhost"/>
 
-    <node name="metal" pkg="metal" type="hidden-ros.py" ns="$(arg name)"
+    <node name="metal" pkg="metal" type="hidden-ros.py" ns="$(arg name)" machine="$(arg machine)"
     		args="--executor=$(arg executor) --agentName=$(arg name) --waitSignal" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>

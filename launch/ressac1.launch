@@ -1,9 +1,13 @@
 <launch>
 
+    <!-- To have the localhost machine defined --> 
+    <include file="$(find metal)/launch/machines.launch"/>
+
     <arg name="executor" default="ressac"/>
     <arg name="vnet" default="false"/>
+    <arg name="machine" default="localhost"/>
 
-    <node name="ressac1" pkg="metal" type="hidden-ros.py" ns="ressac1" args="--executor=$(arg executor) --agentName=ressac1 --waitSignal" >
+    <node name="ressac1" pkg="metal" type="hidden-ros.py" ns="ressac1" machine="$(arg machine)" args="--executor=$(arg executor) --agentName=ressac1 --waitSignal" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>

@@ -1,9 +1,13 @@
 <launch>
 
+    <!-- To have the localhost machine defined --> 
+    <include file="$(find metal)/launch/machines.launch"/>
+
     <arg name="executor" default="hyper"/>
     <arg name="vnet" default="false"/>
+    <arg name="machine" default="localhost"/>
 
-    <node name="mana" pkg="metal" type="hidden-ros.py" ns="mana" args="--executor=$(arg executor) --agentName=mana --waitSignal" >
+    <node name="mana" pkg="metal" type="hidden-ros.py" ns="mana" machine="$(arg machine)" args="--executor=$(arg executor) --agentName=mana --waitSignal" >
         <remap from="hidden/repair/in" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/repair/out" to="/hidden/repair" unless="$(arg vnet)"/>
         <remap from="hidden/communicate/in" to="/hidden/communicate" unless="$(arg vnet)"/>

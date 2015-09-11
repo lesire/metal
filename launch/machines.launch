@@ -1,0 +1,7 @@
+<launch>
+
+  <machine name="localhost" address="127.0.0.1" user="$(env USER)" default="true"/>
+  <machine name="PC-Action" address="134.212.28.32" env-loader="/home/action/work/action/remote_env.sh" user="action" default="never"/>
+  <machine name="PC-Patrick" address="134.212.241.67" env-loader="/home/pbechon/action/action_ros_ws/devel/env.sh" user="pbechon" default="never"/>
+  
+</launch>
