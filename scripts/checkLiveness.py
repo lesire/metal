@@ -21,6 +21,7 @@ hosts = {
           "Ressac 2 : Charge utile" :    {"addr" : "134.212.244.178",  "group":"Ressac 2"},
           "Minode" :                     {"addr" : "134.212.244.36",   "group":"Ressac"},
           "Mana" :                       {"addr" : "140.93.16.55",     "group":"Mana"},
+          "Momo" :                       {"addr" : "140.93.16.72",     "group":"Momo"},
           "Minnie" :                     {"addr" : "140.93.16.57",     "group":"Minnie"},
           "Passerelle ONERA-LASS" :      {"addr" : "134.212.90.100",   "group":"0 - Réseaux"},
           "Access point WiFi 1" :        {"addr" : "134.212.244.109",  "group":"0 - Réseaux"},
