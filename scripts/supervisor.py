@@ -52,6 +52,7 @@ class Supervisor(threading.Thread):
         self.beginDate = -1
         self.state = State.INIT
         self.repairRos = False
+        self.triggerRepair = False #Used by callbacks to trigger repair in the main thread
         
         self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
         self.ubForCom = -1 # Set an upper bound for waiting for the communications. If <= 0, no bound
@@ -356,18 +357,39 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
     # targetPos is a dict
-    def targetFound(self, targetPos = None, notifyTeam = True):
-        self.state = State.TRACKING
-        
+    def targetFound(self, data = None, selfDetection = True):
+
         x,y = 0,0
-        if targetPos is not None:
-            x = targetPos.get("x", 0)
-            y = targetPos.get("y", 0)
-        self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
-    
-        if notifyTeam:
-            self.sendNewStatusMessage("targetFound", json.dumps(targetPos))
-        
+        if data is not None:
+            x = data.get("target", {}).get("x", 0)
+            y = data.get("target", {}).get("y", 0)
+
+        if selfDetection:
+            self.state = State.TRACKING
+
+            # Finish every action currently being executed
+            for a in self.plan.actions.values():
+                if self.isResponsibleForAction(a) and a["tStart"] in self.executedTp and a["tEnd"] not in self.executedTp:
+                    self.outQueue.put({"type":"stopAction", "action":copy(a), "time":self.getCurrentTime()})
+                    try:
+                        self.executeTp(a["tEnd"])
+                    except ExecutionFailed:
+                        pass #Do not trigger a repair : must pursue the target
+
+            self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
+
+            #TODO : find any running agent in com range
+            if self.agent != "ressac1":
+                data = {"target": {"x":x,"y":y}, "repairingRobot":"ressac1"}
+            else:
+                data = {"target": {"x":x,"y":y}}
+
+            self.sendNewStatusMessage("targetFound", json.dumps(data))
+        else:
+            if "repairingRobot" in data and self.agent == data["repairingRobot"]:
+                self.triggerRepair = True
+            pass # Do nothing here, the one detecting it will deal with it
+
     def endAction(self, msg):
         action = msg["action"]
         tp = action["tEnd"]
@@ -620,6 +642,8 @@ class Supervisor(threading.Thread):
         else:
             pass
         
+        agentTracking = [agent for agent in self.repairResponse.keys() if "state" in self.repairResponse[agent] and self.repairResponse[agent]["state"] == "tracking"]
+        
         #lock all the steps of agents that did not respond
         allAgents = set([a["agent"] for a in self.plan.actions.values() if "agent" in a])
         logger.info("All agents : %s" % allAgents)
@@ -645,9 +669,10 @@ class Supervisor(threading.Thread):
         deletedActionKeys = set()
         deletedTps = set()
         
+        #TODO use plan.Plan.removeAction ?
         for k,a in planJson["actions"].items():
             if "communicate-meta" in a["name"]:
-                for deadAgent in self.agentsDead:
+                for deadAgent in self.agentsDead + agentTracking:
                     if deadAgent in a["name"]:
                         deletedActionKeys.add(k)
                         deletedTps.add(a["startTp"])
@@ -693,8 +718,8 @@ class Supervisor(threading.Thread):
         with open(pinitFile, "w") as f:
             json.dump(planJson, f)
         
-        #compute the list of available agents
-        agents = set(self.repairResponse.keys())
+        #compute the list of available agents : all that have answered minus those tracking
+        agents = set([agent for agent in self.repairResponse.keys() if "state" not in self.repairResponse[agent] or self.repairResponse[agent]["state"] != "tracking"])
         agents.add(self.agent)
         
         if len(self.agentsDead) > 0 :
@@ -764,6 +789,8 @@ class Supervisor(threading.Thread):
 
     
     def executionFail(self):
+        
+        self.triggerRepair = False
 
         self.state = State.REPAIRINGACTIVE
 
@@ -773,16 +800,15 @@ class Supervisor(threading.Thread):
             logger.warning("When computing the plan to repair, my state changed to %s. Canceling my repair" % State.reverse_mapping[self.state])
             self.mainLoop()
 
+        planStr = self.repairPlan(planJson)
+
+        #TODO : remove from here ?
         # If a robot is dead, remove the coms
         for a in self.plan.actions.values():
             if "communicate-meta" in a["name"] and not a["executed"]:
                 if any([n in self.agentsDead for n in a["name"].split(" ")]):
                     logger.warning("Dropping %s because a robot is dead" % a["name"])
                     self.dropCommunication(a["name"])
-
-        planStr = self.repairPlan(planJson)
-
-
 
         if planStr is None:
             logger.warning("Reparation failed. Trying to remove deadlines.")
@@ -872,6 +898,9 @@ class Supervisor(threading.Thread):
                             
                     if self.state != State.DEAD:
                         self.update()
+
+                if self.triggerRepair:
+                    raise ExecutionFailed("repair triggered by a callback : did someone saw a target ?")
 
                 self.stopEvent.wait(0.1)
         except ExecutionFailed as e:

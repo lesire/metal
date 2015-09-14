@@ -10,6 +10,7 @@ from std_msgs.msg import Empty,String
 from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
 from metal.srv import AleaAction
 from supervisor import Supervisor,State
+from plan import Plan
 
 class SupervisorRos(Supervisor):
     def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
@@ -135,6 +136,14 @@ class SupervisorRos(Supervisor):
                 else:
                     logger.warning("%s is also trying to repair. I have priority. Ignoring its message")
                     return
+            elif self.state == State.TRACKING:
+                p = self.plan.getLocalJsonPlan(self.agent)
+                for k in list(p["actions"].keys()):
+                    if "executed" not in p["actions"][k] or not "executed" not in p["actions"][k]:
+                        Plan.removeAction(p, k)
+                p["state"] = "tracking"
+                self.sendNewStatusMessage("repairResponse", json.dumps(p))
+                return
             elif self.state != State.RUNNING:
                 logger.error("Received a repair request not when running. Ignoring it")
                 return
@@ -164,10 +173,14 @@ class SupervisorRos(Supervisor):
             logger.info("Receiving a new plan to execute from %s" % sender)
             planStr = msg
             self.init(planStr, self.agent)
+
+            if self.state == State.TRACKING:
+                return # Ignore the new plan
+
             self.state = State.RUNNING
             self.sendVisuUpdate()
         elif type == "targetFound":
-            self.targetFound(json.loads(msg), notifyTeam = False)
+            self.targetFound(json.loads(msg), selfDetection = False)
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
