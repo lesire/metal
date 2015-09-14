@@ -242,6 +242,7 @@ class SupervisorRos(Supervisor):
                 u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
 
             u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+            u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
             
             u.droppedComs = self.droppedComs
 
@@ -260,6 +261,7 @@ class SupervisorRos(Supervisor):
                     u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
 
                 u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+                u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
 
                 u.droppedComs = self.droppedComs
 

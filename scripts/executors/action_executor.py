@@ -25,7 +25,7 @@ class AbstractActionExecutor:
 
     def stop(self, action):
         if not action.get("controllable", False):
-            logger.error("Stopping an uncontrollable action : %s" % action)
+            logger.warning("Stopping an uncontrollable action : %s" % action)
 
         if "_stop" in dir(self):
 

@@ -1,7 +1,7 @@
 from __future__ import division
 
 
-from copy import copy
+from copy import copy,deepcopy
 from math import floor
 import json
 import math
@@ -67,18 +67,20 @@ class Supervisor(threading.Thread):
         self.stopEvent = stopEvent
 
         threading.Thread.__init__ (self, name="%s-sup" % agent)
+        self.agent = agent
         
         #key = (name, startTp, endTp). Value is the JSOn description of the action
         self.ongoingActions = {} # Set it here (and not in init) so it is not reset when the plan is repaired
 
+        self.executedTp = None
+        self.tp = None
+        
         self.init(planStr, agent)
         
     
         
     def init(self, planStr, agent):
         with self.mutex:
-            self.agent = agent
-
             try:
                 if agent is None:
                     self.plan = plan.Plan(planStr)
@@ -90,6 +92,10 @@ class Supervisor(threading.Thread):
                 logger.error(str(e))
                 #logger.error("Error when trying to import this plan : %s" % planStr)
             
+            
+            self.oldExecutedTp = deepcopy(self.executedTp)
+            self.oldTp = deepcopy(self.tp)
+
             self.executedTp = {}
             self.tp = {}
             
@@ -141,14 +147,22 @@ class Supervisor(threading.Thread):
     
                 action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
     
-                if action["executed"]:
-                    #action was executed, this is a past action
+                if action["executed"] and not "dummy init" in action:
+                    #action was executed, this is a past action. Do not consider the method dummy init, only the action itself
                     self.executedTp[tpName] = value
                     self.tp[tpName][1] = "past"
                 else:
                     self.tp[tpName][1] = "future"
-    
-                #TODO if this is an action being executed, send a message to the executor
+
+            self.tp["0-start-dummy init"] = ["dummy init","past"]
+            self.executedTp["0"] = 0
+
+            #Tps can be added/removed by the reparation
+            #if self.oldTp is not None and self.tp != self.oldTp:
+            #    logger.info("When importing a new plan : Old tp was %s\n New tp is %s" %(self.oldTp, self.tp))
+
+            if self.oldExecutedTp is not None and self.executedTp != self.oldExecutedTp:
+                logger.warning("Error when importing a new plan : Old executedTp was %s\n New executedTp is %s" %(self.oldExecutedTp, self.executedTp))
 
         self.stnUpdated({"init" : self.plan.stn.export()})
         self.visuUpdate()
@@ -369,13 +383,15 @@ class Supervisor(threading.Thread):
 
             # Finish every action currently being executed
             for a in self.plan.actions.values():
-                if self.isResponsibleForAction(a) and a["tStart"] in self.executedTp and a["tEnd"] not in self.executedTp:
+                if (a["name"],a["startTp"],a["endTp"]) in self.ongoingActions:
+    
                     self.outQueue.put({"type":"stopAction", "action":copy(a), "time":self.getCurrentTime()})
                     try:
-                        self.executeTp(a["tEnd"])
+                        #self.executeTp(a["tEnd"])
+                        self.endAction({"action":a, "tp":a["tEnd"], "time":self.getCurrentTime(), "report":None})
                     except ExecutionFailed:
                         pass #Do not trigger a repair : must pursue the target
-
+    
             self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
 
             #TODO : find any running agent in com range
@@ -596,6 +612,11 @@ class Supervisor(threading.Thread):
             else:
                 logger.warning("Dealing with the death of %s" % data["robot"])
                 self.agentsDead.append(data["robot"])
+                
+                #Assume its last tp is executed to enable the correct ending of the plan
+                v = self.getCurrentTime()
+                self.tp["1-end-%s" % data["robot"]][1] = "past"
+                self.executedTp = v
                 raise ExecutionFailed("Received an alea of type robotDead")
         elif aleaType == "targetFound":
             targetPos = data.get("position", None)
