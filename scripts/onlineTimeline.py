@@ -191,6 +191,6 @@ if __name__ == "__main__":
 
     timer = QTimer()
     timer.timeout.connect(window.plotResults)
-    timer.start(1000)
+    timer.start(3000)
     
     app.exec_()
