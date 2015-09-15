@@ -77,7 +77,7 @@ class Supervisor(threading.Thread):
         
         self.init(planStr, agent)
         
-    
+        self.visuUpdate()
         
     def init(self, planStr, agent):
         with self.mutex:
@@ -165,7 +165,6 @@ class Supervisor(threading.Thread):
                 logger.warning("Error when importing a new plan : Old executedTp was %s\n New executedTp is %s" %(self.oldExecutedTp, self.executedTp))
 
         self.stnUpdated({"init" : self.plan.stn.export()})
-        self.visuUpdate()
     
     def onMissionStart(self):
         pass
@@ -177,7 +176,7 @@ class Supervisor(threading.Thread):
         else:
             self.sendVisuUpdate()
             if not self.stopEvent.is_set():
-                threading.Timer(1, self.visuUpdate).start() #re-run it in 1 second
+                threading.Timer(5, self.visuUpdate).start() #re-run it in 1 second
 
     def setTimePoint(self, tpName, value):
         return self.plan.setTimePoint(tpName, value, cbStnUpdated=self.stnUpdated)
