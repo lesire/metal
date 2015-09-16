@@ -772,7 +772,7 @@ class Supervisor(threading.Thread):
                            "-I " + pinitFile,
                            "--agents {agents}".format(agents="_".join(agents)),
                            "-P hadd_time_lifo",
-                           "-A areuse_motion_nocostmotion",
+                           "-A areuse_motion",#"-A areuse_motion_nocostmotion",
                            "-F local_openEarliestMostCostFirst_motionLast",
                            "-O " + planPDDLFile,
                            "-o " + planFile,
