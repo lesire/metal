@@ -92,7 +92,6 @@ class Supervisor(threading.Thread):
                 logger.error(str(e))
                 #logger.error("Error when trying to import this plan : %s" % planStr)
             
-            
             self.oldExecutedTp = deepcopy(self.executedTp)
             self.oldTp = deepcopy(self.tp)
 
@@ -156,6 +155,7 @@ class Supervisor(threading.Thread):
 
             self.tp["0-start-dummy init"] = ["dummy init","past"]
             self.executedTp["0"] = 0
+            if self.oldExecutedTp is not None: self.oldExecutedTp = {k:v for k,v in self.oldExecutedTp.items() if not k.startswith("1-end")}
 
             #Tps can be added/removed by the reparation
             #if self.oldTp is not None and self.tp != self.oldTp:
@@ -372,10 +372,15 @@ class Supervisor(threading.Thread):
     # targetPos is a dict
     def targetFound(self, data = None, selfDetection = True):
 
+        logger.warning("Got a target found with : %s" % data)
+
         x,y = 0,0
-        if data is not None:
-            x = data.get("target", {}).get("x", 0)
-            y = data.get("target", {}).get("y", 0)
+        if data is not None and "target" in data:
+            x = data.get("target").get("x", 0)
+            y = data.get("target").get("y", 0)
+        elif data is not None and "position" in data:
+            x = data.get("position").get("x",0)
+            y = data.get("position").get("x",0)
 
         if selfDetection:
             self.state = State.TRACKING
@@ -480,9 +485,9 @@ class Supervisor(threading.Thread):
 
         self.executedTp[tp] = value
         self.tp[tp][1] = "past"
-            
+
         self.setTimePoint(tp, value)
-            
+
         if not self.plan.stn.isConsistent():
             logger.error("\tError : invalid STN when finishing execution of tp %s" % tp)
             raise ExecutionFailed("Invalid STN when finishing execution of tp %s" % tp)
@@ -512,7 +517,7 @@ class Supervisor(threading.Thread):
     def dropCommunication(self, comName):
         #if comName in self.droppedComs: return #already done it
     
-        # remove the communicate meta from the pla
+        # remove the communicate meta from the plan
         planJson = self.plan.getJsonDescription()
         
         # match the action also if I'm not the owner
@@ -524,6 +529,8 @@ class Supervisor(threading.Thread):
         if len(l) != 1:
             logger.warning("Tried to drop %s" % comName)
             logger.warning("Could not find a single meta action when dropping a com action : %d" % len(l))
+            
+            self.droppedComs.append(comName) #Assume the com is dropped to prevent flodding this error
             #This can be caused by a reparation that removed a communication so that I don't know about this com anymore
             return
 
@@ -615,11 +622,10 @@ class Supervisor(threading.Thread):
                 #Assume its last tp is executed to enable the correct ending of the plan
                 v = self.getCurrentTime()
                 self.tp["1-end-%s" % data["robot"]][1] = "past"
-                self.executedTp = v
+                self.executedTp["1-end-%s" % data["robot"]] = v
                 raise ExecutionFailed("Received an alea of type robotDead")
         elif aleaType == "targetFound":
-            targetPos = data.get("position", None)
-            self.targetFound(targetPos)
+            self.targetFound(data)
         elif aleaType == "repair":
             logger.error("Repair trigger by an alea received, probably from the operator")
             raise ExecutionFailed("Repair trigger by an alea received, probably from the operator")
@@ -651,7 +657,7 @@ class Supervisor(threading.Thread):
         if self.repairRos:
             self.sendNewStatusMessage("repairRequest")
             
-            time.sleep(2)
+            time.sleep(10)
             
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
             logger.info("Dead agents : %s" % self.agentsDead)
