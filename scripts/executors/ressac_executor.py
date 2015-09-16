@@ -16,6 +16,13 @@ try:
             self.input_port.open("/" + agentName + "/executor/in")
             ROSActionExecutor.__init__(self, agentName)
 
+            self.current_action = None
+            self.cancelled_actions = set()
+
+        def _stop(self, action):
+            self.cancelled_actions.add(action["name"])
+            ROSActionExecutor._stop(self, action)
+
         def __del__(self):
             self.output_port.close()
             self.input_port.close()
@@ -46,6 +53,10 @@ try:
                 import json
                 b = self.input_port.read(False)
                 if b is not None:
+                    if self.current_action in self.cancelled_actions:
+                        self.cancelled_actions.remove(self.current_action)
+                        return
+
                     logger.info("Received report " + b.toString())
                     r = json.loads(b.get(0).toString())
                     self._cb(r["report"])

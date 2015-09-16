@@ -13,6 +13,10 @@ try:
             MORSEActionExecutor.__init__(self)
             ROSActionExecutor.__init__(self, agentName)
 
+        def _stop(self, action):
+            MORSEActionExecutor._stop(self, action)
+            ROSActionExecutor._stop(self, action)
+
         def _get_morse_host(self):
             #Assume morse is running with roscore
             url = os.environ["ROS_MASTER_URI"]

@@ -905,7 +905,7 @@ class Supervisor(threading.Thread):
         try:
             while not self.isExecuted() and self.state != State.DEAD and not self.stopEvent.is_set():
                 with self.mutex:
-                    if self.state == State.RUNNING:
+                    if self.state == State.RUNNING or self.state == State.TRACKING:
                         while not self.inQueue.empty():
                             msg = self.inQueue.get()
             

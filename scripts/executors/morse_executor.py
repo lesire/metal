@@ -10,6 +10,9 @@ class MORSEActionExecutor(AbstractActionExecutor):
 
     def __init__(self, **kwargs):
         self._connected = False
+
+        self.current_action = None
+        self.cancelled_actions = set()
         logger.info("MORSE executor initialized")
 
     def _get_morse_host(self):
@@ -26,6 +29,14 @@ class MORSEActionExecutor(AbstractActionExecutor):
         except Exception as e:
             pass
 
+    def _stop(self, action):
+        if action["name"].split(" ")[0] == "move":
+            if self.current_action is not None:
+                logger.info("Cancelling the current action")
+                self.current_action.cancel()
+
+            self.cancelled_actions.add(action["name"])
+
     def __del__(self):
         del self.morse
 
@@ -39,9 +50,13 @@ class MORSEActionExecutor(AbstractActionExecutor):
             goto_action = agent.waypoint.goto(x, y, 0.0, 3, 0.5)
         return goto_action
 
-    def action_done(self, cb, evt):
-        logger.debug("Action done {e}".format(e=evt))
-        cb("ok")
+    def action_done(self, cb, name, evt):
+        logger.info("Action done {e}. Name : {name}.".format(e=evt,name=name))
+        if name in self.cancelled_actions:
+            logger.info("It was canceled : do not call the callback")
+            self.cancelled_actions.remove(name)
+        else:
+            cb("ok")
     
     def move(self, who, a, b, cb, **kwargs):
         coords = b.split("_")[1:]
@@ -51,7 +66,8 @@ class MORSEActionExecutor(AbstractActionExecutor):
         logger.info("moving {w} from {a} to {b}".format(w=who,a=a,b=str(coords)))
         goto_action = self._goto(int(coords[0])/100, int(coords[1])/100)
 
-        goto_action.add_done_callback(partial(self.action_done, cb))
+        goto_action.add_done_callback(partial(self.action_done, cb, "move %s %s %s" %(who,a,b)))
+        self.current_action = goto_action
 
     def observe(self, who, point, observation, cb, **kwargs):
         cb("ok")

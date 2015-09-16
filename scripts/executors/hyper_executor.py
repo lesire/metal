@@ -1,6 +1,7 @@
 import logging; logger = logging.getLogger("hidden")
 import re
 import json
+import time
 
 try:
     from .ros_executor import ROSActionExecutor
@@ -21,6 +22,17 @@ try:
             self.hasSeenTarget = False
 
             ROSActionExecutor.__init__(self, agentName)
+
+        def _stop(self, action):
+            if action["name"].split(" ") == "move":
+                logger.info("Stopping current action")
+                action = {"action":"stop"}
+                self._sendCommand(action)
+                logger.info("Stop done")
+
+                self.cb = (lambda status : logger.info("Notified of the end of a cancelled task"))
+
+            ROSActionExecutor._stop(self, action)
 
         def __del__(self):
             self.output_port.close()
@@ -83,7 +95,6 @@ try:
                 action = {"action":"stop"}
                 self._sendCommand(action)
                 logger.info("Stop done")
-                import time
                 time.sleep(1)
                 logger.info("moving to target")
                 action = {'action': 'goto', 'waypoint': {'x': float(x), 'y': float(y)}}

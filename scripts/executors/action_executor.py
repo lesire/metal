@@ -28,7 +28,6 @@ class AbstractActionExecutor:
             logger.warning("Stopping an uncontrollable action : %s" % action)
 
         if "_stop" in dir(self):
-
             self._stop(action)
         else:
             logger.info("Stopping %s" % action["name"])
@@ -54,7 +53,12 @@ class DummyActionExecutor(AbstractActionExecutor):
         self.agent = agentName
         self.pos = {}
         self.nextReport = None
-        
+
+    def _stop(self, action):
+        for i in reversed(range(len(self.nextEvents))):
+            if self.nextEvents[i]["actionJson"]["name"] == action["name"]:
+                del self.nextEvents[i]
+
     def init(self, who, a, cb, actionJson, **kwargs):
         dur = actionJson["dMin"]
         logger.info("Init {w} at {a} in {d}".format(w=who,a=a,d=dur))

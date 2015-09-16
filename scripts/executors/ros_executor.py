@@ -71,6 +71,8 @@ try:
                 elif "communicate" in action["name"]:
                     self._current_msg = None
 
+            DummyActionExecutor._stop(self, action)
+
         def _receiveCom(self, msg):
             if msg.header.receiver != self.name: return # not for me
             
