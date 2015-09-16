@@ -116,6 +116,10 @@ class SupervisorRos(Supervisor):
             logger.error("Invalid call to sendNewStatusMessage. Type : %s" % type)
 
     def repairCallback(self, data):
+        if self.state == State.DEAD:
+            self.repair_sub.unregister()
+            return
+
         type = data.type
         time = data.time
         sender = data.sender
@@ -268,6 +272,10 @@ class SupervisorRos(Supervisor):
                 self.mastn_pub.publish(u)
 
     def mastnUpdate(self, data):
+        if self.state == State.DEAD:
+            self.mastn_sub.unregister()
+            return
+
         if data._connection_header["callerid"] == rospy.get_name():
             return
 
