@@ -23,7 +23,7 @@ def enum(*sequential, **named):
     enums['reverse_mapping'] = reverse
     return type('Enum', (), enums)
 
-State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "DEAD", "DONE", "ERROR")
+State = enum("INIT", "RUNNING", "REPAIRINGACTIVE", "REPAIRINGPASSIVE", "TRACKING", "TRACKINGCONFIRMATION", "DEAD", "DONE", "ERROR")
 
 
 #re-implement the subprocess.call method with a timeout for compatibilty with Python3.2. Taken from Python3.4 source code
@@ -74,6 +74,8 @@ class Supervisor(threading.Thread):
 
         self.executedTp = None
         self.tp = None
+        
+        self.targetData = None #Used to store the target position when waiting for a confirmation
         
         self.init(planStr, agent)
         
@@ -370,7 +372,7 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("Invalid STN when launching execution of %s" % action["name"])
 
     # targetPos is a dict
-    def targetFound(self, data = None, selfDetection = True):
+    def targetFound(self, data = None, selfDetection = True, mustTrack = False):
 
         logger.warning("Got a target found with : %s" % data)
 
@@ -382,7 +384,7 @@ class Supervisor(threading.Thread):
             x = data.get("position").get("x",0)
             y = data.get("position").get("x",0)
 
-        if selfDetection:
+        if selfDetection or mustTrack:
             self.state = State.TRACKING
 
             # Finish every action currently being executed
@@ -396,18 +398,24 @@ class Supervisor(threading.Thread):
                     except ExecutionFailed:
                         pass #Do not trigger a repair : must pursue the target
     
+            logger.info("Sending a track action")
             self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
 
-            #TODO : find any running agent in com range
-            if self.agent != "ressac1":
-                data = {"target": {"x":x,"y":y}, "repairingRobot":"ressac1"}
-            else:
-                data = {"target": {"x":x,"y":y}}
-
-            self.sendNewStatusMessage("targetFound", json.dumps(data))
+            if selfDetection:
+                #TODO : find any running agent in com range
+                if self.agent != "ressac1":
+                    data = {"target": {"x":x,"y":y}, "repairingRobot":"ressac1"}
+                else:
+                    data = {"target": {"x":x,"y":y}}
+                
+                logger.info("Sending a targetFound to other robots")
+                self.sendNewStatusMessage("targetFound", json.dumps(data))
         else:
-            if "repairingRobot" in data and self.agent == data["repairingRobot"]:
-                self.triggerRepair = True
+            #if "repairingRobot" in data and self.agent == data["repairingRobot"]:
+            #    self.triggerRepair = True
+            logger.info("Another robot has detected a target at (%s,%s)" %(x,y))
+            self.state = State.TRACKINGCONFIRMATION
+            self.targetData = data
             pass # Do nothing here, the one detecting it will deal with it
 
     def endAction(self, msg):
@@ -458,6 +466,11 @@ class Supervisor(threading.Thread):
             return #probably a com action that was cancelled
 
         logger.info("End of action %s at %s. Status of the tp : %s" % (action["name"], value, self.tp[tp][1]))
+        
+        if self.tp[tp][1] == "past" and tp in self.executedTp:
+            # Action is already finished. Assume it was cancelled.
+            logger.warning("Ignoring the report the the end of %s. Action is probably already finished" % action["name"])
+            return
         
         #check the scheduled duration of the action
         startTime = self.plan.stn.getBounds(action["tStart"]).lb

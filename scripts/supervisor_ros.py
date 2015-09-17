@@ -77,7 +77,15 @@ class SupervisorRos(Supervisor):
             if s not in dir(State):
                 logger.error("State %s is unknown" % s)
                 return False
-            self.state = getattr(State, s)
+            
+            if self.state == State.TRACKINGCONFIRMATION and s == "TRACKING":
+                self.targetFound(self.targetData, selfDetection=False, mustTrack=True)
+            elif self.state == State.TRACKINGCONFIRMATION and s == "REPAIRINGACTIVE":
+                self.triggerRepair = True
+            else:
+                self.state = getattr(State, s)
+            
+            
             return True
         elif msg.aleaType == "sendMastn":
             if not self.plan.stn.isConsistent():
@@ -148,7 +156,7 @@ class SupervisorRos(Supervisor):
                 p["state"] = "tracking"
                 self.sendNewStatusMessage("repairResponse", json.dumps(p))
                 return
-            elif self.state != State.RUNNING:
+            elif self.state != State.RUNNING and self.state != State.TRACKINGCONFIRMATION:
                 logger.error("Received a repair request not when running. Ignoring it")
                 return
             
