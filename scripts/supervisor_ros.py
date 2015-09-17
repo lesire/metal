@@ -276,6 +276,8 @@ class SupervisorRos(Supervisor):
                 u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
 
                 u.droppedComs = self.droppedComs
+                
+                u.deadRobots = self.agentsDead
 
                 self.mastn_pub.publish(u)
 
@@ -293,7 +295,11 @@ class SupervisorRos(Supervisor):
             for c in data.droppedComs:
                 if c not in self.droppedComs:
                     self.dropCommunication(c)
-    
+
+            for r in data.deadRobots:
+                if r not in self.agentsDead:
+                    self.agentsDead.append(r)
+
             cl = pystn.ConstraintListL()
             dataStnUpdate = []
             for a in data.arcs:
