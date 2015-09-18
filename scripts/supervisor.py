@@ -76,6 +76,7 @@ class Supervisor(threading.Thread):
         self.tp = None
         
         self.targetData = None #Used to store the target position when waiting for a confirmation
+        self.newPlanToImport = None #Used to store the plan to import when a planSync is launched
         
         self.init(planStr, agent)
         
@@ -701,7 +702,7 @@ class Supervisor(threading.Thread):
             self.repairResponse[agent] = copy(localPlan)
         
         
-        planJson = plan.Plan.mergeJsonPlans(self.repairResponse)
+        planJson = plan.Plan.mergeJsonPlans(self.repairResponse, idAgent=self.agent)
         planJson["current-time"] = time.time() - self.beginDate
 
         #Remove coordinating action for dead robots
@@ -954,6 +955,11 @@ class Supervisor(threading.Thread):
 
                 if self.triggerRepair:
                     raise ExecutionFailed("repair triggered by a callback : did someone saw a target ?")
+
+                if self.newPlanToImport is not None:
+                    logger.info("Detecting a new plan to import. Importing it")
+                    self.init(self.newPlanToImport, self.agent)
+                    self.newPlanToImport = None
 
                 self.stopEvent.wait(0.1)
         except ExecutionFailed as e:

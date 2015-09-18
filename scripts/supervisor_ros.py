@@ -120,6 +120,12 @@ class SupervisorRos(Supervisor):
         elif type == "targetFound":
             logger.info("Sending a target found with data %s" % data)
             self.repair_pub.publish(self.agent, "targetFound", self.getCurrentTime(), data)
+        elif type == "planSyncRequest":
+            logger.info("Sending planSync request")
+            self.repair_pub.publish(self.agent, "planSyncRequest", self.getCurrentTime(), data)
+        elif type == "planSyncResponse":
+            logger.info("Sending planSync response")
+            self.repair_pub.publish(self.agent, "planSyncResponse", self.getCurrentTime(), data)
         else:
             logger.error("Invalid call to sendNewStatusMessage. Type : %s" % type)
 
@@ -184,15 +190,57 @@ class SupervisorRos(Supervisor):
         elif type == "repairDone":
             logger.info("Receiving a new plan to execute from %s" % sender)
             planStr = msg
-            self.init(planStr, self.agent)
+            
+            if self.state in [State.REPAIRINGPASSIVE, State.TRACKING]:
+                self.init(planStr, self.agent)
+            else:
+                logger.warning("I'm not is the right state but I received a new plan. Ignoring it, will sync later if needed")
 
-            if self.state == State.TRACKING:
-                return # Ignore the new plan
+            if self.state == State.REPAIRINGPASSIVE:
+                self.state = State.RUNNING
 
-            self.state = State.RUNNING
             self.sendVisuUpdate()
         elif type == "targetFound":
             self.targetFound(json.loads(msg), selfDetection = False)
+        elif type == "planSyncRequest":
+            self.sendNewStatusMessage("planSyncResponse", json.dumps({"plan":self.plan.getJsonDescription()}))
+        elif type == "planSyncResponse":
+            msg = json.loads(msg)
+            if "plan" not in msg:
+                logger.error("Received an ill-formated planSyncResponse : %s" % msg)
+            otherPlan = msg["plan"]
+            myID = self.plan.ids[-1]
+            otherID = otherPlan["ID"]["value"]
+            if myID == otherID:
+                return
+
+            logger.info("I'm executing plan %s. %s is executing %s" % (self.plan.ids, sender, otherPlan["ID"]))
+            
+            if myID in otherPlan["ID"]["parents"]:
+                logger.info("The other has repaired and I was not notified. I need to update my plan")
+                
+                agents = set([a["agent"] for a in otherPlan["actions"].values() if "agent" in a])
+                
+                logger.info("List of agents in this plan : %s " % agents)
+                plansDict = {}
+                
+                
+                p = Plan(json.dumps(otherPlan), self.agent)
+                for a in agents:
+                    plansDict[a] = p.getLocalJsonPlan(a)
+                plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent) #overwrite the remote plan
+                p = Plan.mergeJsonPlans(plansDict, idAgent = sender)
+                
+                self.newPlanToImport = json.dumps(p)
+                return
+                
+                
+            elif otherID in self.plan.ids:
+                logger.info("I'm more up to date. Do nothing")
+                return
+            else:
+                logger.info("We are not on the same branch : repair the plan")
+                self.triggerRepair = True
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
@@ -244,7 +292,7 @@ class SupervisorRos(Supervisor):
         Supervisor.setTimePoint(self, tp, value)
         
         l = self.plan.getMastnMsg()
-        rospy.logdebug("Updated constraints: %s" % str(l))
+        #rospy.logdebug("Updated constraints: %s" % str(l))
 
         #only send a MaSTN update if the stn is consistent
         if self.plan.stn.isConsistent():
@@ -257,6 +305,9 @@ class SupervisorRos(Supervisor):
             u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
             
             u.droppedComs = self.droppedComs
+
+            u.deadRobots = self.agentsDead
+            u.planId = self.plan.ids[-1]
 
             self.mastn_pub.publish(u)
 
@@ -278,6 +329,7 @@ class SupervisorRos(Supervisor):
                 u.droppedComs = self.droppedComs
                 
                 u.deadRobots = self.agentsDead
+                u.planId = self.plan.ids[-1]
 
                 self.mastn_pub.publish(u)
 
@@ -290,8 +342,13 @@ class SupervisorRos(Supervisor):
             return
 
         with self.mutex:
+            
+            if data.planId != self.plan.ids[-1]:
+                logger.warning("I detect an inconsistency in the plan being executed. Send a plan sync. (%s != %s)" % (data.planId, self.plan.ids[-1]))
+                self.sendNewStatusMessage("planSyncRequest")
+            
             # Check if a com was cancelled
-            logger.debug("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))
+            #logger.info("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))
             for c in data.droppedComs:
                 if c not in self.droppedComs:
                     self.dropCommunication(c)

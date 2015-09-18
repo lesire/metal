@@ -243,6 +243,9 @@ class Plan:
             elif tp.startswith("1-end"):
                 logger.debug("\t%5.2f (%s): %s" % (time/1000, tpName, tp))
 
+        self.ids = d["ID"]["parents"] + [d["ID"]["value"]]
+        logger.info("plan ID : %s" % d["ID"]["value"])
+
     # Called before the plan is used.
     # Do some checks and modification of the initial plan.
     @staticmethod
@@ -267,6 +270,9 @@ class Plan:
                         if t == a["startTp"] or t == a["endTp"]:
                             a["locked"] = True
                             del data["absolute-time"][i]
+    
+        if "ID" not in data:
+            data["ID"] = {"value":0, "parents":[]}
     
         return data
     
@@ -460,11 +466,11 @@ class Plan:
         #logger.info("local plan for %s : %s" % (agent,data))
         return data
 
-    # get a dictionnary of plan with agent as a key.
+    # get a dictionnary of plan with agent as a key. Given plan sould be local
     # Index of actions and tps are assumed to be in the same 'namespace'
     # special case for "dead" robots : remove their actions and the link using them
     @staticmethod
-    def mergeJsonPlans(data):
+    def mergeJsonPlans(data, idAgent=None):
         #Check for consistency
         for agent1,agent2 in itertools.combinations(data.keys(),2):
             actionKeys1 = set(data[agent1]["actions"].keys())
@@ -521,6 +527,11 @@ class Plan:
                 
             for tp,value in plan["absolute-time"]:
                 result["absolute-time"].append([tp,value])
+        
+        if idAgent is None:
+            result["ID"] = data[list(data.keys()[0])]["ID"] # take a random ID among the plans
+        else:
+            result["ID"] = data[idAgent]["ID"]
         
         return result
 
