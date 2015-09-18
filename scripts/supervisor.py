@@ -783,6 +783,7 @@ class Supervisor(threading.Thread):
                            "-u",
                            "-H " + helperFile,
                            "-I " + pinitFile,
+                           "--timeout 60 --timeoutRepair 30",
                            "--agents {agents}".format(agents="_".join(agents)),
                            "-P hadd_time_lifo",
                            "-A areuse_motion",#"-A areuse_motion_nocostmotion",
@@ -810,6 +811,19 @@ class Supervisor(threading.Thread):
             logger.error("During reparation : hipop timeout")
             return None
         
+        #If failed a first time, try the fast mode
+        if r != 0:
+            logger.error("During the reparation hipop returned %s. Cannot repair." % r)
+            if r == 1:
+                logger.error("No solution was found by hipop. Trying fast mode")
+                command = command.replace("hipop ", "hipop -f ")
+                r = call(command.split(" "), stdout=outputFile, stderr= subprocess.STDOUT, timeout = 30)
+            else:
+                outputFile.seek(0)
+                for l in outputFile.readlines():
+                    logger.error(l.replace("\n",""))
+                return None
+        
         if(r == 0):
             with open(planFile) as f:
                 planStr = " ".join(f.readlines())
@@ -818,7 +832,7 @@ class Supervisor(threading.Thread):
             return planStr
 
         else:
-            logger.error("During the reparation hipop returned %s. Cannot repair." % r)
+            logger.error("During the second reparation hipop returned %s. Cannot repair." % r)
             if r == 1:
                 logger.error("No solution was found by hipop")
             outputFile.seek(0)
