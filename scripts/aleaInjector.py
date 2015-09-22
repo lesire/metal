@@ -36,39 +36,43 @@ def getServices():
 data = {}
 
 def launch(m):
-    logger.info("Reveived start message")
+    rospy.loginfo("Reveived start message")
     
     getServices()
-    logger.info("Got agents %d agents: %s" % (len(aleaServices), " ".join(aleaServices.keys())))
+    rospy.loginfo("Got agents %d agents: %s" % (len(aleaServices), " ".join(aleaServices.keys())))
     
     if len(data) == 0:
-        logger.info("No alea to inject")
+        rospy.loginfo("No alea to inject")
         rospy.signal_shutdown("Nothing to do")
         return
     
     for d in data.values():
+        if "type" not in d or "to" not in d or "data" not in d or "date" not in d:
+            rospy.logerr("Ill formated alea : %s" % d)
+            continue
+        
         if d["to"] == "vnet":
             #assume d is like {"to":"vnet", "type":"add", "date":10, data":{"src":"mana", "tgt":"minnie", ...}}
 
             def cb(d):
-                logger.info("Calling /vnet/%s with %s" % (d["type"], d["data"]))
+                rospy.loginfo("Calling /vnet/%s with %s" % (d["type"], d["data"]))
                 pub = rospy.Publisher("/vnet/%s" % d["type"], String, queue_size=10, latch=True)
                 pub.publish(json.dumps(d["data"]))
             Timer(d["date"], partial(cb, copy(d))).start()
 
         elif d["to"] not in aleaServices:
-            logger.error("Unknown robot : %s. I know %s" % (d["to"], " ".join(aleaServices.keys())))
+            rospy.logerr("Unknown robot : %s. I know %s" % (d["to"], " ".join(aleaServices.keys())))
             continue
         else:
 
-            if d["type"] in ["sendMastn", "repair"]:
+            if d["type"] in ["sendMastn", "state", "repair"]:
                 def cb(d):
-                    logger.info("Calling sup %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
+                    rospy.loginfo("Calling sup %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
                     aleaSupServices[d["to"]](d["type"], json.dumps(d["data"]))
                 Timer(d["date"], partial(cb, copy(d))).start()
             else:
                 def cb(d):
-                    logger.info("Calling exec %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
+                    rospy.loginfo("Calling exec %s for an alea of type %s with %s" % (d["to"], d["type"], d["data"]))
                     aleaServices[d["to"]](d["type"], json.dumps(d["data"]))
                 Timer(d["date"], partial(cb, copy(d))).start()
         
@@ -99,17 +103,17 @@ def main(argv):
     if args.aleaFile is not None:
         #read it from file
         data = json.load(args.aleaFile)
-        logger.info("Aleas read from the given file")
+        rospy.loginfo("Aleas read from the given file")
     elif rospy.has_param("/hidden/aleas"):
         #get it from ros
         data = json.loads(rospy.get_param("/hidden/aleas"))
-        logger.info("Aleas read from the parameter server")
+        rospy.loginfo("Aleas read from the parameter server")
     else:
-        logger.error("No aleas given : nothing read from file or from the ros server")
+        rospy.logerr("No aleas given : nothing read from file or from the ros server")
 
     rospy.Subscriber("/hidden/start", Empty, launch, queue_size = 1 )
 
-    logger.info("Alea injector module started")
+    rospy.loginfo("Alea injector module started")
     
     if sys.version_info >= (3,4):
         threading.main_thread().setName("%delay")

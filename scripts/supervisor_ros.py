@@ -2,6 +2,7 @@ import logging; logger = logging.getLogger("hidden")
 
 from copy import copy
 
+import time
 import pystn
 import rospy
 import json
@@ -33,6 +34,7 @@ class SupervisorRos(Supervisor):
         Supervisor.__init__(self, inQueue, outQueue, planStr, startEvent, stopEvent, agent, pddlFiles)
        
         self.repairRos = True
+        self.lastPlanSync = time.time()
 
         if rospy.has_param("/hidden/ubForCom"):
             f = float(rospy.get_param("/hidden/ubForCom"))
@@ -68,7 +70,7 @@ class SupervisorRos(Supervisor):
             return False
         
         if msg.aleaType == "state":
-            logger.info("Changing the current state due to a message reveived on the alea topic")
+            logger.info("Changing the current state due to a message reveived on the alea topic to %s" % data["state"])
             s = data["state"]
             if not isinstance(s, str):
                 logger.error("state field is not a string : " % data)
@@ -203,44 +205,14 @@ class SupervisorRos(Supervisor):
         elif type == "targetFound":
             self.targetFound(json.loads(msg), selfDetection = False)
         elif type == "planSyncRequest":
-            self.sendNewStatusMessage("planSyncResponse", json.dumps({"plan":self.plan.getJsonDescription()}))
+            self.receivePlanSyncRequest(sender)
         elif type == "planSyncResponse":
             msg = json.loads(msg)
             if "plan" not in msg:
                 logger.error("Received an ill-formated planSyncResponse : %s" % msg)
             otherPlan = msg["plan"]
-            myID = self.plan.ids[-1]
-            otherID = otherPlan["ID"]["value"]
-            if myID == otherID:
-                return
-
-            logger.info("I'm executing plan %s. %s is executing %s" % (self.plan.ids, sender, otherPlan["ID"]))
             
-            if myID in otherPlan["ID"]["parents"]:
-                logger.info("The other has repaired and I was not notified. I need to update my plan")
-                
-                agents = set([a["agent"] for a in otherPlan["actions"].values() if "agent" in a])
-                
-                logger.info("List of agents in this plan : %s " % agents)
-                plansDict = {}
-                
-                
-                p = Plan(json.dumps(otherPlan), self.agent)
-                for a in agents:
-                    plansDict[a] = p.getLocalJsonPlan(a)
-                plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent) #overwrite the remote plan
-                p = Plan.mergeJsonPlans(plansDict, idAgent = sender)
-                
-                self.newPlanToImport = json.dumps(p)
-                return
-                
-                
-            elif otherID in self.plan.ids:
-                logger.info("I'm more up to date. Do nothing")
-                return
-            else:
-                logger.info("We are not on the same branch : repair the plan")
-                self.triggerRepair = True
+            self.receivePlanSyncResponse(sender, otherPlan)
         else:
             logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
@@ -311,6 +283,62 @@ class SupervisorRos(Supervisor):
 
             self.mastn_pub.publish(u)
 
+    def startPlanSync(self):
+        if self.lastPlanSync - time.time() < 5:
+            return #Do nothing, an update from less than 5 seconds exists
+        
+        self.lastPlanSync = time.time()
+        self.sendNewStatusMessage("planSyncRequest")
+        
+    def receivePlanSyncRequest(self, sender):
+        if self.lastPlanSync - time.time() < 5 and sender!=self.agent:
+            return #Do nothing, an update from less than 5 seconds exists
+
+        self.lastPlanSync = time.time()
+        self.sendNewStatusMessage("planSyncResponse", json.dumps({"plan":self.plan.getJsonDescription()}))
+
+
+    def receivePlanSyncResponse(self, sender, otherPlan):
+        myID = self.plan.ids[-1]
+        otherID = otherPlan["ID"]["value"]
+        if myID == otherID:
+            return
+
+        logger.info("I'm executing plan %s. %s is executing %s" % (self.plan.ids, sender, otherPlan["ID"]))
+        
+        if self.newPlanToImport is not None:
+            newID = json.loads(self.newPlanToImport)["ID"]["value"]
+            if newID != otherID:
+                logger.warning("I'm executing %s. I received a new plan %s and a previous plan %s. Ignoring this one" % (myID,otherID,newID))
+            else:
+                logger.info("Ignoring this plan since I have already ask for its use")
+        
+        if myID in otherPlan["ID"]["parents"]:
+            logger.info("The other has repaired and I was not notified. I need to update my plan")
+            
+            agents = set([a["agent"] for a in otherPlan["actions"].values() if "agent" in a])
+            
+            logger.info("List of agents in this plan : %s " % agents)
+            plansDict = {}
+            
+            with self.mutex:
+                p = Plan(json.dumps(otherPlan), self.agent)
+                for a in agents:
+                    plansDict[a] = p.getLocalJsonPlan(a)
+                plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent) #overwrite the remote plan
+                p = Plan.mergeJsonPlans(plansDict, idAgent = sender)
+                
+                self.newPlanToImport = json.dumps(p)
+            return
+            
+            
+        elif otherID in self.plan.ids:
+            logger.info("I'm more up to date. Do nothing")
+            return
+        else:
+            logger.info("We are not on the same branch : repair the plan")
+            self.triggerRepair = True
+    
     def sendFullMastnUpdate(self):
         with self.mutex:
             #only send a MaSTN update if the stn is consistent
@@ -345,7 +373,8 @@ class SupervisorRos(Supervisor):
             
             if data.planId != self.plan.ids[-1]:
                 logger.warning("I detect an inconsistency in the plan being executed. Send a plan sync. (%s != %s)" % (data.planId, self.plan.ids[-1]))
-                self.sendNewStatusMessage("planSyncRequest")
+                self.startPlanSync()
+                
             
             # Check if a com was cancelled
             #logger.info("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))

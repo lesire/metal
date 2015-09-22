@@ -21,6 +21,10 @@ import rosbag
 from std_msgs.msg import Empty, String
 from metal.msg import StnVisu
 
+sh = logging.StreamHandler()
+sh.setFormatter(logging.Formatter('%(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
+logger.addHandler(sh)
+
 class InputError(Exception):
     pass
 
@@ -200,7 +204,7 @@ def runBenchmark(missionDir, aleaFiles, outputDir = None, maxJobs = 1, vnet = Fa
 
     inputs = []
     for i,alea in enumerate(aleaFiles):
-        inputs.append({"missionDir" : missionDir, "aleaFile" :  alea, "outputDir":os.path.join(outputDir, "simu_%d" % i)})
+        inputs.append({"missionDir" : missionDir, "aleaFile" :  os.path.abspath(alea), "outputDir":os.path.join(outputDir, "simu_%d" % i)})
     runParallelSimu(inputs, maxJobs=maxJobs, vnet=vnet)
     
     logger.info("Done with this benchmark : %s" % outputDir)
@@ -220,37 +224,68 @@ def parseBenchmark(outputDir):
                 data = json.load(f)
                 
             results[dir] = data
-            
-    logger.info("Found %s runs" % len(results))
-    
-    i = len([v for v in results.values() if v["success"]])
-    logger.info("Found %d successes : %.2f%%" % (i, 100*i/len(results)))
-    
-    lengths = [v["finishTime"] for v in results.values() if v["success"]]
-    m = mean(lengths)
-    logger.info("Mean time (for the sucessful missions) : %.2f" % (m))
-    
-    lengths = [(v["finishTime"]/v["nominalTime"] - 1) for v in results.values() if v["success"]]
-    m = mean(lengths)
-    logger.info("Mean increase of time (for the sucessful missions) : %.2f%%" % (100*m))
-    
-    lengths = [v["obsPoints"]["nbr"] for v in results.values() if v["success"]]
-    m = mean(lengths)
-    logger.info("Mean number of points explored (for the sucessful missions) : %.2f" % (m))
-    
-    lengths = [v["obsPoints"]["ratio"] for v in results.values() if v["success"]]
-    m = mean(lengths)
-    logger.info("Mean percentage of points explored (for the sucessful missions) : %.2f%%" % (100*m))
-    
-    lengths = [v["repair"]["requestNbr"] for v in results.values() if v["success"]]
-    m = mean(lengths)
-    logger.info("Mean number of repair requests (for the sucessful missions) : %.2f" % (m))
-    
-    lengths = [v["repair"]["totalTime"] for v in results.values() if v["success"]]
-    m = mean(lengths)
-    logger.info("Mean time taken to repair the plan (sec) (for the sucessful missions) : %.2f" % (m/1000))
 
-    pass
+    with open(os.path.join(outputDir, "result.json"), "w") as f:
+        def printAndOutput(s):
+            logger.info(s)
+            f.write(s + "\n")
+            
+        printAndOutput("Found %s runs" % len(results))
+        
+        i = len([v for v in results.values() if v["success"]])
+        printAndOutput("Found %d successes : %.2f%%" % (i, 100*i/len(results)))
+        
+        lengths = [v["finishTime"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean time (for the sucessful missions) : %.2f" % (m))
+        
+        lengths = [(v["finishTime"]/v["nominalTime"] - 1) for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean increase of time (for the sucessful missions) : %.2f%%" % (100*m))
+        
+        lengths = [v["obsPoints"]["nbr"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of points explored (for the sucessful missions) : %.2f" % (m))
+        
+        lengths = [v["obsPoints"]["ratio"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean percentage of points explored (for the sucessful missions) : %.2f%%" % (100*m))
+        
+        lengths = [v["coms"]["nbr"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of coms (for the sucessful missions) : %.2f" % (m))
+        
+        lengths = [v["coms"]["ratio"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean percentage of coms (for the sucessful missions) : %.2f%%" % (100*m))
+        
+        lengths = [v["repair"]["requestNbr"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of repair requests (for the sucessful missions) : %.2f" % (m))
+        
+        lengths = [v["repair"]["totalTime"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean time taken to repair the plan (sec) (for the sucessful missions) : %.2f" % (m/1000))
+        
+        lengths = [v["vNet"]["nbrForwarded"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of forwarded messages : %.2f" % (m))
+        
+        lengths = [v["vNet"]["nbrPartial"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of partially forwarded messages : %.2f" % (m))
+        
+        lengths = [v["vNet"]["nbrFiltered"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of filtered messages : %.2f" % (m))
+
+        lengths = [v["vNet"]["bandwith"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean bandwith usage : %.2f" % (m))
+        
+        lengths = [v["target"]["nbrTrack"] for v in results.values() if v["success"]]
+        m = mean(lengths)
+        printAndOutput("Mean number of track done : %.2f" % (m))
     
 """
 Parse the ros bag and extract metrics :
@@ -260,14 +295,14 @@ Parse the ros bag and extract metrics :
 """
 def parseSimu(outputDir):
     logger.info("Parsing %s" % outputDir)
-    result = {"obsPoints" : {}, "repair":{}}
+    result = {"obsPoints" : {}, "repair":{}, "coms":{}, "vNet":{}, "target":{}}
     
     if not os.path.exists(os.path.join(outputDir, "stats.bag")):
         logger.error("No simulation ran in %s" % outputDir)
         return
     
     
-    ## Parse the pddl files ##
+    ## Parse the input pddl files ##
     
     missionName = None
     pddlPrb = None
@@ -280,10 +315,15 @@ def parseSimu(outputDir):
     with open(os.path.join(outputDir, "hipop-files", pddlPrb)) as f:
         strPrb = " ".join(f.readlines())
         #TODO : replace("\n", " ")
+    
+    with open(os.path.join(outputDir, "hipop-files", missionName+".pddl")) as f:
+        strPddlPlan = " ".join(f.readlines())
 
     obsPointsNominal = re.findall("(explored [^)]*)", strPrb)
     result["obsPoints"]["nominalNbr"] = len(obsPointsNominal)
-
+    
+    comsNominal = re.findall("(communicate-meta [^)]*)", strPddlPlan)
+    result["coms"]["nominalNbr"] = len(comsNominal)
     
     result["nominalTime"] = getPlanLength(os.path.join(outputDir, "hipop-files", missionName + ".pddl"))
     ## Parse the ros bag ##
@@ -293,18 +333,32 @@ def parseSimu(outputDir):
     try:
         logger.info("Number of messages %s" % bag.get_message_count())
         
+        ###### Parse the actions dones : coms and observation #####
         obsPoints = set()
+        coms = set()
+        targets = []
         for _, msg, _ in bag.read_messages(topics="/hidden/stats"):
             data = json.loads(msg.data)
             
             if data["type"] == "observe":
                 obsPoints.add(data["to"])
+            elif data["type"] == "com":
+                coms.add((data["from"],data["to"]))
+                coms.add((data["to"],data["from"]))
+            elif data["type"] == "track":
+                targets.append((data["x"], data["y"]))
             
             logger.debug(data)
 
         result["obsPoints"]["nbr"] = len(obsPoints)
         result["obsPoints"]["ratio"] = float(result["obsPoints"]["nbr"]) / result["obsPoints"]["nominalNbr"]
 
+        result["coms"]["nbr"] = len(coms)/2 # Both side are in : from->to and to->from
+        result["coms"]["ratio"] = float(result["coms"]["nbr"]) / result["coms"]["nominalNbr"]
+        
+        result["target"]["nbrTrack"] = len(targets)
+
+        ###### Compute the time of the plan based on the state of each robot #####
         hasError = False
         trackingRobots = set()
         agents = {}
@@ -336,33 +390,58 @@ def parseSimu(outputDir):
         if l:
             result["finishTime"] = max(l)
 
+        ###### Parse the repair attemps : number of length #####
         repairRequestNbr = 0
         repairDoneNbr = 0
         repairLengths = []
         repairBegin = None
-        for _,msg,_ in bag.read_messages(topics="/hidden/repair"):
-            if msg.type == "repairRequest":
-                repairRequestNbr += 1
-                repairBegin = int(msg.time)
-            if msg.type == "repairDone":
-                repairDoneNbr += 1
-                if repairBegin is None:
-                    print("Error : repairDone sent before repairRequest ?")
-                else:
-                    repairLengths.append(int(msg.time) - repairBegin)
-                    repairBegin = None
-
+        
+        repairTopics = []
+        for topic in bag.get_type_and_topic_info()[1].keys():
+            if topic.endswith("repair/out"):
+                repairTopics.append(topic)
+        
+        if repairTopics:
+            for _,msg,_ in bag.read_messages(topics=repairTopics):
+                if msg.type == "repairRequest":
+                    repairRequestNbr += 1
+                    repairBegin = int(msg.time)
+                if msg.type == "repairDone":
+                    repairDoneNbr += 1
+                    if repairBegin is None:
+                        print("Error : repairDone sent before repairRequest ?")
+                    else:
+                        repairLengths.append(int(msg.time) - repairBegin)
+                        repairBegin = None
+                        
         result["repair"]["requestNbr"] = repairRequestNbr
         result["repair"]["doneNbr"] = repairDoneNbr
         result["repair"]["lengths"] = repairLengths
         result["repair"]["totalTime"] = sum(repairLengths)
+        
+        ###### Parse the messages that went through vNet #####
+        nbrForwarded, nbrPartial, nbrFiltered = (0,0,0)
+        bandwith = 0
 
+        for _,msg,_ in bag.read_messages(topics="/vnet/statistics"):
+            msg = json.loads(msg.data)
+            if msg["from"] in msg["forwarded"]: msg["forwarded"].remove(msg["from"])
+            
+            if msg["forwarded"] and not msg["filtered"]:
+                nbrForwarded += 1
+                bandwith += int(msg["size"])
+            elif not msg["forwarded"] and msg["filtered"]:
+                nbrFiltered += 1
+                bandwith += int(msg["size"])
+            else:
+                nbrPartial += 1
+        
+        result["vNet"]["nbrForwarded"] = nbrForwarded
+        result["vNet"]["nbrPartial"] = nbrPartial
+        result["vNet"]["nbrFiltered"] = nbrFiltered
+        result["vNet"]["bandwith"] = bandwith
 
-        droppedComs = set()
-        for _,msg,_ in bag.read_messages(topics="/hidden/mastnUpdate"):
-            droppedComs = droppedComs.union(set(msg.droppedComs))
-
-        result["droppedComs"] = len(droppedComs)
+        
 
     finally:
         bag.close()
@@ -386,11 +465,8 @@ def main(argv):
     numeric_level = getattr(logging, args.logLevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % args.logLevel)
-    logger.propagate = False
-    sh = logging.StreamHandler()
+    #logger.propagate = False
     logger.setLevel(numeric_level)
-    sh.setFormatter(logging.Formatter('%(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
-    logger.addHandler(sh)
         
     ## Parse only ##
     if args.parseOnly:

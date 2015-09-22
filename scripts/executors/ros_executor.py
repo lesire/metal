@@ -97,6 +97,8 @@ try:
             
                     if msg.header.reply_expected:
                         self._send_msg()
+                        
+                    self._stats_pub.publish(json.dumps({"type":"com", "from":msg.header.sender, "to":msg.header.receiver}, sort_keys=True))
 
                 else:
                     logger.warning("Received a message that I'm not expecting : %s" % msg.header)
@@ -207,6 +209,10 @@ try:
             t = kwargs.get("time", None)
 
             self._stats_pub.publish(json.dumps({"type":"observe", "by":who, "from":a, "to":b, "time":t}, sort_keys=True))
+
+        def track(self, x, y, cb, *args, **kwargs):
+            super(ROSActionExecutor, self).track(x, y, cb, *args, **kwargs)
+            self._stats_pub.publish(json.dumps({"type":"track", "by":self.agent, "x":x, "y":y}, sort_keys=True))
 
         def stopExecutor(self, time):
             super(ROSActionExecutor, self).stopExecutor(time)

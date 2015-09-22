@@ -149,8 +149,11 @@ class Supervisor(threading.Thread):
     
                 action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
     
-                if action["executed"] and not "dummy init" in action:
-                    #action was executed, this is a past action. Do not consider the method dummy init, only the action itself
+                if action["executed"]:
+                    #action was executed, this is a past action. Do not consider the method dummy init or dummy end, only the action itself
+                    if "dummy init" in action["name"] and action["name"] != "dummy init":continue
+                    if "dummy end"  in action["name"] and action["name"] != "dummy end":continue
+                    
                     self.executedTp[tpName] = value
                     self.tp[tpName][1] = "past"
                 else:
@@ -403,11 +406,7 @@ class Supervisor(threading.Thread):
             self.outQueue.put({"type":"startAction", "action":{"name":"track %s %s" % (x,y), "dMin":1}, "time":self.getCurrentTime()})
 
             if selfDetection:
-                #TODO : find any running agent in com range
-                if self.agent != "ressac1":
-                    data = {"target": {"x":x,"y":y}, "repairingRobot":"ressac1"}
-                else:
-                    data = {"target": {"x":x,"y":y}}
+                data = {"target": {"x":x,"y":y}}
                 
                 logger.info("Sending a targetFound to other robots")
                 self.sendNewStatusMessage("targetFound", json.dumps(data))
@@ -933,6 +932,12 @@ class Supervisor(threading.Thread):
         try:
             while not self.isExecuted() and self.state != State.DEAD and not self.stopEvent.is_set():
                 with self.mutex:
+                    
+                    if self.newPlanToImport is not None:
+                        logger.info("Detecting a new plan to import. Importing it")
+                        self.init(self.newPlanToImport, self.agent)
+                        self.newPlanToImport = None
+                    
                     if self.state == State.RUNNING or self.state == State.TRACKING:
                         while not self.inQueue.empty():
                             msg = self.inQueue.get()
@@ -955,11 +960,6 @@ class Supervisor(threading.Thread):
 
                 if self.triggerRepair:
                     raise ExecutionFailed("repair triggered by a callback : did someone saw a target ?")
-
-                if self.newPlanToImport is not None:
-                    logger.info("Detecting a new plan to import. Importing it")
-                    self.init(self.newPlanToImport, self.agent)
-                    self.newPlanToImport = None
 
                 self.stopEvent.wait(0.1)
         except ExecutionFailed as e:
