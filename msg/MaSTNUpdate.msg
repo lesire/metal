@@ -1,6 +1,8 @@
 Header header
+string sender
 StnArc[] arcs
-string[] executedNodes
+StnTp[] executedNodes
+string[] executedActions
 string[] droppedComs
 string[] deadRobots
 int64 planId

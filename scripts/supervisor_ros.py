@@ -2,13 +2,14 @@ import logging; logger = logging.getLogger("hidden")
 
 from copy import copy
 
+import threading
 import time
 import pystn
 import rospy
 import json
 import sys
 from std_msgs.msg import Empty,String
-from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc
+from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc, StnTp
 from metal.srv import AleaAction
 from supervisor import Supervisor,State
 from plan import Plan
@@ -34,7 +35,8 @@ class SupervisorRos(Supervisor):
         Supervisor.__init__(self, inQueue, outQueue, planStr, startEvent, stopEvent, agent, pddlFiles)
        
         self.repairRos = True
-        self.lastPlanSync = time.time()
+        self.lastPlanSyncRequest = time.time()
+        self.lastPlanSyncResponse = time.time()
 
         if rospy.has_param("/hidden/ubForCom"):
             f = float(rospy.get_param("/hidden/ubForCom"))
@@ -56,6 +58,12 @@ class SupervisorRos(Supervisor):
             f = float(rospy.get_param("/hidden/ubForTrack"))
             logger.info("Setting ubForTrack to %s from the parameter server" % f)
             self.ubForTrack = f
+        
+        def sendRegularMaSTNUpdate():
+            while not rospy.is_shutdown() and self.state != State.DEAD and not self.stopEvent.is_set():
+                self.sendFullMastnUpdate()
+                rospy.sleep(30)
+        threading.Thread(target=sendRegularMaSTNUpdate,name=self.agent+"-mastnbeat").start()
 
     def aleaReceived(self,msg):
         #logger.warning(msg)
@@ -268,76 +276,138 @@ class SupervisorRos(Supervisor):
 
         #only send a MaSTN update if the stn is consistent
         if self.plan.stn.isConsistent():
-            u = MaSTNUpdate()
-            u.header.stamp = rospy.Time.now()
-            for a in l:
-                u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
-
-            u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
-            u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
             
-            u.droppedComs = self.droppedComs
-
-            u.deadRobots = self.agentsDead
-            u.planId = self.plan.ids[-1]
-
-            self.mastn_pub.publish(u)
+            arcs = []
+            for a in l:
+                arcs.append(StnArc(a[0], a[1], a[2], a[3]))
+                
+            self.sendMastnUpdate(arcs)
 
     def startPlanSync(self):
-        if self.lastPlanSync - time.time() < 5:
+        if time.time() - self.lastPlanSyncRequest < 5:
+            logger.info("Do not send a planSync request. Last update was requested at %d, %d seconds before" % (self.lastPlanSyncRequest, time.time() - self.lastPlanSyncRequest))
             return #Do nothing, an update from less than 5 seconds exists
         
-        self.lastPlanSync = time.time()
+        self.lastPlanSyncRequest = time.time()
         self.sendNewStatusMessage("planSyncRequest")
         
     def receivePlanSyncRequest(self, sender):
-        if self.lastPlanSync - time.time() < 5 and sender!=self.agent:
+        if time.time() - self.lastPlanSyncResponse < 5:
+            logger.info("Do not send a planSync response. Last update was requested at %d, %d seconds before" % (self.lastPlanSyncResponse, time.time() - self.lastPlanSyncResponse))
             return #Do nothing, an update from less than 5 seconds exists
 
-        self.lastPlanSync = time.time()
+        self.lastPlanSyncResponse = time.time()
         self.sendNewStatusMessage("planSyncResponse", json.dumps({"plan":self.plan.getJsonDescription()}))
 
 
     def receivePlanSyncResponse(self, sender, otherPlan):
-        myID = self.plan.ids[-1]
-        otherID = otherPlan["ID"]["value"]
-        if myID == otherID:
-            return
+        with self.mutex:
+            myID = self.plan.ids[-1]
+            otherID = otherPlan["ID"]["value"]
+            if myID == otherID:
+                return
 
-        logger.info("I'm executing plan %s. %s is executing %s" % (self.plan.ids, sender, otherPlan["ID"]))
-        
-        if self.newPlanToImport is not None:
-            newID = json.loads(self.newPlanToImport)["ID"]["value"]
-            if newID != otherID:
-                logger.warning("I'm executing %s. I received a new plan %s and a previous plan %s. Ignoring this one" % (myID,otherID,newID))
-            else:
-                logger.info("Ignoring this plan since I have already ask for its use")
-        
-        if myID in otherPlan["ID"]["parents"]:
-            logger.info("The other has repaired and I was not notified. I need to update my plan")
+            logger.info("I'm executing plan %s. %s is executing %s" % (self.plan.ids, sender, otherPlan["ID"]))
             
-            agents = set([a["agent"] for a in otherPlan["actions"].values() if "agent" in a])
-            
-            logger.info("List of agents in this plan : %s " % agents)
-            plansDict = {}
-            
-            with self.mutex:
+            if self.newPlanToImport is not None:
+                newID = json.loads(self.newPlanToImport)["ID"]["value"]
+                if newID != otherID:
+                    logger.warning("I'm executing %s. I received a new plan %s and a previous plan %s. Ignoring this one" % (myID,otherID,newID))
+                else:
+                    logger.info("Ignoring this plan since I have already ask for its use")
+                return
+
+            if myID in otherPlan["ID"]["parents"]:
+                logger.info("The other has repaired and I was not notified. I need to update my plan")
+                
+                agents = set([a["agent"] for a in otherPlan["actions"].values() if "agent" in a])
+                
+                logger.info("List of agents in this plan : %s " % agents)
+                plansDict = {}
+                
                 p = Plan(json.dumps(otherPlan), self.agent)
+                
+                #Check that all my communications are still in the plan
+                droppedComs = set()
+                for k,a in self.plan.actions.items():
+                    if a["agent"] == self.agent:
+                        if k in p.actions and a["name"] == p.actions[k]["name"]:
+                            continue #Ok, my action is still here
+                        elif k not in p.actions and "communicate" in a["name"]:
+                            #self.dropCommunication(a["name"])
+                            droppedComs.add(a["name"])
+                        else:
+                            logger.error("My action %s (%s) is not in the new plan" % (a["name"],k))
+                
+                for k,a in p.actions.items():
+                    if a["agent"] == self.agent:
+                        if k in self.plan.actions and a["name"] == self.plan.actions[k]["name"]:
+                            continue #Ok, my action is still here
+                        else:
+                            logger.error("They added an action for me %s (%s)" % (a["name"],k))
+                            for k1,a1 in self.plan.actions.items():
+                                if a1["name"] == a["name"]: logger.error("I have this action with key %s" % k1)
+                
+                for k,a in self.plan.actions.items():
+                    if "communicate-meta" in a["name"] and k not in p.actions:
+                        droppedComs.add(a["name"])
+                
+                for c in droppedComs:
+                    self.dropCommunication(c)
+                
                 for a in agents:
-                    plansDict[a] = p.getLocalJsonPlan(a)
-                plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent) #overwrite the remote plan
+                    if a != self.agent:
+                        plansDict[a] = p.getLocalJsonPlan(a)
+                plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent, currentTime=(time.time() - self.beginDate))
                 p = Plan.mergeJsonPlans(plansDict, idAgent = sender)
+                p["current-time"] = plansDict[self.agent]["current-time"]
                 
                 self.newPlanToImport = json.dumps(p)
-            return
-            
-            
-        elif otherID in self.plan.ids:
-            logger.info("I'm more up to date. Do nothing")
-            return
-        else:
-            logger.info("We are not on the same branch : repair the plan")
-            self.triggerRepair = True
+                
+                #logger.info("Other plans are : %s" % plansDict)
+                #logger.info("New plan to import next is %s" % self.newPlanToImport)
+                
+                return
+
+            elif otherID in self.plan.ids:
+                logger.info("I'm more up to date. Do nothing")
+                return
+            else:
+                logger.info("We are not on the same branch : repair the plan")
+                self.triggerRepair = True
+    
+    def sendMastnUpdate(self, arcs):
+        u = MaSTNUpdate()
+        u.header.stamp = rospy.Time.now()
+    
+        for a in arcs:
+            u.arcs.append(a)
+    
+        u.sender = self.agent
+        
+        for k,a in self.plan.getJsonDescription()["actions"].items():
+            if ("agent" not in a or a["agent"] == self.agent) and "executed" in a and a["executed"]:
+                u.executedActions.append(k)
+    
+        executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+        for tp in executedNodes:
+            v = self.plan.stn.getBounds(tp)
+            if v.ub != v.lb:
+                logger.error("Timepoint %s is executed but stil has some leeway ? %s" % (tp,v))
+                continue
+            u.executedNodes.append(StnTp(tp, v.lb))
+        
+        #u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+        for r in self.agentsDead:
+            u.executedNodes.append(StnTp("1-end-%s"%r, -1))
+        #u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
+    
+        u.droppedComs = self.droppedComs
+        
+        u.deadRobots = self.agentsDead
+        u.planId = self.plan.ids[-1]
+    
+        self.mastn_pub.publish(u)
     
     def sendFullMastnUpdate(self):
         with self.mutex:
@@ -345,21 +415,11 @@ class SupervisorRos(Supervisor):
             if self.plan.stn.isConsistent():
                 logger.info("Sending a full MaSTN update")
 
-                u = MaSTNUpdate()
-                u.header.stamp = rospy.Time.now()
-
+                arcs = []
                 for a in self.plan.stn.getMaSTNConstraints():
-                    u.arcs.append(StnArc(a[0], a[1], a[2], a[3]))
-
-                u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
-                u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
-
-                u.droppedComs = self.droppedComs
+                    arcs.append(StnArc(a[0], a[1], a[2], a[3]))
                 
-                u.deadRobots = self.agentsDead
-                u.planId = self.plan.ids[-1]
-
-                self.mastn_pub.publish(u)
+                self.sendMastnUpdate(arcs)
 
     def mastnUpdate(self, data):
         if self.state == State.DEAD:
@@ -372,8 +432,9 @@ class SupervisorRos(Supervisor):
         with self.mutex:
             
             if data.planId != self.plan.ids[-1]:
-                logger.warning("I detect an inconsistency in the plan being executed. Send a plan sync. (%s != %s)" % (data.planId, self.plan.ids[-1]))
+                logger.warning("I detect an inconsistency in the plan being executed by %s. (%s != %s). Ignoring this update" % (data._connection_header["callerid"], data.planId, self.plan.ids[-1]))
                 self.startPlanSync()
+                return #ignore this message as it is not relevant anymore. It could cause inconsistency since it was computed on different plans
                 
             
             # Check if a com was cancelled
@@ -408,8 +469,23 @@ class SupervisorRos(Supervisor):
                 return
 
             for n in data.executedNodes:
-                if n in self.tp:
-                    self.tp[n][1] = "past"
-                    self.executedTp[n] = self.plan.stn.getBounds(n).lb
+                if n.tpName in self.tp:
+                    if self.tp[n.tpName][1] == "past":
+                        continue # I already know this
+                    
+                    self.tp[n.tpName][1] = "past"
+                    
+                    bounds = self.plan.stn.getBounds(n.tpName)
+                    if n.tpValue >=0 and (n.tpValue > bounds.ub or n.tpValue < bounds.lb):
+                        logger.error("Got a foreign tp (%s) executed at %s. But its bounds are %s. Using my bounds" % (n.tpName, n.tpValue, bounds))
+                        self.executedTp[n.tpName] = bounds.lb
+                    elif n.tpValue <0 or "1-end" in n.tpName:
+                        self.executedTp[n.tpName] = n.tpValue
+                    else:
+                        self.executedTp[n.tpName] = n.tpValue
+                        self.plan.setForeignTp(n.tpName, n.tpValue)
                 else:
-                    logger.error("Cannot find %s in tps. Ignoring this mastn update" % n)
+                    logger.error("Cannot find %s in tps. Ignoring this mastn constraint" % (n.tpName))
+
+            for k in data.executedActions:
+                self.plan.setForeignActionExecuted(k, agentFrom=data.sender)

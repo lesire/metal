@@ -77,7 +77,11 @@ class Plan:
 
         self.tpName[1] = "1-end-" + self.agent if self.agent is not None else "1-end"
 
+        #First compute the mapping tp/tpName
         for index,a in self.actions.items():
+            if "dummy init" in a["name"] and a["name"] != "dummy init": continue #Ignore the dummy init of methods
+            if "dummy end" in a["name"] and a["name"] != "dummy end": continue #Ignore the dummy end of methods
+            
             tpNumber = a["startTp"]
             if tpNumber not in self.tpName:
                 self.tpName[tpNumber] = str(tpNumber) + "-start-" + a["name"]
@@ -91,7 +95,12 @@ class Plan:
                 if "agent" in a:
                     self.tpAgent[tpNumber] = a["agent"]
             a["tEnd"] = self.tpName[tpNumber]
-                
+
+        # Then update the actions
+        for index,a in self.actions.items():
+            if "tStart" not in a: a["tStart"] = self.tpName[a["startTp"]]
+            if "tEnd" not in a: a["tEnd"] = self.tpName[a["endTp"]]
+            
             if isActionControllable(a["name"]):
                 a["controllable"] = True
             else:
@@ -178,6 +187,7 @@ class Plan:
                 if "start-communicate" in self.tpName[time]:
                     if "current-time" not in d or value > d["current-time"]:
                         self.jsonDescr["absolute-time"].remove([time, value])
+                        logger.info("Removing the absolute time of %s" % self.tpName[time])
                         continue
 
                 t = time
@@ -244,7 +254,6 @@ class Plan:
                 logger.debug("\t%5.2f (%s): %s" % (time/1000, tpName, tp))
 
         self.ids = d["ID"]["parents"] + [d["ID"]["value"]]
-        logger.info("plan ID : %s" % d["ID"]["value"])
 
     # Called before the plan is used.
     # Do some checks and modification of the initial plan.
@@ -280,18 +289,21 @@ class Plan:
     def getLength(self):
         return self.stn.getLength()/timeFactor
     
-    def getJsonDescription(self):
+    def getJsonDescription(self, currentTime = None):
         result = deepcopy(self.jsonDescr)
         
         if "absolute-time" in result:
-            execuptedTps = {l[0]:l[1] for l in result["absolute-time"]}
+            executedTps = {l[0]:l[1] for l in result["absolute-time"]}
             
             for a in result["actions"].values():
-                if a["startTp"] in execuptedTps and a["endTp"] in execuptedTps:
+                if a["startTp"] in executedTps and a["endTp"] in executedTps:
                     if "dMin" in a:
-                        a["dMin"] = min(abs(a["dMin"]), execuptedTps[a["endTp"]] - execuptedTps[a["startTp"]])
+                        a["dMin"] = min(abs(a["dMin"]), (executedTps[a["endTp"]] - executedTps[a["startTp"]])/timeFactor)
                     if "dMax" in a:
-                        a["dMax"] = max(abs(a["dMax"]), execuptedTps[a["endTp"]] - execuptedTps[a["startTp"]])
+                        a["dMax"] = max(abs(a["dMax"]), (executedTps[a["endTp"]] - executedTps[a["startTp"]])/timeFactor)
+        
+        if currentTime is not None:
+            result["current-time"] = currentTime
         return result
     
     # Add a temporal constraint to the plan.
@@ -393,9 +405,39 @@ class Plan:
             
         self.jsonDescr["unavailable-actions"].append(action["name"])
 
+    def setForeignActionExecuted(self, key, agentFrom):
+        if key not in self.jsonDescr["actions"]:
+            logger.error("Received an update from %s with executed actions %k. I do not know it" % (agentFrom, key))
+        elif self.jsonDescr["actions"][key]["agent"] != agentFrom:
+            logger.error("%s pretends he has executed %k. But this action belongs to %s" % (agentFrom, key, self.jsonDescr["actions"][key]["agent"]))
+        else:
+            if "executed" not in self.jsonDescr["actions"][key] or not self.jsonDescr["actions"][key]["executed"]:
+                logger.info("I'm informed that %s has executed %s" % (agentFrom, self.jsonDescr["actions"][key]["name"]))
+                self.jsonDescr["actions"][key]["executed"] = True
+                self.jsonDescr["actions"][key]["locked"] = True
+    
+    
+    def setForeignTp(self, tpName, value):
+        tp = tpName.split("-")[0]
+        try:
+            tp = int(tp)
+        except:
+            logger.error("Cannot convert %s from %t to a tpNumber" % tp)
+            return
+        
+        for k,v in self.jsonDescr["absolute-time"]:
+            if k == tp and value != v:
+                logger.error("setForeignTp called with an already executed point %s. %s %s! " % (tpName, value/timeFactor, v))
+                return
+            elif k == tp and value == v:
+                return
+
+        logger.info("I'm informed that the timepoint %s was executed at %s" % (tpName, value))
+        self.jsonDescr["absolute-time"].append([tp, value/timeFactor])
+
     # Returns the plan with only actions for which the given agent is responsible 
-    def getLocalJsonPlan(self, agent):
-        data = self.getJsonDescription()
+    def getLocalJsonPlan(self, agent, currentTime = None):
+        data = self.getJsonDescription(currentTime=currentTime)
         
         keysToDelete = set()
         

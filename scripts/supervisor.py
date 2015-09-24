@@ -6,6 +6,7 @@ from math import floor
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -161,7 +162,23 @@ class Supervisor(threading.Thread):
 
             self.tp["0-start-dummy init"] = ["dummy init","past"]
             self.executedTp["0"] = 0
-            if self.oldExecutedTp is not None: self.oldExecutedTp = {k:v for k,v in self.oldExecutedTp.items() if not k.startswith("1-end")}
+            if self.oldExecutedTp is not None: 
+                self.oldExecutedTp = {k:v for k,v in self.oldExecutedTp.items() if not k.startswith("1-end")}
+
+                #Change the name of the timepoint to refer to the abstract action and not its dummy init/end
+                #Probably not needed anymore
+                for k in list(self.oldExecutedTp.keys()):
+                    m = re.match("(\d+)-start-dummy init ([a-zA-Z0-9_]+) [a-zA-Z0-9_]+",k)
+                    if m:
+                        newKey = m.groups()[0] + "-start-" + m.groups()[1]
+                        self.oldExecutedTp[newKey] = self.oldExecutedTp[k]
+                        del self.oldExecutedTp[k]
+                        
+                    m = re.match("(\d+)-start-dummy end ([a-zA-Z0-9_]+) [a-zA-Z0-9_]+",k)
+                    if m:
+                        newKey = m.groups()[0] + "-end-" + m.groups()[1]
+                        self.oldExecutedTp[newKey] = self.oldExecutedTp[k]
+                        del self.oldExecutedTp[k]
 
             #Tps can be added/removed by the reparation
             #if self.oldTp is not None and self.tp != self.oldTp:
@@ -681,7 +698,11 @@ class Supervisor(threading.Thread):
         else:
             pass
         
-        agentTracking = [agent for agent in self.repairResponse.keys() if "state" in self.repairResponse[agent] and self.repairResponse[agent]["state"] == "tracking"]
+        for a in self.repairResponse.keys():
+            if "state" not in self.repairResponse[a]:
+                self.repairResponse[a]["state"] = "ok"
+        
+        agentTracking = [agent for agent in self.repairResponse.keys() if self.repairResponse[agent]["state"] == "tracking"]
         
         #lock all the steps of agents that did not respond
         allAgents = set([a["agent"] for a in self.plan.actions.values() if "agent" in a])
@@ -696,10 +717,12 @@ class Supervisor(threading.Thread):
             localPlan = self.plan.getLocalJsonPlan(agent)
             
             if agent not in self.agentsDead:
-                for a in localPlan["actions"].values():
-                    a["locked"] = True
+                for k in localPlan["actions"].keys():
+                    localPlan["actions"][k]["locked"] = True
             self.repairResponse[agent] = copy(localPlan)
+            self.repairResponse[agent]["state"] = "noCom"
         
+        #logger.info("Repair responses are : %s" % self.repairResponse)
         
         planJson = plan.Plan.mergeJsonPlans(self.repairResponse, idAgent=self.agent)
         planJson["current-time"] = time.time() - self.beginDate
@@ -710,7 +733,7 @@ class Supervisor(threading.Thread):
         
         #TODO use plan.Plan.removeAction ?
         for k,a in planJson["actions"].items():
-            if "communicate-meta" in a["name"]:
+            if "communicate-meta" in a["name"] and ("executed" not in a or not a["executed"]):
                 for deadAgent in self.agentsDead + agentTracking:
                     if deadAgent in a["name"]:
                         deletedActionKeys.add(k)
@@ -738,6 +761,8 @@ class Supervisor(threading.Thread):
                 if a.get("agent", None) == agent and not a.get("executed", False) and a.get("locked", False):
                     a["locked"] = False
 
+        #logger.info("Merging it into %s" % planJson)
+
         return planJson
         
     def repairPlan(self, planJson):
@@ -758,7 +783,7 @@ class Supervisor(threading.Thread):
             json.dump(planJson, f)
         
         #compute the list of available agents : all that have answered minus those tracking
-        agents = set([agent for agent in self.repairResponse.keys() if "state" not in self.repairResponse[agent] or self.repairResponse[agent]["state"] != "tracking"])
+        agents = set([agent for agent in self.repairResponse.keys() if self.repairResponse[agent]["state"] not in ["noCom","tracking"]])
         agents.add(self.agent)
         
         if len(self.agentsDead) > 0 :
@@ -854,14 +879,6 @@ class Supervisor(threading.Thread):
             self.mainLoop()
 
         planStr = self.repairPlan(planJson)
-
-        #TODO : remove from here ?
-        # If a robot is dead, remove the coms
-        for a in self.plan.actions.values():
-            if "communicate-meta" in a["name"] and not a["executed"]:
-                if any([n in self.agentsDead for n in a["name"].split(" ")]):
-                    logger.warning("Dropping %s because a robot is dead" % a["name"])
-                    self.dropCommunication(a["name"])
 
         if planStr is None:
             logger.warning("Reparation failed. Trying to remove deadlines.")

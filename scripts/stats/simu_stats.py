@@ -225,7 +225,7 @@ def parseBenchmark(outputDir):
                 
             results[dir] = data
 
-    with open(os.path.join(outputDir, "result.json"), "w") as f:
+    with open(os.path.join(outputDir, "result.txt"), "w") as f:
         def printAndOutput(s):
             logger.info(s)
             f.write(s + "\n")

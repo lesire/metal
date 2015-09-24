@@ -48,6 +48,7 @@ add_message_files(
     ActionVisu.msg
     RepairMsg.msg
     StnArc.msg
+    StnTp.msg
     MaSTNUpdate.msg
     Communication.msg
     CommunicationId.msg
