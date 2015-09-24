@@ -325,10 +325,14 @@ class SupervisorRos(Supervisor):
                 logger.info("List of agents in this plan : %s " % agents)
                 plansDict = {}
                 
+                #Prevent the removal of coms time
+                otherPlan["current-time"] = (time.time() - self.beginDate)
                 p = Plan(json.dumps(otherPlan), self.agent)
                 
                 #Check that all my communications are still in the plan
-                droppedComs = set()
+                droppedComs = set() #In my current plan
+                foreignDroppedCom = set() #In the remote plan
+                
                 for k,a in self.plan.actions.items():
                     if a["agent"] == self.agent:
                         if k in p.actions and a["name"] == p.actions[k]["name"]:
@@ -343,6 +347,15 @@ class SupervisorRos(Supervisor):
                     if a["agent"] == self.agent:
                         if k in self.plan.actions and a["name"] == self.plan.actions[k]["name"]:
                             continue #Ok, my action is still here
+                        if "communicate-meta" in a["name"]:
+                            comName = a["name"]
+                            if comName in self.droppedComs or a["name"]:
+                                #I already dropped this com.
+                                logger.warning("They kept a com that I dropped %s (%s)" % (a["name"],k))
+                                foreignDroppedCom.add(k)
+                            else:
+                                logger.error("They added an com action for me %s (%s)" % (a["name"],k))
+                                logger.error("%s not in %s" % (comName, self.droppedComs))
                         else:
                             logger.error("They added an action for me %s (%s)" % (a["name"],k))
                             for k1,a1 in self.plan.actions.items():
@@ -354,6 +367,20 @@ class SupervisorRos(Supervisor):
                 
                 for c in droppedComs:
                     self.dropCommunication(c)
+                
+                if foreignDroppedCom:
+                    logger.info("Imported plan before removing a foreign com: %s" % json.dumps(otherPlan))
+                    p = Plan(json.dumps(otherPlan), self.agent)
+                    
+                for c in foreignDroppedCom:
+                    logger.info("Removing action %s (%s)" % (otherPlan["actions"][c], c))
+                    logger.info("Length before %s" % len(otherPlan["actions"]))
+                    otherPlan = Plan.removeAction(otherPlan, c) #remove the com meta for actions that I dropped
+                    logger.info("Length after %s" % len(otherPlan["actions"]))
+                    
+                if foreignDroppedCom:
+                    logger.info("Imported plan after removing a foreign com: %s" % json.dumps(otherPlan))
+                    p = Plan(json.dumps(otherPlan), self.agent)
                 
                 for a in agents:
                     if a != self.agent:

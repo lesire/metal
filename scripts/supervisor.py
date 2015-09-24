@@ -548,7 +548,7 @@ class Supervisor(threading.Thread):
         #if comName in self.droppedComs: return #already done it
     
         # remove the communicate meta from the plan
-        planJson = self.plan.getJsonDescription()
+        planJson = self.plan.getJsonDescription(currentTime=(time.time() - self.beginDate))
         
         # match the action also if I'm not the owner
         if "communicate-meta" in comName:
@@ -591,7 +591,7 @@ class Supervisor(threading.Thread):
             self.droppedComs.append(a["name"])
 
         planJson = plan.Plan.removeAction(planJson, k)
-        planJson["current-time"] = self.getCurrentTime()
+        #planJson["current-time"] = self.getCurrentTime()
 
         self.init(json.dumps(planJson), self.agent)
         

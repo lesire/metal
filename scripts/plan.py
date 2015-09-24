@@ -142,7 +142,12 @@ class Plan:
             
             if a["tStart"] != a["tEnd"] and not a["controllable"]:
                 if "dMin" in a:
-                    self.stn.addConstraint(a["tStart"], a["tEnd"], int(round(timeFactor*a["dMin"])))
+                    dMin = int(round(timeFactor*a["dMin"]))
+                    
+                    if "communicate-meta" in a["name"]:
+                        dMin = 0 #in this case a problem can arise if the action was in fact shorter, we did not get the end time but another robot executed a action depending of it and notifies us. This is a hack for a lack of a better solution
+                    
+                    self.stn.addConstraint(a["tStart"], a["tEnd"], dMin)
                 else:
                     logger.warning("Action %s does not have a dMin ?" % a["name"])
       
