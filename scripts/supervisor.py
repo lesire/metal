@@ -290,6 +290,10 @@ class Supervisor(threading.Thread):
 
             if self.tp[tp][1] == "controllable":
                 
+                #Must be before setTimepoint to send the new tp as executed
+                self.tp[tp][1] = "past"
+                self.executedTp[tp] = currentTime
+
                 #End of a controllable action
                 self.setTimePoint(tp, currentTime)
                 
@@ -302,9 +306,9 @@ class Supervisor(threading.Thread):
 
                     msg = {"type":"stopAction", "action":copy(a), "time":currentTime}
                     self.outQueue.put(msg)
-                
-            self.tp[tp][1] = "past"
-            self.executedTp[tp] = currentTime
+            else:
+                self.tp[tp][1] = "past"
+                self.executedTp[tp] = currentTime
                 
         else:
             logger.error("\tError : a timepoint does not match its action %s" % tp)

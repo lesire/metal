@@ -155,74 +155,75 @@ class SupervisorRos(Supervisor):
         if self.state == State.DEAD:
             return
         
-        if type == "repairRequest":
-            if self.state == State.REPAIRINGACTIVE:
-                #Another robot is trying to repair. Abort the repair for one of them
-                if self.agent < sender:
-                    logger.warning("%s is also trying to repair. He has priority. Canceling my repair" % sender)
-                    pass #cancel my reparation
-                else:
-                    logger.warning("%s is also trying to repair. I have priority. Ignoring its message")
+        with self.mutex:
+            if type == "repairRequest":
+                if self.state == State.REPAIRINGACTIVE:
+                    #Another robot is trying to repair. Abort the repair for one of them
+                    if self.agent < sender:
+                        logger.warning("%s is also trying to repair. He has priority. Canceling my repair" % sender)
+                        pass #cancel my reparation
+                    else:
+                        logger.warning("%s is also trying to repair. I have priority. Ignoring its message")
+                        return
+                elif self.state == State.TRACKING:
+                    p = self.plan.getLocalJsonPlan(self.agent)
+                    for k in list(p["actions"].keys()):
+                        if "executed" not in p["actions"][k] or not "executed" not in p["actions"][k]:
+                            Plan.removeAction(p, k)
+                    p["state"] = "tracking"
+                    self.sendNewStatusMessage("repairResponse", json.dumps(p))
                     return
-            elif self.state == State.TRACKING:
-                p = self.plan.getLocalJsonPlan(self.agent)
-                for k in list(p["actions"].keys()):
-                    if "executed" not in p["actions"][k] or not "executed" not in p["actions"][k]:
-                        Plan.removeAction(p, k)
-                p["state"] = "tracking"
-                self.sendNewStatusMessage("repairResponse", json.dumps(p))
-                return
-            elif self.state != State.RUNNING and self.state != State.TRACKINGCONFIRMATION:
-                logger.error("Received a repair request not when running. Ignoring it")
-                return
-            
-            logger.info("Received a repair request. Pausing the execution")
-            self.state = State.REPAIRINGPASSIVE
-            self.sendVisuUpdate()
-
-            self.sendNewStatusMessage("repairResponse", json.dumps(self.plan.getLocalJsonPlan(self.agent)))
-
-        elif type == "repairResponse":
-            try:
-                plan = json.loads(msg)
-            except TypeError:
-                logger.error("Receive a repair message with msg not a json string : %s" % msg)
-                return
-            
-            if "repairResponse" not in dir(self):
-                return #I'm not currently repairing
-
-            if sender not in self.repairResponse:
-                self.repairResponse[sender] = plan
-                logger.info("Receive a repair response from %s " % sender)
+                elif self.state != State.RUNNING and self.state != State.TRACKINGCONFIRMATION:
+                    logger.error("Received a repair request not when running. Ignoring it")
+                    return
+                
+                logger.info("Received a repair request. Pausing the execution")
+                self.state = State.REPAIRINGPASSIVE
+                self.sendVisuUpdate()
+    
+                self.sendNewStatusMessage("repairResponse", json.dumps(self.plan.getLocalJsonPlan(self.agent)))
+            elif type == "repairResponse":
+                try:
+                    plan = json.loads(msg)
+                except TypeError:
+                    logger.error("Receive a repair message with msg not a json string : %s" % msg)
+                    return
+                
+                if "repairResponse" not in dir(self):
+                    return #I'm not currently repairing
+    
+                if sender not in self.repairResponse:
+                    self.repairResponse[sender] = plan
+                    logger.info("Receive a repair response from %s " % sender)
+                else:
+                    logger.error("Received several response from %s. Keeping only the first one" % sender)
+            elif type == "repairDone":
+                logger.info("Receiving a new plan to execute from %s" % sender)
+                planStr = msg
+                
+                if self.state in [State.REPAIRINGPASSIVE, State.TRACKING]:
+                    self.init(planStr, self.agent)
+                else:
+                    logger.warning("I'm not is the right state but I received a new plan. Ignoring it, will sync later if needed")
+    
+                if self.state == State.REPAIRINGPASSIVE:
+                    self.state = State.RUNNING
+    
+                self.sendVisuUpdate()
+            elif type == "targetFound":
+                with self.mutex:
+                    self.targetFound(json.loads(msg), selfDetection = False)
+            elif type == "planSyncRequest":
+                self.receivePlanSyncRequest(sender)
+            elif type == "planSyncResponse":
+                msg = json.loads(msg)
+                if "plan" not in msg:
+                    logger.error("Received an ill-formated planSyncResponse : %s" % msg)
+                otherPlan = msg["plan"]
+                
+                self.receivePlanSyncResponse(sender, otherPlan)
             else:
-                logger.error("Received several response from %s. Keeping only the first one" % sender)
-        elif type == "repairDone":
-            logger.info("Receiving a new plan to execute from %s" % sender)
-            planStr = msg
-            
-            if self.state in [State.REPAIRINGPASSIVE, State.TRACKING]:
-                self.init(planStr, self.agent)
-            else:
-                logger.warning("I'm not is the right state but I received a new plan. Ignoring it, will sync later if needed")
-
-            if self.state == State.REPAIRINGPASSIVE:
-                self.state = State.RUNNING
-
-            self.sendVisuUpdate()
-        elif type == "targetFound":
-            self.targetFound(json.loads(msg), selfDetection = False)
-        elif type == "planSyncRequest":
-            self.receivePlanSyncRequest(sender)
-        elif type == "planSyncResponse":
-            msg = json.loads(msg)
-            if "plan" not in msg:
-                logger.error("Received an ill-formated planSyncResponse : %s" % msg)
-            otherPlan = msg["plan"]
-            
-            self.receivePlanSyncResponse(sender, otherPlan)
-        else:
-            logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
+                logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
     def sendVisuUpdate(self, onlyPast = False):
         data = []
