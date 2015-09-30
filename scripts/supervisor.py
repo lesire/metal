@@ -57,7 +57,9 @@ class Supervisor(threading.Thread):
         
         self.allowShorterAction = True # If true, will shorten actions when they finish early. Else, will wait until its nominal length.
         self.ubForCom = -1 # Set an upper bound for waiting for the communications. If <= 0, no bound
-        self.ubForTrack = -1 # Set an upper bound for track actions : if met the robot will drop its plan. If <= 0, no bound
+        self.ubForTrack = -1 # Set an upper bound for track confirmation
+        
+        self.trackTimer = None
 
         self.mutex = threading.RLock() #Prevent concurent modifications of the plan
 
@@ -440,12 +442,24 @@ class Supervisor(threading.Thread):
                 logger.info("Sending a targetFound to other robots")
                 self.sendNewStatusMessage("targetFound", json.dumps(data))
         else:
-            #if "repairingRobot" in data and self.agent == data["repairingRobot"]:
-            #    self.triggerRepair = True
+
             logger.info("Another robot has detected a target at (%s,%s)" %(x,y))
             self.state = State.TRACKINGCONFIRMATION
             self.targetData = data
-            pass # Do nothing here, the one detecting it will deal with it
+            
+            if self.ubForTrack > 0:
+                if self.trackTimer is not None:
+                    self.trackTimer.cancel() #cancel the previous timer
+                
+                # Set a timer
+                def resumeExecution():
+                    if self.state == State.TRACKINGCONFIRMATION:
+                        self.state = State.RUNNING
+                        logger.warning("I have waited enough for the operator order. Resuming the execution.")
+                    self.trackTimer = None
+
+                self.trackTimer = threading.Timer(self.ubForTrack, resumeExecution)
+                self.trackTimer.start()
 
     def endAction(self, msg):
         action = msg["action"]
