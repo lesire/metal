@@ -431,10 +431,11 @@ class Plan:
             return
         
         for k,v in self.jsonDescr["absolute-time"]:
-            if k == tp and value != v:
+            if k == tp and int(value*1000) != int(v*1000):
                 logger.error("setForeignTp called with an already executed point %s. %s %s! " % (tpName, value/timeFactor, v))
+                logger.error("%s %s %s" % (int(value*1000), int(v*1000), int(value*1000) != int(v*1000)))
                 return
-            elif k == tp and value == v:
+            elif k == tp and int(value*1000) == int(v*1000):
                 return
 
         logger.info("I'm informed that the timepoint %s was executed at %s" % (tpName, value))

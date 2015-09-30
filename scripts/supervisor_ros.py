@@ -173,7 +173,7 @@ class SupervisorRos(Supervisor):
                     p["state"] = "tracking"
                     self.sendNewStatusMessage("repairResponse", json.dumps(p))
                     return
-                elif self.state != State.RUNNING and self.state != State.TRACKINGCONFIRMATION:
+                elif self.state not in [State.RUNNING, State.TRACKINGCONFIRMATION, State.DONE]:
                     logger.error("Received a repair request not when running. Ignoring it")
                     return
                 

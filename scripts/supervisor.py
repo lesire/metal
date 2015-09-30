@@ -142,13 +142,21 @@ class Supervisor(threading.Thread):
                         self.tp[tp] = [tp, "uncontrollable"] #end of the global plan of another agent
                     else:
                         logger.error("There is a tp that I do not know about : %s" % tp)
+                        
+            if self.state == State.DONE:
+                self.tp["1-endglobal-" + self.agent][1] = "past"
+                self.tp["1-end-" + self.agent][1] = "past" 
                     
             
             for tpName,value in self.plan.absTimes:
                 #Ignore nodes that belongs to another robot
                 if tpName not in self.plan.stn.getNodeIds(): continue
     
-                action = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]][0]
+                actionList = [a for a in self.plan.actions.values() if (a["tStart"] == tpName or a["tEnd"] == tpName) and "dummy" not in a["name"]]
+                if len(actionList) == 0:
+                    logger.error("I got tp %s and it doesn't match any action in the plan ?" % tpName)
+                    continue
+                action = actionList[0]
     
                 if action["executed"]:
                     #action was executed, this is a past action. Do not consider the method dummy init or dummy end, only the action itself
