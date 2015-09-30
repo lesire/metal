@@ -13,7 +13,7 @@ from threading import RLock
 
 import rospy
 from metal.msg import StnVisu
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty,String
 
 agents = {} #store a boolean, True if the node is done
 mutex = RLock()
@@ -53,6 +53,8 @@ def main():
         if endTime is not None and time.time() > endTime:
             rospy.logerr("Timeout")
             rospy.signal_shutdown("timeout")
+            subscriber_stats = rospy.Publisher("/hidden/stats", String, queue_size=10)
+            subscriber_stats.publish("""{"type":"timeout"}""")
         else:
             time.sleep(1)
     #rospy.spin()
