@@ -18,10 +18,13 @@ sh.setFormatter(logging.Formatter('%(levelname)s (%(filename)s:%(lineno)d): %(me
 logger.addHandler(sh)
 
 class AbstractPlanGen(object):
-    def __init__(self, robots, planLength, nbrInstance, **kwargs):
+    def __init__(self, mission, robots, planLength, nbrInstance, **kwargs):
         self.robots = list(robots)
         self.planLength = planLength
         self.nbrInstance = nbrInstance
+        self.mission = mission
+        
+        self.activeRobots = [k for k,a in mission["agents"].items() if not a["spare"]]
         
     #Store the output in self.data.
     def nextAlea(self):
@@ -58,6 +61,10 @@ class AbstractPlanGen(object):
 
         # Must finish the track to finish the plan
         self.data[self.nextIndex()] = {"type" : "state", "date":endTrackingTime, "to":detectorRobot, "data":{"state":"running"}}
+
+    def addDelayedAction(self, delayedRobot, time, delay):
+        
+        self.data[self.nextIndex()] = {"type" : "delay", "date":time, "to":delayedRobot, "data":{"delay":float(delay)}}
 
     #Must define a _nextAlea method that acts on self.data
 
@@ -109,7 +116,27 @@ class TargetFoundIsolatedRobotGen(AbstractPlanGen):
         self.addTargetFound(detectorRobot, d1, repairingRobot, d1+5)
         self.addIsolatedRobot(isolatedRobot, d1-5, d2)
 
+class simpleDelayGen(AbstractPlanGen):
+    _name = "simpleDelay"
+    _description = "A random robot has a delay of 45 sec"
+    
+    def _nextAlea(self):
+        delayedRobot = random.sample(self.robots, 1)
+        d1 = random.uniform(5, self.planLength-5)  # target found
+        
+        self.addDelayedAction(delayedRobot, d1, 45)
 
+class simpleDelayIsolatedRobotGen(AbstractPlanGen):
+    _name = "simpleDelayIsolatedRobot"
+    _description = "A random robot has a delay of 45 sec  while another one is isolated"
+    
+    def _nextAlea(self):
+        delayedRobot,isolatedRobot = random.sample(self.robots, 2)
+        d1 = random.uniform(5, self.planLength-5)  # target found
+        d2 = random.uniform(d1, self.planLength-5) # Coms back online
+        
+        self.addDelayedAction(delayedRobot, d1, 45)
+        self.addIsolatedRobot(isolatedRobot, d1-5, d2)
 
 def getPlanFiles(missionFolder):
     assert("hipop-files" in os.listdir(missionFolder))
@@ -124,6 +151,14 @@ def getPlanFiles(missionFolder):
     assert(missionName is not None)
     
     return os.path.join(missionFolder, "hipop-files", missionName + ".plan"),os.path.join(missionFolder, "hipop-files", missionName + ".pddl")
+
+def getMission(missionFolder):
+    if missionFolder.endswith("/"):
+        missionFolder = missionFolder[:-1]
+    missionFile = missionFolder + ".json"
+    with open(missionFile) as f:
+        mission = json.load(f)
+    return mission
 
 def getAgentList(planFile):
     with open(planFile) as f:
@@ -187,6 +222,7 @@ def main(argv):
     os.makedirs(args.outputFolder)
     
     planFile, planPDDLFile = getPlanFiles(args.mission)
+    mission = getMission(args.mission)
     agents = getAgentList(planFile)
     planLength = getPlanLength(planPDDLFile)
     
@@ -195,7 +231,7 @@ def main(argv):
     logger.info("Creating the alea files")
     
     for gen in AbstractPlanGen.__subclasses__():
-    #for gen in [TargetFoundGen]:
+    #for gen in [simpleDelayGen, simpleDelayIsolatedRobotGen]:
         logger.info("Creating problems with generator %s" % gen._name)
         
         os.chdir(args.outputFolder)
@@ -204,7 +240,7 @@ def main(argv):
         dirBench = "aleas_" + gen._name
         os.mkdir(dirBench) 
 
-        g = gen(robots=agents, planLength=planLength, nbrInstance=nbrInstance)
+        g = gen(mission=mission, robots=agents, planLength=planLength, nbrInstance=nbrInstance)
         for i in range(nbrInstance):
             d = g.nextAlea()
             with open(os.path.join(dirBench, str(i) + ".json"), "w") as f:
