@@ -40,7 +40,7 @@ try:
             p.position.y = int(coords[1])/100
             self.move_publisher.publish(p)
             self.move_cb = cb
-            self.current_action.add("move %s %s %s" % (who,a,b))
+            self.current_action = "move %s %s %s" % (who,a,b)
 
         def observe_agv(self, who, point, observation, cb, **kwargs):
             cb("ok")
