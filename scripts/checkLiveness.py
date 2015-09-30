@@ -15,17 +15,21 @@ import time
 
 hosts = {
           "PC Mission" :                 {"addr" : "134.212.28.32",    "group":"PC Opérateur"},
+          "PC Mission Fixe" :            {"addr" : "134.212.241.95",    "group":"PC Opérateur"},
           "Ressac 2 : Station Sol" :     {"addr" : "134.212.244.34",   "group":"Ressac 2"},
           "Ressac 1 : Charge utile" :    {"addr" : "134.212.244.176",  "group":"Ressac 1"},
           "Ressac 1 : Station Sol" :     {"addr" : "134.212.244.35",   "group":"Ressac 1"},
           "Ressac 2 : Charge utile" :    {"addr" : "134.212.244.178",  "group":"Ressac 2"},
           "Minode" :                     {"addr" : "134.212.244.36",   "group":"Ressac"},
-          "Mana" :                       {"addr" : "140.93.16.55",     "group":"Mana"},
-          "Momo" :                       {"addr" : "140.93.16.72",     "group":"Momo"},
-          "Minnie" :                     {"addr" : "140.93.16.57",     "group":"Minnie"},
+          "Mana" :                       {"addr" : "140.93.16.55",     "group":"LAAS"},
+          "Momo" :                       {"addr" : "140.93.16.72",     "group":"LAAS"},
+          "Minnie" :                     {"addr" : "140.93.16.57",     "group":"LAAS"},
           "Passerelle ONERA-LASS" :      {"addr" : "134.212.90.100",   "group":"0 - Réseaux"},
           "Access point WiFi 1" :        {"addr" : "134.212.244.109",  "group":"0 - Réseaux"},
           "Access point WiFi 2" :        {"addr" : "134.212.244.110",  "group":"0 - Réseaux"},
+          "Effibot 1" :                  {"addr" : "134.212.244.71",  "group":"Effibot"},
+          "Effibot 2" :                  {"addr" : "134.212.244.72",  "group":"Effibot"},
+          "Effibot 3" :                  {"addr" : "134.212.244.73",  "group":"Effibot"},
         }
 
 ######################
