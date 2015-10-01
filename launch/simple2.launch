@@ -4,7 +4,7 @@
     <arg name="simu" default="true"/>
     <arg name="executor" default="ros"/>
     <arg name="bag_repair" default="false"/>
-    <arg name="vnet" default="false"/>
+    <arg name="vnet" default="true"/>
     <arg name="auto_start" default="false"/>
     
     <include file="$(find metal)/data/simple2-mission/hidden-params.launch" />

@@ -4,7 +4,7 @@
     <include file="$(find metal)/launch/machines.launch"/>
 
     <arg name="executor" default="effibot"/>
-    <arg name="vnet" default="false"/>
+    <arg name="vnet" default="true"/>
     <arg name="name" default="effibot5"/>
     <arg name="machine" default="localhost"/>
 

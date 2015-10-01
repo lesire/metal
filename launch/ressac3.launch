@@ -4,7 +4,7 @@
     <include file="$(find metal)/launch/machines.launch"/>
 
     <arg name="executor" default="ressac"/>
-    <arg name="vnet" default="false"/>
+    <arg name="vnet" default="true"/>
     <arg name="machine" default="localhost"/>
 
     <node name="ressac3" pkg="metal" type="hidden-ros.py" ns="ressac3" machine="$(arg machine)" args="--executor=$(arg executor) --agentName=ressac3 --waitSignal" >

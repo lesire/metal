@@ -4,7 +4,7 @@
     <include file="$(find metal)/launch/machines.launch"/>
 
     <arg name="executor" default="hyper"/>
-    <arg name="vnet" default="false"/>
+    <arg name="vnet" default="true"/>
     <arg name="machine" default="localhost"/>
 
     <node name="minnie" pkg="metal" type="hidden-ros.py" ns="minnie" machine="$(arg machine)" args="--executor=$(arg executor) --agentName=minnie --waitSignal" >
