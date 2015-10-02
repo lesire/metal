@@ -147,7 +147,14 @@ class OnlineTimeline(PlotWindow):
                     d["edgecolor"] = "k"
                     d["facecolor"] = color
 
-                self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, lw=1, ls="solid", alpha=alpha, **d)
+                if "communicate-meta" not in action["name"]:
+                    self.axes.axhspan(index-0.05, index+0.05, xstart/xmax, xstop/xmax, lw=1, ls="solid", alpha=alpha, **d)
+                else:
+                    robots = action["name"].split(" ")[1:3]
+                    index0 = self.data[robots[0]]["index"]  if robots[0] in self.data else index
+                    index1 = self.data[robots[1]]["index"]  if robots[1] in self.data else index
+                    self.axes.axhspan(index0, index1, xstart/xmax, xstop/xmax, lw=5, ls="solid", alpha=alpha, **d)
+
                 
             if index is not None:
                 captions[index] = robot + "\n" + self.data[robot]["state"]
