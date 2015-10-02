@@ -469,7 +469,7 @@ class Supervisor(threading.Thread):
         report = msg.get("report", None)
         
         if isinstance(report, str):
-            report = {"type" : report}
+            report = {"type" : report.lower()}
         
         if (action["name"], action["startTp"], action["endTp"]) not in self.ongoingActions:
             logger.warning("When finishing the execution of %s, could not find it in self.ongoingActions" % action["name"])
@@ -481,7 +481,7 @@ class Supervisor(threading.Thread):
             
         if report is None:
             logger.warning("End of action %s without report" % action["name"])
-        elif report["type"] == "ok":
+        elif report["type"] in ["ok", "success"]:
             logger.info("End of action %s ok" % action["name"])
         elif report["type"] == "interrupted":
             logger.info("Action %s interrupted by the supervisor" % action["name"])
