@@ -18,14 +18,14 @@ sh.setFormatter(logging.Formatter('%(levelname)s (%(filename)s:%(lineno)d): %(me
 logger.addHandler(sh)
 
 class AbstractPlanGen(object):
-    def __init__(self, mission, robots, planLength, nbrInstance, **kwargs):
-        self.robots = list(robots)
+    def __init__(self, mission, planLength, nbrInstance, **kwargs):
+        self.robots = list([str(k) for k in mission["agents"].keys()])
         self.planLength = planLength
         self.nbrInstance = nbrInstance
         self.mission = mission
-        
-        self.activeRobots = [k for k,a in mission["agents"].items() if not a["spare"]]
-        
+
+        self.activeRobots = [str(k) for k,a in mission["agents"].items() if not a["spare"]]
+
     #Store the output in self.data.
     def nextAlea(self):
         self.data = {}
@@ -73,7 +73,7 @@ class DeadRobotGen(AbstractPlanGen):
     _description = "A random robot is declared dead, another robot is notified after (might be quite late)."
     
     def _nextAlea(self):
-        deadRobot,reparingRobot = random.sample(self.robots, 2)
+        deadRobot,reparingRobot = random.sample(self.activeRobots, 2)
         d1 = random.uniform(0, self.planLength)  # death of the robot
         d2 = random.uniform(d1, self.planLength) # notification to a live robot
         
@@ -85,7 +85,7 @@ class deadRobotIsolatedRobotGen(AbstractPlanGen):
     _description = "A random robot is declared dead, another robot is notified after (might be quite late). During this time, a third robot is isolated."
     
     def _nextAlea(self):
-        deadRobot,reparingRobot,isolatedRobot = random.sample(self.robots, 3)
+        deadRobot,reparingRobot,isolatedRobot = random.sample(self.activeRobots, 3)
         d1 = random.uniform(5, self.planLength-5)  # death of the robot
         d2 = random.uniform(d1, self.planLength-5) # notification to a live robot
         d3 = random.uniform(d2, self.planLength) # end of the isolation
@@ -98,7 +98,7 @@ class TargetFoundGen(AbstractPlanGen):
     _description = "A random robot finds a target"
     
     def _nextAlea(self):
-        detectorRobot,repairingRobot = random.sample(self.robots, 2)
+        detectorRobot,repairingRobot = random.sample(self.activeRobots, 2)
         d1 = random.uniform(0, self.planLength-10)  # target found
         
         self.addTargetFound(detectorRobot, d1, repairingRobot, d1+5)
@@ -109,7 +109,7 @@ class TargetFoundIsolatedRobotGen(AbstractPlanGen):
     _description = "A random robot finds a target while another one is isolated"
     
     def _nextAlea(self):
-        detectorRobot,repairingRobot,isolatedRobot = random.sample(self.robots, 3)
+        detectorRobot,repairingRobot,isolatedRobot = random.sample(self.activeRobots, 3)
         d1 = random.uniform(5, self.planLength-5)  # target found
         d2 = random.uniform(d1, self.planLength-5) # Coms back online
         
@@ -121,8 +121,8 @@ class simpleDelayGen(AbstractPlanGen):
     _description = "A random robot has a delay of 45 sec"
     
     def _nextAlea(self):
-        delayedRobot = random.sample(self.robots, 1)
-        d1 = random.uniform(5, self.planLength-5)  # target found
+        delayedRobot = random.sample(self.activeRobots, 1)
+        d1 = random.uniform(5, self.planLength-5) # Delayed action
         
         self.addDelayedAction(delayedRobot, d1, 45)
 
@@ -131,12 +131,45 @@ class simpleDelayIsolatedRobotGen(AbstractPlanGen):
     _description = "A random robot has a delay of 45 sec  while another one is isolated"
     
     def _nextAlea(self):
-        delayedRobot,isolatedRobot = random.sample(self.robots, 2)
-        d1 = random.uniform(5, self.planLength-5)  # target found
+        delayedRobot,isolatedRobot = random.sample(self.activeRobots, 2)
+        d1 = random.uniform(5, self.planLength-5)  # Delayed action
         d2 = random.uniform(d1, self.planLength-5) # Coms back online
         
         self.addDelayedAction(delayedRobot, d1, 45)
         self.addIsolatedRobot(isolatedRobot, d1-5, d2)
+
+class complexGen(AbstractPlanGen):
+    _name = "complex"
+    _description = "5 random aleas are created"
+    
+    def _nextAlea(self):
+        dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])
+        
+        self.availRobots = set(self.activeRobots)
+        
+        for d in dates:
+            type = random.choice(["dead", "deadIsolated", "target", "targetIsolated", "delay"])
+            if type == "dead":
+                deadRobot,reparingRobot = random.sample(list(self.availRobots), 2)
+                self.addDeadRobot(deadRobot, d-2, reparingRobot, d+2)
+                self.availRobots.remove(deadRobot)
+            elif type == "dead":
+                deadRobot,reparingRobot,isolatedRobot = random.sample(list(self.availRobots), 3)
+                self.addDeadRobot(deadRobot, d-2, reparingRobot, d+2)
+                self.addIsolatedRobot(isolatedRobot, d-5, d+5)
+                self.availRobots.remove(deadRobot)
+            elif type == "target":
+                detectorRobot,repairingRobot = random.sample(list(self.availRobots), 2)
+                self.addTargetFound(detectorRobot, d-2, repairingRobot, d+2)
+                self.availRobots.remove(detectorRobot)
+            elif type == "targetIsolated":
+                detectorRobot,repairingRobot,isolatedRobot = random.sample(list(self.availRobots), 3)
+                self.addTargetFound(detectorRobot, d-2, repairingRobot, d+2)
+                self.addIsolatedRobot(isolatedRobot, d-5, d+5)
+                self.availRobots.remove(detectorRobot)
+            elif type == "delay":
+                delayedRobot = random.sample(list(self.availRobots), 1)
+                self.addDelayedAction(delayedRobot, d, 45)
 
 def getPlanFiles(missionFolder):
     assert("hipop-files" in os.listdir(missionFolder))
@@ -158,16 +191,32 @@ def getMission(missionFolder):
     missionFile = missionFolder + ".json"
     with open(missionFile) as f:
         mission = json.load(f)
-    return mission
-
-def getAgentList(planFile):
-    with open(planFile) as f:
-        plan = json.load(f)
         
-    agents = set([a["agent"] for a in plan["actions"].values() if "agent" in a])
-    logger.info("Found %d agents : %s" % (len(agents), list(agents)))
-    
-    return agents
+    for agent in mission["agents"].keys():
+        if "spare" in mission["agents"][agent]:
+            if mission["agents"][agent]["spare"] in ["false", "False"]:
+                mission["agents"][agent]["spare"] = False
+            elif mission["agents"][agent]["spare"] in ["true", "True"]:
+                mission["agents"][agent]["spare"] = True
+            else:
+                logging.error("Cannot convert %s to boolean" % mission["agents"][agent]["spare"])
+                sys.exit(1)
+        else:
+            mission["agents"][agent]["spare"] = False
+
+        for k,v in mission["agents"][agent]["position"].items():
+            mission["agents"][agent]["position"][k] = float(v)
+            
+    for wpg in mission["wp_groups"].keys():
+        for wpn in mission["wp_groups"][wpg]["waypoints"].keys():
+            for k,v in mission["wp_groups"][wpg]["waypoints"][wpn].items():
+                mission["wp_groups"][wpg]["waypoints"][wpn][k] = float(v)
+
+    for obs in mission["mission_goal"]["observation_points"].keys():
+        for k,v in mission["mission_goal"]["observation_points"][obs].items():
+            mission["mission_goal"]["observation_points"][obs][k] = float(v)
+                
+    return mission
     
 def getPlanLength(planPDDLFile):
     result = 0
@@ -209,6 +258,7 @@ def main(argv):
     parser.add_argument("-n", "--nbrInstance", type=int, default=10)
     parser.add_argument("-j", "--jobs"     , type=int, default=20)
     parser.add_argument("--logLevel"       , type=str, default="info")
+    parser.add_argument("--dry-run"        , action="store_true")
     args = parser.parse_args(argv)
     
     #Configure the logger
@@ -223,7 +273,6 @@ def main(argv):
     
     planFile, planPDDLFile = getPlanFiles(args.mission)
     mission = getMission(args.mission)
-    agents = getAgentList(planFile)
     planLength = getPlanLength(planPDDLFile)
     
     nbrInstance = args.nbrInstance
@@ -231,7 +280,7 @@ def main(argv):
     logger.info("Creating the alea files")
     
     for gen in AbstractPlanGen.__subclasses__():
-    #for gen in [simpleDelayGen, simpleDelayIsolatedRobotGen]:
+    #for gen in [complexGen]:
         logger.info("Creating problems with generator %s" % gen._name)
         
         os.chdir(args.outputFolder)
@@ -240,7 +289,7 @@ def main(argv):
         dirBench = "aleas_" + gen._name
         os.mkdir(dirBench) 
 
-        g = gen(mission=mission, robots=agents, planLength=planLength, nbrInstance=nbrInstance)
+        g = gen(mission=mission, planLength=planLength, nbrInstance=nbrInstance)
         for i in range(nbrInstance):
             d = g.nextAlea()
             with open(os.path.join(dirBench, str(i) + ".json"), "w") as f:
@@ -248,7 +297,8 @@ def main(argv):
     
         logger.info("Finished creating the aleas files for %s. Now running the benchmarks" % gen._name)
 
-        simu_stats.runBenchmark(args.mission, sorted([os.path.join(dirBench, f) for f in os.listdir(dirBench)]), os.path.abspath("output_" + gen._name), maxJobs=args.jobs, vnet=True)
+        if not args.dry_run:
+            simu_stats.runBenchmark(args.mission, sorted([os.path.join(dirBench, f) for f in os.listdir(dirBench)]), os.path.abspath("output_" + gen._name), maxJobs=args.jobs, vnet=True)
         
         logger.info("Finished running the benchmarks for %s." % gen._name)
         
