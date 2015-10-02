@@ -43,6 +43,7 @@ def getStnVisu(msg):
 def cbStart(msg):
     global endTime
     endTime = time.time() + timeout
+    rospy.loginfo("Starting. Endtime will be %s. It is %s." % (endTime, time.time()))
 
 def main():
     rospy.init_node("watcher", anonymous=True)
@@ -51,10 +52,13 @@ def main():
 
     while not rospy.is_shutdown():
         if endTime is not None and time.time() > endTime:
-            rospy.logerr("Timeout")
-            rospy.signal_shutdown("timeout")
+            rospy.loginfo("Timeout. Endtime is %s. It is %s." % (endTime, time.time()))
+
             subscriber_stats = rospy.Publisher("/hidden/stats", String, queue_size=10)
             subscriber_stats.publish("""{"type":"timeout"}""")
+            time.sleep(1)
+
+            rospy.signal_shutdown("timeout")
         else:
             time.sleep(1)
     #rospy.spin()
