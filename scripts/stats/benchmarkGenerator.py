@@ -68,6 +68,13 @@ class AbstractPlanGen(object):
 
     #Must define a _nextAlea method that acts on self.data
 
+class NominalGen(AbstractPlanGen):
+    _name = "nominal"
+    _description = "No alea."
+    
+    def _nextAlea(self):
+        pass
+        
 class DeadRobotGen(AbstractPlanGen):
     _name = "deadRobot"
     _description = "A random robot is declared dead, another robot is notified after (might be quite late)."
@@ -140,11 +147,13 @@ class simpleDelayIsolatedRobotGen(AbstractPlanGen):
 
 class complexGen(AbstractPlanGen):
     _name = "complex"
-    _description = "5 random aleas are created"
+    _description = "2 random aleas are created"
     
     def _nextAlea(self):
         dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])
-        
+        while dates[1] - dates[0] < 20:
+            dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])        
+
         self.availRobots = set(self.activeRobots)
         
         for d in dates:
@@ -231,26 +240,7 @@ def getPlanLength(planPDDLFile):
             
     logger.info("Nominal plan last for %.2f seconds" % result)
     return result
-    
-def generateDead(outputFolder, agents, planLength):
-    
-    nbrAlea = 20
-    
-    for i in range(nbrAlea):
-        deadRobot,reparingRobot = random.sample(agents, 2)
-        d1 = random.uniform(0, planLength)  # death of the robot
-        d2 = random.uniform(d1, planLength) # notification to a live robot
-        
-        data = {}
-        
-        data["0"] = {"type" : "robotDead", "date":d1, "to":deadRobot, "data":{"robot" : deadRobot}}
-        data["1"] = {"type" : "robotDead", "date":d2, "to":reparingRobot, "data":{"robot" : deadRobot}}
-        
-        with open(os.path.join(outputFolder, "alea_%d.json"%i), "w") as f:
-            json.dump(data, f,indent=2)
-        
-    pass
-    
+
 def main(argv):
     parser = argparse.ArgumentParser(description="Launch a statistical simulation")
     parser.add_argument("--outputFolder"   , type=os.path.abspath, required=True)
@@ -280,7 +270,7 @@ def main(argv):
     logger.info("Creating the alea files")
     
     for gen in AbstractPlanGen.__subclasses__():
-    #for gen in [complexGen]:
+    #for gen in [NominalGen]:
         logger.info("Creating problems with generator %s" % gen._name)
         
         os.chdir(args.outputFolder)

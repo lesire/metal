@@ -234,6 +234,12 @@ def parseBenchmark(outputDir):
         
         i = len([v for v in results.values() if v["success"]])
         printAndOutput("Found %d successes : %.2f%%" % (i, 100*i/len(results)))
+
+        i = len([v for v in results.values() if v["timeout"]])
+        printAndOutput("Found %d timeout : %.2f%%" % (i, 100*i/len(results)))
+
+        i = len([v for v in results.values() if v["error"]])
+        printAndOutput("Found %d errors : %.2f%%" % (i, 100*i/len(results)))
         
         lengths = [v["finishTime"] for v in results.values() if v["success"]]
         m = mean(lengths)
@@ -360,17 +366,19 @@ def parseSimu(outputDir):
 
         ###### Compute the time of the plan based on the state of each robot #####
         hasError = False
+        hasTimeout = False
         trackingRobots = set()
         agents = {}
         for _,msg,_ in bag.read_messages(topics="/hidden/stnvisu"):
             if msg.agent not in agents:
                 agents[msg.agent] = {}
             
-            if "finishTime" not in agents[msg.agent] and msg.state in ["DONE", "ERROR", "DEAD", "TRACKING"]:
+            if "finishTime" not in agents[msg.agent] and msg.state in ["DONE", "ERROR", "DEAD"]:
                 agents[msg.agent]["finishTime"] = msg.time
                 
             if msg.state == "ERROR":
                 hasError = True
+                logger.warning("%s is in error state" % msg.agent)
                 
             if msg.state == "TRACKING":
                 trackingRobots.add(msg.agent)
@@ -378,11 +386,13 @@ def parseSimu(outputDir):
             logger.debug("%s : %s -> %s" % (msg.time, msg.agent, msg.state))
 
         for agent,d in agents.items():
-            if "finishTime" not in d:
+            if "finishTime" not in d and not hasError:
                 logger.error("Cannot determine the end time of %s" % agent)
-                hasError = True
+                hasTimeout = True
 
-        result["success"] = not hasError
+        result["error"] = hasError
+        result["timeout"] = hasTimeout
+        result["success"] = not hasError and not hasTimeout
         result["trackingRobots"] = list(trackingRobots)
         result["trackingRobotsNbr"] = len(trackingRobots)
 
