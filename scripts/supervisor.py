@@ -531,10 +531,19 @@ class Supervisor(threading.Thread):
                 value = startTime + dMin
         
         lb = self.plan.stn.getBounds(tp).lb
+        ub = self.plan.stn.getBounds(tp).ub
         if self.tp[tp][1] == "uncontrollable" and value < lb:
             logger.warning("Finished %s early : %s. Waiting until %s." % (action["name"], value, lb))
             value = lb
-            
+        
+        #If the action has an ub and we were too close to it when the com-meta started, the deadline can be slightly overdue.
+        #Instead of removing the upper bound for the plan (since another robot could be responsible for it), we change the date of the end of the action
+        if "end-communicate" in tp and value > ub:
+            logger.warning("The end of a com action is too late. The ub is too strict. Slightly change the date to accomodate this")
+            if abs(value-ub) > 1000:
+                logger.error("The difference is larger than 1 second ?!?")
+            value = ub
+        
         logger.info("End of the action %s at %s" % (action["name"], value/1000))
         
         c = self.plan.stn.getBounds(str(tp))

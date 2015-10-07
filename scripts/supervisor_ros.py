@@ -163,7 +163,7 @@ class SupervisorRos(Supervisor):
                         logger.warning("%s is also trying to repair. He has priority. Canceling my repair" % sender)
                         pass #cancel my reparation
                     else:
-                        logger.warning("%s is also trying to repair. I have priority. Ignoring its message")
+                        logger.warning("%s is also trying to repair. I have priority. Ignoring its message" % sender)
                         return
                 elif self.state == State.TRACKING:
                     p = self.plan.getLocalJsonPlan(self.agent)

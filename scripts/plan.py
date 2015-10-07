@@ -157,7 +157,7 @@ class Plan:
                 #if any([re.match(regex, a["name"]) for regex in nonRandomAction]):
                 #     self.stn.addConstraint(str(a["tStart"]), str(a["tEnd"]), int(timeFactor*a["dMin"]), int(timeFactor*a["dMin"]))
 
-        for cl in (d["causal-links"] + d["temporal-links"]):
+        for cl in d["causal-links"]:
             start = self.tpName[cl["startTp"]]
 
             # If end point is the endTp, then get the one corresponding to the agent executing the action
@@ -170,6 +170,18 @@ class Plan:
                 self.stn.addConstraint(self.stn.getStartId(), end, timeDelta)
             else:
                 self.stn.addConstraint(start, end, timeDelta)
+
+        for tl in d["temporal-links"]:
+            startTp = self.tpName[tl["startTp"]]
+            endTp = self.tpName[tl["endTp"]]
+            if startTp.startswith("0-"):
+                startTp = self.stn.getStartId()
+
+            lb = tl.get("lb", timeDelta)
+            if "ub" not in tl:
+                self.stn.addConstraint(startTp, endTp, lb)
+            else:
+                self.stn.addConstraint(startTp, endTp, lb, tl["ub"])
 
         for action in d["actions"].values():
             if "children" in action and action["children"]:
@@ -390,7 +402,7 @@ class Plan:
                 if "dMax" in action and self.stn.isConsistent():
                     start = self.stn.getBounds(str(self.actions[index]["tStart"]))
                     if start.ub != start.lb:
-                        logger.error(tpName)
+                        logger.error(self.actions[index]["tStart"])
                         logger.error("Error : an action is executed but still has temporal flexibility %s,%s?" % (start.lb, start.ub))
                 
                     duration = (value - start.lb)/timeFactor
