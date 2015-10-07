@@ -793,7 +793,7 @@ class Supervisor(threading.Thread):
         
     def repairPlan(self, planJson):
     
-        fileBaseName = time.strftime("plan_broken_%Y_%m_%d_%H_%M_%S")
+        fileBaseName = time.strftime("plan_broken_%Y_%m_%d_%H_%M_%S_" + self.agent)
         domainFile = fileBaseName + "_domain.pddl"
         prbFile = fileBaseName + "_prb.pddl"
         helperFile = fileBaseName + "_helper.pddl"
