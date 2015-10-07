@@ -1007,7 +1007,7 @@ class Supervisor(threading.Thread):
                             else:
                                 logger.warning("Supervisor received unknown message %s" % msg)
                             
-                    if self.state != State.DEAD:
+                    if self.state == State.RUNNING:
                         self.update()
 
                 if self.triggerRepair:
