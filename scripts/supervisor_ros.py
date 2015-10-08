@@ -12,7 +12,7 @@ from std_msgs.msg import Empty,String
 from metal.msg import StnVisu, ActionVisu, RepairMsg, MaSTNUpdate, StnArc, StnTp
 from metal.srv import AleaAction
 from supervisor import Supervisor,State
-from plan import Plan
+from plan import Plan, PlanImportError
 
 class SupervisorRos(Supervisor):
     def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
@@ -371,15 +371,13 @@ class SupervisorRos(Supervisor):
                 
                 if foreignDroppedCom:
                     logger.info("Imported plan before removing a foreign com: %s" % json.dumps(otherPlan))
-                    p = Plan(json.dumps(otherPlan), self.agent)
-                    
-                for c in foreignDroppedCom:
-                    logger.info("Removing action %s (%s)" % (otherPlan["actions"][c], c))
-                    logger.info("Length before %s" % len(otherPlan["actions"]))
-                    otherPlan = Plan.removeAction(otherPlan, c) #remove the com meta for actions that I dropped
-                    logger.info("Length after %s" % len(otherPlan["actions"]))
-                    
-                if foreignDroppedCom:
+    
+                    for c in foreignDroppedCom:
+                        logger.info("Removing action %s (%s)" % (otherPlan["actions"][c], c))
+                        logger.info("Length before %s" % len(otherPlan["actions"]))
+                        otherPlan = Plan.removeAction(otherPlan, c) #remove the com meta for actions that I dropped
+                        logger.info("Length after %s" % len(otherPlan["actions"]))
+
                     logger.info("Imported plan after removing a foreign com: %s" % json.dumps(otherPlan))
                     p = Plan(json.dumps(otherPlan), self.agent)
                 
@@ -389,6 +387,47 @@ class SupervisorRos(Supervisor):
                 plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent, currentTime=(time.time() - self.beginDate))
                 p = Plan.mergeJsonPlans(plansDict, idAgent = sender)
                 p["current-time"] = plansDict[self.agent]["current-time"]
+                
+                # See if the plan is still temporally valid. It could be a problem if I added a ub for a com
+                # while the other robot was late : both constraints are problematic. In this case, drop my
+                # current com
+                try:
+                    _ = Plan(json.dumps(p), self.agent)
+                except PlanImportError as e:
+                    logger.warning("The fused plan will not be valid. Try to drop my current com")
+                    for name,_,_ in self.ongoingActions:
+                        if "communicate " in name:
+                            #Find the com meta name
+                            robot1,robot2 = name.split(" ")[1:3]
+                            nameIndex = None
+                            for k,a in self.plan.actions.items():
+                                if a["name"].startswith("communicate-meta %s %s" % (robot1,robot2)) or\
+                                   a["name"].startswith("communicate-meta %s %s" % (robot2,robot1)):
+                                    name = a["name"]
+                                    nameIndex = k
+                                    break
+                            
+                            if nameIndex is None:
+                                logger.error("Could not find the index of the com meta action !")
+                                self.state = State.ERROR
+                                return
+                            
+                            logger.warning("Dropping %s (%s)" % (name, nameIndex))
+                            
+                            self.dropCommunication(name)
+
+                            logger.info("Length before %s" % len(otherPlan["actions"]))
+                            otherPlan = Plan.removeAction(otherPlan, nameIndex) #remove the com meta for actions that I dropped
+                            logger.info("Length after %s" % len(otherPlan["actions"]))
+        
+                            p = Plan(json.dumps(otherPlan), self.agent)
+                            
+                            for a in agents:
+                                if a != self.agent:
+                                    plansDict[a] = p.getLocalJsonPlan(a)
+                            plansDict[self.agent] = self.plan.getLocalJsonPlan(self.agent, currentTime=(time.time() - self.beginDate))
+                            p = Plan.mergeJsonPlans(plansDict, idAgent = sender)
+                            p["current-time"] = plansDict[self.agent]["current-time"]
                 
                 self.newPlanToImport = json.dumps(p)
                 
