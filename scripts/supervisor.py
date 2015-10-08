@@ -723,78 +723,79 @@ class Supervisor(threading.Thread):
             self.sendNewStatusMessage("repairRequest")
             
             time.sleep(10)
-            
+        else:
+            pass
+        
+        with self.mutex:
             logger.info("Receive responses from : %s" % str(self.repairResponse.keys()))
             logger.info("Dead agents : %s" % self.agentsDead)
             for agent in self.agentsDead:
                 if agent in self.repairResponse:
                     logger.warning("Received a repair response from %s. Ignoring it since he is dead" % agent)
                     del self.repairResponse[agent]
-        else:
-            pass
-        
-        for a in self.repairResponse.keys():
-            if "state" not in self.repairResponse[a]:
-                self.repairResponse[a]["state"] = "ok"
-        
-        agentTracking = [agent for agent in self.repairResponse.keys() if self.repairResponse[agent]["state"] == "tracking"]
-        
-        #lock all the steps of agents that did not respond
-        allAgents = set([a["agent"] for a in self.plan.actions.values() if "agent" in a])
-        logger.info("All agents : %s" % allAgents)
-        
-        for agent in allAgents:
-            if agent in self.repairResponse:
-                continue #
+                        
+            for a in self.repairResponse.keys():
+                if "state" not in self.repairResponse[a]:
+                    self.repairResponse[a]["state"] = "ok"
             
-            logger.info("Locally adding plan for %s" % agent)
+            agentTracking = [agent for agent in self.repairResponse.keys() if self.repairResponse[agent]["state"] == "tracking"]
             
-            localPlan = self.plan.getLocalJsonPlan(agent)
+            #lock all the steps of agents that did not respond
+            allAgents = set([a["agent"] for a in self.plan.actions.values() if "agent" in a])
+            logger.info("All agents : %s" % allAgents)
             
-            if agent not in self.agentsDead:
-                for k in localPlan["actions"].keys():
-                    localPlan["actions"][k]["locked"] = True
-            self.repairResponse[agent] = copy(localPlan)
-            self.repairResponse[agent]["state"] = "noCom"
-        
-        #logger.info("Repair responses are : %s" % self.repairResponse)
-        
-        planJson = plan.Plan.mergeJsonPlans(self.repairResponse, idAgent=self.agent)
-        planJson["current-time"] = time.time() - self.beginDate
-
-        #Remove coordinating action for dead robots
-        deletedActionKeys = set()
-        deletedTps = set()
-        
-        #TODO use plan.Plan.removeAction ?
-        for k,a in planJson["actions"].items():
-            if "communicate-meta" in a["name"] and ("executed" not in a or not a["executed"]):
-                for deadAgent in self.agentsDead + agentTracking:
-                    if deadAgent in a["name"]:
-                        deletedActionKeys.add(k)
-                        deletedTps.add(a["startTp"])
-                        deletedTps.add(a["endTp"])
-                        break
-
-        for k in deletedActionKeys:
-            logger.info("Removing action %s" % planJson["actions"][k]["name"])
-            del planJson["actions"][k]
-        for i in reversed(range(len(planJson["causal-links"]))):
-            cl = planJson["causal-links"][i]
-            if cl["startTp"] in deletedTps or cl["endTp"] in deletedTps:
-                del planJson["causal-links"][i]
-        for i in reversed(range(len(planJson["temporal-links"]))):
-            cl = planJson["temporal-links"][i]
-            if cl["startTp"] in deletedTps or cl["endTp"] in deletedTps:
-                del planJson["temporal-links"][i]
-        for i in reversed(range(len(planJson["absolute-time"]))):
-            if planJson["absolute-time"][i][0] in deletedTps:
-                del planJson["absolute-time"][i]
-
-        for agent in self.agentsDead:
-            for a in planJson["actions"].values():
-                if a.get("agent", None) == agent and not a.get("executed", False) and a.get("locked", False):
-                    a["locked"] = False
+            for agent in allAgents:
+                if agent in self.repairResponse:
+                    continue #
+                
+                logger.info("Locally adding plan for %s" % agent)
+                
+                localPlan = self.plan.getLocalJsonPlan(agent)
+                
+                if agent not in self.agentsDead:
+                    for k in localPlan["actions"].keys():
+                        localPlan["actions"][k]["locked"] = True
+                self.repairResponse[agent] = copy(localPlan)
+                self.repairResponse[agent]["state"] = "noCom"
+            
+            #logger.info("Repair responses are : %s" % self.repairResponse)
+            
+            planJson = plan.Plan.mergeJsonPlans(self.repairResponse, idAgent=self.agent)
+            planJson["current-time"] = time.time() - self.beginDate
+    
+            #Remove coordinating action for dead robots
+            deletedActionKeys = set()
+            deletedTps = set()
+            
+            #TODO use plan.Plan.removeAction ?
+            for k,a in planJson["actions"].items():
+                if "communicate-meta" in a["name"] and ("executed" not in a or not a["executed"]):
+                    for deadAgent in self.agentsDead + agentTracking:
+                        if deadAgent in a["name"]:
+                            deletedActionKeys.add(k)
+                            deletedTps.add(a["startTp"])
+                            deletedTps.add(a["endTp"])
+                            break
+    
+            for k in deletedActionKeys:
+                logger.info("Removing action %s" % planJson["actions"][k]["name"])
+                del planJson["actions"][k]
+            for i in reversed(range(len(planJson["causal-links"]))):
+                cl = planJson["causal-links"][i]
+                if cl["startTp"] in deletedTps or cl["endTp"] in deletedTps:
+                    del planJson["causal-links"][i]
+            for i in reversed(range(len(planJson["temporal-links"]))):
+                cl = planJson["temporal-links"][i]
+                if cl["startTp"] in deletedTps or cl["endTp"] in deletedTps:
+                    del planJson["temporal-links"][i]
+            for i in reversed(range(len(planJson["absolute-time"]))):
+                if planJson["absolute-time"][i][0] in deletedTps:
+                    del planJson["absolute-time"][i]
+    
+            for agent in self.agentsDead:
+                for a in planJson["actions"].values():
+                    if a.get("agent", None) == agent and not a.get("executed", False) and a.get("locked", False):
+                        a["locked"] = False
 
         #logger.info("Merging it into %s" % planJson)
 
@@ -951,9 +952,10 @@ class Supervisor(threading.Thread):
         self.sendNewStatusMessage("repairDone", planStr)
         del self.repairResponse
 
-        self.init(planStr, self.agent)
-        logger.info("Finished reparation : restarting the main loop")
-        self.state = State.RUNNING
+        with self.mutex:
+            self.init(planStr, self.agent)
+            logger.info("Finished reparation : restarting the main loop")
+            self.state = State.RUNNING
         self.mainLoop()
         
     def run(self):
