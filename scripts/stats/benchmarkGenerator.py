@@ -11,11 +11,19 @@ import random
 import re
 import sys
 
-import simu_stats
-
 sh = logging.StreamHandler()
 sh.setFormatter(logging.Formatter('%(levelname)s (%(filename)s:%(lineno)d): %(message)s'))
 logger.addHandler(sh)
+
+# return a sorted list of n random values between minValue and maxValue with a minimum distance of sep between each of them
+def randomList(n, minValue, maxValue, sep):
+    result = []
+    for i in range(n):
+        newValue = random.uniform(minValue, maxValue)
+        while result and min([abs(newValue - r) for r in result]) < sep:
+            newValue = random.uniform(minValue, maxValue)
+        result.append(newValue)
+    return sorted(result)
 
 class AbstractPlanGen(object):
     def __init__(self, mission, planLength, nbrInstance, **kwargs):
@@ -122,6 +130,17 @@ class TargetFoundIsolatedRobotGen(AbstractPlanGen):
         
         self.addTargetFound(detectorRobot, d1, repairingRobot, d1+5)
         self.addIsolatedRobot(isolatedRobot, d1-5, d2)
+
+class DoubleTargetFoundGen(AbstractPlanGen):
+    _name = "doubleTargetFound"
+    _description = "Two random different robots find a target !"
+
+    def _nextAlea(self):
+        detectorRobot,repairingRobot,detectorRobot2,repairingRobot2 = random.sample(self.activeRobots, 4)
+        d1,d2 = randomList(2, 0, self.planLength-10, 25)  # targets found
+
+        self.addTargetFound(detectorRobot, d1, repairingRobot, d1+5)
+        self.addTargetFound(detectorRobot2, d2, repairingRobot2, d2+5)
 
 class simpleDelayGen(AbstractPlanGen):
     _name = "simpleDelay"
@@ -242,6 +261,8 @@ def getPlanLength(planPDDLFile):
     return result
 
 def main(argv):
+    import simu_stats
+    
     parser = argparse.ArgumentParser(description="Launch a statistical simulation")
     parser.add_argument("--outputFolder"   , type=os.path.abspath, required=True)
     parser.add_argument("--mission"        , type=os.path.abspath, required=True)
@@ -271,6 +292,7 @@ def main(argv):
     
     for gen in AbstractPlanGen.__subclasses__():
     #for gen in [NominalGen]:
+        #if gen == NominalGen: continue #do not run nominal
         logger.info("Creating problems with generator %s" % gen._name)
         
         os.chdir(args.outputFolder)
