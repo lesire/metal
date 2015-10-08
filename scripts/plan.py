@@ -441,16 +441,22 @@ class Plan:
         except:
             logger.error("Cannot convert %s from %t to a tpNumber" % tp)
             return
-        
+
         for k,v in self.jsonDescr["absolute-time"]:
-            if k == tp and int(value*1000) != int(v*1000):
+            vMs = int(v*timeFactor + 0.5)
+            if k == tp and int(value) != vMs:
                 logger.error("setForeignTp called with an already executed point %s. %s %s! " % (tpName, value/timeFactor, v))
-                logger.error("%s %s %s" % (int(value*1000), int(v*1000), int(value*1000) != int(v*1000)))
+                logger.error("%s %s %s" % (int(value), vMs, int(value) != vMs))
                 return
-            elif k == tp and int(value*1000) == int(v*1000):
+            elif k == tp and int(value) == vMs:
                 return
 
-        logger.info("I'm informed that the timepoint %s was executed at %s" % (tpName, value))
+        found = any([tp == a["startTp"] or tp == a["endTp"] for a in self.jsonDescr["actions"].values()])
+        if not found:
+            logger.error("I'm informed of the execution of %s. But it is not associated to any action in my plan" % tpName)
+            return
+
+        logger.info("I'm informed that the timepoint %s was executed at %s" % (tpName, value/timeFactor))
         self.jsonDescr["absolute-time"].append([tp, value/timeFactor])
 
     # Returns the plan with only actions for which the given agent is responsible 

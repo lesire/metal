@@ -417,7 +417,10 @@ class SupervisorRos(Supervisor):
             if ("agent" not in a or a["agent"] == self.agent) and "executed" in a and a["executed"]:
                 u.executedActions.append(k)
     
-        executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+        #executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
+        # Send all executed nodes, not just the frontier, for the same reason that we send the action : if an action is executed we need this information for computing the global plan
+        # TODO : have each robot remember the date of its tps ? What happens when one is dead ?
+        executedNodes = [tp for tp in self.tp.keys() if self.tp[tp][1] == "past" and tp != "0-start-dummy init"]
         for tp in executedNodes:
             v = self.plan.stn.getBounds(tp)
             if v.ub != v.lb:
@@ -425,10 +428,8 @@ class SupervisorRos(Supervisor):
                 continue
             u.executedNodes.append(StnTp(tp, v.lb))
         
-        #u.executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
         for r in self.agentsDead:
             u.executedNodes.append(StnTp("1-end-%s"%r, -1))
-        #u.executedNodes += ["1-end-%s"%r for r in self.agentsDead]
     
         u.droppedComs = self.droppedComs
         
@@ -513,7 +514,10 @@ class SupervisorRos(Supervisor):
                         self.executedTp[n.tpName] = n.tpValue
                         self.plan.setForeignTp(n.tpName, n.tpValue)
                 else:
-                    logger.error("Cannot find %s in tps. Ignoring this mastn constraint" % (n.tpName))
+                    # Not one of my tp. But I should bookeep it in case the sender dies and I need its local plan
+                    self.plan.setForeignTp(n.tpName, n.tpValue)
+                #else:
+                #    logger.error("Cannot find %s in tps. Ignoring this mastn constraint" % (n.tpName))
 
             for k in data.executedActions:
                 self.plan.setForeignActionExecuted(k, agentFrom=data.sender)
