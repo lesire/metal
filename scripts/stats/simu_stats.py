@@ -220,6 +220,10 @@ def parseBenchmark(outputDir):
         if re.match("^simu_\d+$", dir):
             parseSimu(os.path.join(outputDir, dir))
             
+            if not os.access(os.path.join(outputDir, dir, "results.json"), os.R_OK):
+                logger.error("Cannot find results.json. A problem occurred in this run")
+                continue
+
             with open(os.path.join(outputDir, dir, "results.json")) as f:
                 data = json.load(f)
                 
