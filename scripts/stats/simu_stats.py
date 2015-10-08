@@ -439,7 +439,7 @@ def parseSimu(outputDir):
 
         for _,msg,_ in bag.read_messages(topics="/vnet/statistics"):
             msg = json.loads(msg.data)
-            if msg["from"] in msg["forwarded"]: msg["forwarded"].remove(msg["from"])
+            if msg["from"] in msg["forwarded"]: msg["forwarded"].remove(msg["from"]) # remove the sender from the list of receiver
             
             if msg["forwarded"] and not msg["filtered"]:
                 nbrForwarded += 1
