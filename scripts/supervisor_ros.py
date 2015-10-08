@@ -460,17 +460,16 @@ class SupervisorRos(Supervisor):
 
         with self.mutex:
             
-            if data.planId != self.plan.ids[-1]:
-                logger.warning("I detect an inconsistency in the plan being executed by %s. (%s != %s). Ignoring this update" % (data._connection_header["callerid"], data.planId, self.plan.ids[-1]))
-                self.startPlanSync()
-                return #ignore this message as it is not relevant anymore. It could cause inconsistency since it was computed on different plans
-                
-            
-            # Check if a com was cancelled
+            # Check if a com was cancelled, even from another plan
             #logger.info("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))
             for c in data.droppedComs:
                 if c not in self.droppedComs:
                     self.dropCommunication(c)
+                    
+            if data.planId != self.plan.ids[-1]:
+                logger.warning("I detect an inconsistency in the plan being executed by %s. (%s != %s). Ignoring this update" % (data._connection_header["callerid"], data.planId, self.plan.ids[-1]))
+                self.startPlanSync()
+                return #ignore this message as it is not relevant anymore. It could cause inconsistency since it was computed on different plans
 
             for r in data.deadRobots:
                 if r not in self.agentsDead:
