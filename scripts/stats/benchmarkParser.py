@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import functools
 import logging; logger = logging.getLogger(__name__)
 import json
 import os
@@ -40,12 +41,12 @@ def parseScenario(scenarioFolder, nominalFolder):
             resultsNominal[d] = data
     
     name = os.path.basename(scenarioFolder).split("_")[1]
-    print("*" * 140)
+    print("*" * 166)
     print("%s : %s" % (name,getDescription(name)))
     print()
     print("Succes : %d\tTimeout : %d\tEchec : %d\tTotal : %s" % (len([r for r in resultsScenario.values() if r["success"]]), len([r for r in resultsScenario.values() if r["timeout"]]), len([r for r in resultsScenario.values() if r["error"]]), len(resultsScenario)))
     print()
-    print("{:<35} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12}".format("","Moyenne","Moyenne nom","Diff.","Diff.(%)","Ecart type(σ)","Variation(%)","σ nom","Var. nom.(%)"))
+    print("{:<35} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12} {:^12}".format("","Min", "Max", "Moyenne","Moyenne nom","Diff.","Diff.(%)","Ecart type(σ)","Variation(%)","σ nom","Var. nom.(%)"))
     
     def mean(data):
         data = [d for d in data if d is not None]
@@ -59,34 +60,54 @@ def parseScenario(scenarioFolder, nominalFolder):
         m = mean(data)
         return mean([(x-m)**2 for x in data])**0.5
     
+    def oneValuePerRun(l, f=f):
+        return [f(r) for r in l if r["success"]]
+
+    def getRepairTimeList(l):
+        result = []
+        for r in l:
+            if r["success"] and len(r["repair"]["lengths"]) > 0:
+                result = result + r["repair"]["lengths"]
+        result = list(map(lambda x:x/1000.0,result))
+        return result
+
     values = [
-              ("Durée de la mission (s)", lambda x:x["finishTime"]),
-              ("Nombre de points observés", lambda x:x["obsPoints"]["nbr"]),
-              ("Nombre de rendez-vous réussis", lambda x:x["coms"]["nbr"]),
-              ("Nombre de réparations", lambda x:x["repair"]["requestNbr"]),
-              ("Temps passé en réparation (s)", lambda x:x["repair"]["totalTime"]/1000.),
-              ("Durée moyenne d'une réparation (s)", lambda x: mean(x["repair"]["lengths"])/1000.0 if x["repair"]["lengths"] else None),
-              ("Nombre de messages transférés", lambda x:x["vNet"]["nbrForwarded"]),
-              ("Nombre de messages part. transférés", lambda x:x["vNet"]["nbrPartial"]),
-              ("Nombre de messages bloqués", lambda x:x["vNet"]["nbrFiltered"]),
-              ("Nombre de messages total", lambda x:x["vNet"]["nbrForwarded"] + x["vNet"]["nbrPartial"] + x["vNet"]["nbrFiltered"]),
-              ("Taille totale des messages (~ko)", lambda x:x["vNet"]["bandwith"]/1000.0),
-              ("Nombre de suivi de cible", lambda x:x["target"]["nbrTrack"]),
+              ("Durée de la mission (s)",               functools.partial(oneValuePerRun, f=lambda x:x["finishTime"])),
+              ("Nombre de points observés",             functools.partial(oneValuePerRun, f=lambda x:x["obsPoints"]["nbr"])),
+              ("Nombre de rendez-vous réussis",         functools.partial(oneValuePerRun, f=lambda x:x["coms"]["nbr"])),
+              ("Nombre de réparations",                 functools.partial(oneValuePerRun, f=lambda x:x["repair"]["requestNbr"])),
+              ("Temps passé en réparation (s)",         functools.partial(oneValuePerRun, f=lambda x:x["repair"]["totalTime"]/1000.)),
+              ("Durée moyenne d'une réparation (s)",    getRepairTimeList),
+              ("Nombre de messages transférés",         functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"])),
+              ("Nombre de messages part. transférés",   functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrPartial"])),
+              ("Nombre de messages bloqués",            functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrFiltered"])),
+              ("Nombre de messages total",              functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"] + x["vNet"]["nbrPartial"] + x["vNet"]["nbrFiltered"])),
+              ("Taille totale des messages (~ko)",      functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["bandwith"]/1000.0)),
+              ("Nombre de suivi de cible",              functools.partial(oneValuePerRun, f=lambda x:x["target"]["nbrTrack"])),
               ]
-    
 
-    
-    for name,getValue in values:
-        scenarioValues = [getValue(r) for r in resultsScenario.values() if r["success"]]
-        nominalValues  = [getValue(r) for r in resultsNominal.values() if r["success"]]
+    for name,getValues in values:
+        scenarioValues = getValues(resultsScenario.values())
+        nominalValues = getValues(resultsNominal.values())
+        scenarioMean = mean(scenarioValues)
+        nominalMean = mean(nominalValues)
         
-        if mean(nominalValues) == 0:
-            print("{:<35}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12s}|{:^12.2f}|{:^12s}|{:^12.2f}|{:^12s}|".format(      name, mean(scenarioValues), mean(nominalValues), mean(scenarioValues) - mean(nominalValues), " "                                                                 , stddev(scenarioValues), " "                                            , stddev(nominalValues), ""                                             ))
-        else:
-            print("{:<35}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12.2f}|".format(name, mean(scenarioValues), mean(nominalValues), mean(scenarioValues) - mean(nominalValues), (mean(scenarioValues) - mean(nominalValues))*100/mean(nominalValues), stddev(scenarioValues), stddev(scenarioValues)*100/mean(scenarioValues), stddev(nominalValues), stddev(nominalValues)*100/mean(nominalValues)))
+        formatStr = "{:<35}|{:^12%s}|{:^12%s}|{:^12.2f}|{:^12.2f}|{:^12.2f}|{:^12%s}|{:^12.2f}|{:^12%s}|{:^12.2f}|{:^12%s}|" % (".2f" if len(scenarioValues) else "s",".2f" if len(scenarioValues) else "s", "s" if nominalMean == 0 else ".2f", "s" if scenarioMean == 0 else ".2f", "s" if nominalMean == 0 else ".2f")
 
+        line = formatStr.format(name,
+                             min(scenarioValues) if len(scenarioValues) else "",
+                             max(scenarioValues) if len(scenarioValues) else "",
+                             scenarioMean,
+                             nominalMean,
+                             scenarioMean - nominalMean,
+                             (scenarioMean - nominalMean)*100/nominalMean if nominalMean != 0 else "",
+                             stddev(scenarioValues),
+                             stddev(scenarioValues)*100/scenarioMean if scenarioMean != 0 else "",
+                             stddev(nominalValues),
+                             stddev(nominalValues)*100/nominalMean if nominalMean != 0 else "")
+        print(line)
     
-    print("*" * 140)
+    print("*" * 166)
 def main(argv):
     parser = argparse.ArgumentParser(description="Parse a statistical simulation")
     parser.add_argument("outputFolder"   , type=os.path.abspath)
