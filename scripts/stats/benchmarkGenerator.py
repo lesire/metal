@@ -174,14 +174,14 @@ class complexGen(AbstractPlanGen):
             dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])        
 
         self.availRobots = set(self.activeRobots)
-        
+
         for d in dates:
             type = random.choice(["dead", "deadIsolated", "target", "targetIsolated", "delay"])
             if type == "dead":
                 deadRobot,reparingRobot = random.sample(list(self.availRobots), 2)
                 self.addDeadRobot(deadRobot, d-2, reparingRobot, d+2)
                 self.availRobots.remove(deadRobot)
-            elif type == "dead":
+            elif type == "deadIsolated":
                 deadRobot,reparingRobot,isolatedRobot = random.sample(list(self.availRobots), 3)
                 self.addDeadRobot(deadRobot, d-2, reparingRobot, d+2)
                 self.addIsolatedRobot(isolatedRobot, d-5, d+5)
@@ -198,6 +198,9 @@ class complexGen(AbstractPlanGen):
             elif type == "delay":
                 delayedRobot = random.sample(list(self.availRobots), 1)
                 self.addDelayedAction(delayedRobot, d, 45)
+            else:
+                logger.error("Unknown type")
+
 
 def getPlanFiles(missionFolder):
     assert("hipop-files" in os.listdir(missionFolder))
