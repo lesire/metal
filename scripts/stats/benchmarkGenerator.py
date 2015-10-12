@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 ### rosbag API is not python3 compatible ###
 
 from __future__ import division
@@ -79,6 +80,7 @@ class AbstractPlanGen(object):
 class NominalGen(AbstractPlanGen):
     _name = "nominal"
     _description = "No alea."
+    _descriptionFr = "Pas d'aléa."
     
     def _nextAlea(self):
         pass
@@ -86,6 +88,7 @@ class NominalGen(AbstractPlanGen):
 class DeadRobotGen(AbstractPlanGen):
     _name = "deadRobot"
     _description = "A random robot is declared dead, another robot is notified after (might be quite late)."
+    _descriptionFR = "Un robot meurt et un autre robot en est notifié (éventuellement beaucoup plus tard)."
     
     def _nextAlea(self):
         deadRobot,reparingRobot = random.sample(self.activeRobots, 2)
@@ -98,7 +101,8 @@ class DeadRobotGen(AbstractPlanGen):
 class deadRobotIsolatedRobotGen(AbstractPlanGen):
     _name = "deadRobotIsolatedRobot"
     _description = "A random robot is declared dead, another robot is notified after (might be quite late). During this time, a third robot is isolated."
-    
+    _descriptionFR = "Un robot meurt et un autre robot en est notifié (éventuellement beaucoup plus tard). Pendant ce temps, un 3ème est isolé du reste de l'équipe."
+
     def _nextAlea(self):
         deadRobot,reparingRobot,isolatedRobot = random.sample(self.activeRobots, 3)
         d1 = random.uniform(5, self.planLength-5)  # death of the robot
@@ -111,6 +115,8 @@ class deadRobotIsolatedRobotGen(AbstractPlanGen):
 class TargetFoundGen(AbstractPlanGen):
     _name = "targetFound"
     _description = "A random robot finds a target"
+    _descriptionFR = "Un robot trouve une cible et la suit seul pendant une minute."
+
     
     def _nextAlea(self):
         detectorRobot,repairingRobot = random.sample(self.activeRobots, 2)
@@ -122,7 +128,8 @@ class TargetFoundGen(AbstractPlanGen):
 class TargetFoundIsolatedRobotGen(AbstractPlanGen):
     _name = "targetFoundIsolatedRobot"
     _description = "A random robot finds a target while another one is isolated"
-    
+    _descriptionFR = "Un robot trouve une cible et la suit seul pendant une minute. Pendant ce temps, un autre robot est isolé du reste de l'équipe."
+
     def _nextAlea(self):
         detectorRobot,repairingRobot,isolatedRobot = random.sample(self.activeRobots, 3)
         d1 = random.uniform(5, self.planLength-5)  # target found
@@ -134,6 +141,7 @@ class TargetFoundIsolatedRobotGen(AbstractPlanGen):
 class DoubleTargetFoundGen(AbstractPlanGen):
     _name = "doubleTargetFound"
     _description = "Two random different robots find a target !"
+    _descriptionFR = "Deux robots distincts détectent deux cibles différentes."
 
     def _nextAlea(self):
         detectorRobot,repairingRobot,detectorRobot2,repairingRobot2 = random.sample(self.activeRobots, 4)
@@ -145,7 +153,8 @@ class DoubleTargetFoundGen(AbstractPlanGen):
 class simpleDelayGen(AbstractPlanGen):
     _name = "simpleDelay"
     _description = "A random robot has a delay of 45 sec"
-    
+    _descriptionFR = "Un robot prend un retard de 45 secondes sur une de ses actions."
+
     def _nextAlea(self):
         delayedRobot = random.sample(self.activeRobots, 1)
         d1 = random.uniform(5, self.planLength-5) # Delayed action
@@ -155,6 +164,8 @@ class simpleDelayGen(AbstractPlanGen):
 class simpleDelayIsolatedRobotGen(AbstractPlanGen):
     _name = "simpleDelayIsolatedRobot"
     _description = "A random robot has a delay of 45 sec  while another one is isolated"
+    _descriptionFR = "Un robot prend un retard de 45 secondes sur une de ses actions. Pendant ce temps, un autre robot est isolé du reste de l'équipe."
+
     
     def _nextAlea(self):
         delayedRobot,isolatedRobot = random.sample(self.activeRobots, 2)
@@ -167,6 +178,7 @@ class simpleDelayIsolatedRobotGen(AbstractPlanGen):
 class complexGen(AbstractPlanGen):
     _name = "complex"
     _description = "2 random aleas are created"
+    _description = "2 aléas sont introduits, espacés d'au moins 20 secondes"
     
     def _nextAlea(self):
         dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])

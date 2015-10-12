@@ -13,7 +13,7 @@ def getDescription(name):
         import benchmarkGenerator
         for gen in benchmarkGenerator.AbstractPlanGen.__subclasses__():
             if gen._name == name:
-                return gen._description
+                return gen._descriptionFR
         return name
     except Exception as e:
         return name
@@ -44,13 +44,13 @@ def getRepairTimeList(l):
 #Each columns is defined by its name and its function.
 #The function is given two lists : the values for the current setting and the values for the nominal case
 columns = [
-            ("Min",             lambda s,n: min(s) if len(s) else ""),
-            ("Max",             lambda s,n: max(s) if len(s) else ""),
+            ("Min.",            lambda s,n: min(s) if len(s) else ""),
+            ("Max.",            lambda s,n: max(s) if len(s) else ""),
             ("Moyenne",         lambda s,n: mean(s)),
-            ("Moyenne nom",     lambda s,n: mean(n)),
+            ("Moyenne nom.",    lambda s,n: mean(n)),
             ("Diff.",           lambda s,n: (mean(s) - mean(n))),
             ("Diff.(%)",        lambda s,n: (mean(s) - mean(n))*100/(mean(n)) if mean(n) != 0 else ""),
-            ("Ecart type(σ)",   lambda s,n: stddev(s)),
+            ("Écart type(σ)",   lambda s,n: stddev(s)),
             ("Variation(%)",    lambda s,n: stddev(s)*100/mean(s) if mean(s) != 0 else ""),
             ("σ nom",           lambda s,n: stddev(n)),
             ("Var. nom.(%)",    lambda s,n: stddev(n)*100/mean(n) if mean(n) != 0 else ""),
@@ -99,7 +99,7 @@ def parseScenario(scenarioFolder, nominalFolder):
     name = os.path.basename(scenarioFolder).split("_")[1]
     header.append("%s : %s" % (name,getDescription(name)))
     header.append("")
-    header.append("Succes : %d\tTimeout : %d\tEchec : %d\tTotal : %s" % (len([r for r in resultsScenario.values() if r["success"]]), len([r for r in resultsScenario.values() if r["timeout"]]), len([r for r in resultsScenario.values() if r["error"]]), len(resultsScenario)))
+    header.append("Succès : %d\tTimeout : %d\tÉchec : %d\tTotal : %s" % (len([r for r in resultsScenario.values() if r["success"]]), len([r for r in resultsScenario.values() if r["timeout"]]), len([r for r in resultsScenario.values() if r["error"]]), len(resultsScenario)))
 
 
     results = [["" for _ in range(len(columns)+1)] for _ in range(len(values)+1)]
@@ -129,7 +129,7 @@ def printTableASCII(header,table):
     #Size (in characters)
     nameSize = 35
     cellSize = 13
-    
+
     print("\n".join(header))
 
     #print("*" * (nameSize + len(columns)*(cellSize+1) + 1))
@@ -138,51 +138,49 @@ def printTableASCII(header,table):
         print(format.format(*line))
     print("*" * (nameSize + len(columns)*(cellSize+1) + 1))
 
+def printBeginLatex():
+    print("""
+\\documentclass{report}
+
+\\usepackage[landscape,margin=1cm]{geometry}
+
+\\usepackage{lmodern}
+\\usepackage[T1]{fontenc}
+\\usepackage[utf8]{inputenc}
+\\usepackage{amsmath}
+\\usepackage{amssymb}
+\\usepackage[frenchb]{babel}
+
+
+\\begin{document}
+    """)
+
 def printTableLatex(header, table):
 
     print()
+    print("\\begin{center}")
     print("\n".join(header))
+    print("\\end{center}")
     print()
     
-    table[0] = [l.replace("%", "\\%") for l in table[0]]
+    table[0] = [l.replace("%", "\\%").replace("σ","$\\sigma$") for l in table[0]]
     
     print("\\begin{tabular}{|" + ("c|" *len(table[0])) + "}\\hline")
     for line in table:
         print("&".join(line) + "\\\\\\hline")
     print("\end{tabular}")
 
-    """
-    name = os.path.basename(scenarioFolder).split("_")[1]
-    print("*" * (nameSize + len(columns)*(cellSize+1) + 1))
-    print("%s : %s" % (name,getDescription(name)))
-    print()
-    print("Succes : %d\tTimeout : %d\tEchec : %d\tTotal : %s" % (len([r for r in resultsScenario.values() if r["success"]]), len([r for r in resultsScenario.values() if r["timeout"]]), len([r for r in resultsScenario.values() if r["error"]]), len(resultsScenario)))
-    print()
-    print("*" * (nameSize + len(columns)*(cellSize+1) + 1))
+    print("\n\\clearpage\n")
 
-    print(" "*nameSize + " " + " ".join([ ("{:^" + str(cellSize) + "}").format(c[0]) for c in columns]))
+def printEndLatex():
+    print("\\end{document}")
 
-    for name,getValues in values:
-        scenarioValues = getValues(resultsScenario.values())
-        nominalValues = getValues(resultsNominal.values())
-        
-        line = ("{:" + str(nameSize) + "}").format(name)
-        for _,f in columns:
-            value = f(scenarioValues,nominalValues)
-            if type(value) == float or type(value) == int:
-                line += "|{:^12.2f}".format(value)
-            else:
-                line += "|{:^12s}".format(value)
-        line += "|"
-        print(line)
-
-    print("*" * (nameSize + len(columns)*(cellSize+1) + 1))
-    """
 def main(argv):
     parser = argparse.ArgumentParser(description="Parse a statistical simulation")
     parser.add_argument("outputFolder"   , type=os.path.abspath)
     parser.add_argument("--logLevel"       , type=str, default="info")
     parser.add_argument("--latex"       , action="store_true")
+    parser.add_argument("--full-latex", action="store_true")
     args = parser.parse_args(argv)
     
     #Configure the logger
@@ -196,14 +194,23 @@ def main(argv):
         logger.error("No nomial run found. Exiting")
         sys.exit(1)
 
-    for d in os.listdir(args.outputFolder):
-        if d.startswith("output_") and d != "output_nominal":
-            h,t = parseScenario(os.path.join(args.outputFolder, d), os.path.join(args.outputFolder, "output_nominal"))
-            if args.latex:
-                printTableLatex(h,t)
-            else:
-                printTableASCII(h,t)
+    if args.full_latex:
+        printBeginLatex()
 
+    #Compute an order among the outputs
+    namesOrdered = ["deadRobot", "deadRobotIsolatedRobot", "targetFound", "targetFoundIsolatedRobot", "doubleTargetFound", "simpleDelay", "simpleDelayIsolatedRobot", "complex"]
+    scenariis = [d for d in os.listdir(args.outputFolder) if d.startswith("output_") and d != "output_nominal"]
+    scenariis = sorted(scenariis, key=lambda x:namesOrdered.index(x.split("_")[1]) if x.split("_")[1] in namesOrdered else len(namesOrdered))
+
+    for d in scenariis:
+        h,t = parseScenario(os.path.join(args.outputFolder, d), os.path.join(args.outputFolder, "output_nominal"))
+        if args.latex or args.full_latex:
+            printTableLatex(h,t)
+        else:
+            printTableASCII(h,t)
+
+    if args.full_latex:
+        printEndLatex()
     logger.info("Done")
             
 if __name__=="__main__":
