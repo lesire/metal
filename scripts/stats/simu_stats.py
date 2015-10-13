@@ -403,6 +403,10 @@ def parseSimu(outputDir):
         l = [d["finishTime"]/1000. for d in agents.values() if "finishTime" in d]
         if l:
             result["finishTime"] = max(l)
+        else:
+            result["error"] = True
+            result["success"] = False
+            result["finishTime"] = -1
 
         ###### Parse the repair attemps : number of length #####
         repairRequestNbr = 0
