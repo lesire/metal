@@ -627,7 +627,25 @@ class Supervisor(threading.Thread):
             self.droppedComs.append(a["name"])
 
         planJson = plan.Plan.removeAction(planJson, k)
-        #planJson["current-time"] = self.getCurrentTime()
+
+        #Remove the ub of the droped coms
+        tps = []
+        robot1,robot2 = comMetaName.split(" ")[1:3]
+        for a in planJson["actions"].values():
+            if a["name"].startswith("communicate %s %s" % (robot1,robot2)) or\
+               a["name"].startswith("communicate %s %s" % (robot2,robot1)):
+                tps.append(a["startTp"])
+                tps.append(a["endTp"])
+        
+        #TODO we should only remove ub for this dropped com. But a problem arise if we drop a com when we should already have executed something ...
+        for i,tl in reversed(list(enumerate(planJson["temporal-links"]))):
+            #if "ub" in tl and tl["endTp"] in tps:
+            if "ub" in tl:
+                logger.info("Removing an ub constraint")
+                del planJson["temporal-links"][i]
+
+        if self.agent == "mana":
+            logger.warning("Importing the plan %s" % json.dumps(planJson))
 
         self.init(json.dumps(planJson), self.agent)
         

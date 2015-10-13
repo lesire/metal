@@ -498,12 +498,6 @@ class SupervisorRos(Supervisor):
             return
 
         with self.mutex:
-            
-            # Check if a com was cancelled, even from another plan
-            #logger.info("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))
-            for c in data.droppedComs:
-                if c not in self.droppedComs:
-                    self.dropCommunication(c)
                     
             if data.planId != self.plan.ids[-1]:
                 logger.warning("I detect an inconsistency in the plan being executed by %s. (%s != %s). Ignoring this update" % (data._connection_header["callerid"], data.planId, self.plan.ids[-1]))
@@ -529,6 +523,12 @@ class SupervisorRos(Supervisor):
 
             self.plan.stn.setConstraints(cl)
             self.stnUpdated({"mastnUpdate":dataStnUpdate})
+
+            # Check if a com was cancelled. Must append after updating the temporal constraint as the new imported plan could be invalid with previous constraints
+            #logger.info("%s received a message from %s with dropped coms %s" % (self.agent, data._connection_header["callerid"], data.droppedComs))
+            for c in data.droppedComs:
+                if c not in self.droppedComs:
+                    self.dropCommunication(c)
 
             if not self.plan.stn.isConsistent():
                 logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
