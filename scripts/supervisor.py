@@ -352,7 +352,7 @@ class Supervisor(threading.Thread):
                 ub =  math.ceil((cCom.ub + cCom.lb)/2)
 
                 logger.info("Ignoring previous computation : using a fixed value of %f seconds" % self.ubForCom)
-                ub = self.plan.stn.getBounds(action["tEnd"]).lb + int(self.ubForCom) * 1000
+                ub = max(self.plan.stn.getBounds(action["tEnd"]).lb, currentTime) + int(self.ubForCom) * 1000
                 logger.info("Executing a com action at %.2f. Set its upper bound to %.2f. Max duration : %.2f" % (currentTime/1000, ub/1000, (ub - currentTime)/1000))
 
                 self.plan.addTemporalConstraint(None, action["tEnd"], 0, ub, cbStnUpdated=self.stnUpdated)
@@ -370,6 +370,7 @@ class Supervisor(threading.Thread):
                     self.sendVisuUpdate()
                     return
 
+                #TODO wake up 500ms before the actual deadline to avoid doing it too late
                 threading.Timer((ub - currentTime)/1000, lambda : self.inQueue.put({"type":"ubAction", "action":action, "date":ub})).start()
 
 
