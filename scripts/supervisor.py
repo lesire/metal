@@ -648,9 +648,6 @@ class Supervisor(threading.Thread):
                 logger.info("Removing an ub constraint")
                 del planJson["temporal-links"][i]
 
-        if self.agent == "mana":
-            logger.warning("Importing the plan %s" % json.dumps(planJson))
-
         self.init(json.dumps(planJson), self.agent)
         
         logger.info("Finished importing the new plan when deleting the com-meta action")
