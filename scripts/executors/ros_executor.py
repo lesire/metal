@@ -172,11 +172,11 @@ try:
             elif msg.aleaType == "targetFound":
                 logger.info("Received a alea of type target")
 
-                pos = data.get("position", {})
+                pos = data.get("target", {})
                 x = pos.get("x", 0)
                 y = pos.get("y", 0)
 
-                self.outQueue.put({"type":"alea", "aleaType":"targetFound", "position":{"x":x, "y":y}})
+                self.outQueue.put({"type":"alea", "aleaType":"targetFound", "target":{"x":x, "y":y}})
 
                 return True
             elif msg.aleaType == "nextReport":
