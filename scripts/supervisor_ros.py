@@ -459,7 +459,8 @@ class SupervisorRos(Supervisor):
         #executedNodes = [tp for tp in self.plan.stn.getFrontierNodeIds() if self.tp[tp][1] == "past"]
         # Send all executed nodes, not just the frontier, for the same reason that we send the action : if an action is executed we need this information for computing the global plan
         # TODO : have each robot remember the date of its tps ? What happens when one is dead ?
-        executedNodes = [tp for tp in self.tp.keys() if self.tp[tp][1] == "past" and tp != "0-start-dummy init"]
+        # Ignore the fake executed node that corresponds to dead robot plans
+        executedNodes = [tp for tp in self.tp.keys() if self.tp[tp][1] == "past" and tp != "0-start-dummy init" and (not tp.startswith("1-end") or tp == "1-end-" + self.agent)]
         for tp in executedNodes:
             v = self.plan.stn.getBounds(tp)
             if v.ub != v.lb:
