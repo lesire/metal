@@ -46,7 +46,7 @@ try:
             self._com_succeded = False #true if received the message from the other side
             
             self.last_time_sent = time.time()
-            self.time_gap = 0.1 # min time between resend, in seconds
+            self.time_gap = 1 # min time between resend, in seconds
 
             self._com_sub = rospy.Subscriber("hidden/communicate/in", Communication, self._receiveCom)
             self._com_pub = rospy.Publisher( "hidden/communicate/out", Communication, queue_size=10)

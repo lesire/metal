@@ -618,8 +618,12 @@ class Supervisor(threading.Thread):
             self.outQueue.put(msg)
 
         elif "executed" in a and a["executed"]:
-            logger.error("Cannot drop %s. %s is executed" % (comName, a["name"]))
-            return
+            #This can happen if coms are cut after the start of the communication action.
+            #This robot knows that the other is here to communicate, but the message is cut
+            #One robot has executed the com-meta action and the other dropped it. In this case we drop it.
+            logger.warning("This action is already executed, but I will remove it anyway.")
+            #logger.error("Cannot drop %s. %s is executed" % (comName, a["name"]))
+            #return
         
         logger.info("Dropping communication : %s" % a["name"])
 
