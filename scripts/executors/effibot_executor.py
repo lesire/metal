@@ -15,6 +15,7 @@ try:
             self.move_subscriber = rospy.Subscriber("goto/status", String, self._move_cb)
 
             self.current_action = None
+            self.move_cb = None
             self.cancelled_actions = set()
 
         def _stop(self, action):
@@ -26,10 +27,19 @@ try:
                 self.cancelled_actions.remove(self.current_action)
                 return
 
-            if "Success" in data.data:
+            if self.current_action is None:
+                return #No action in progress
+
+            if data.data.lower() == "ok":
                 self.move_cb("ok")
+            elif data.data.lower() == "ko" :
+                self.move_cb("ko")
             else:
-                self.move_cb("error")
+                #ignore it
+                return
+
+            self.current_action = None
+            self.move_cb = None
 
         # move effibot1 pt_agv_16239_-6582 pt_agv_22229_-2588
         def move(self, who, a, b, cb, **kwargs):
