@@ -156,7 +156,7 @@ class simpleDelayGen(AbstractPlanGen):
     _descriptionFR = "Un robot prend un retard de 45 secondes sur une de ses actions."
 
     def _nextAlea(self):
-        delayedRobot = random.sample(self.activeRobots, 1)
+        delayedRobot = random.sample(self.activeRobots, 1)[0]
         d1 = random.uniform(5, self.planLength-5) # Delayed action
         
         self.addDelayedAction(delayedRobot, d1, 45)
@@ -208,7 +208,7 @@ class complexGen(AbstractPlanGen):
                 self.addIsolatedRobot(isolatedRobot, d-5, d+5)
                 self.availRobots.remove(detectorRobot)
             elif type == "delay":
-                delayedRobot = random.sample(list(self.availRobots), 1)
+                delayedRobot = random.sample(list(self.availRobots), 1)[0]
                 self.addDelayedAction(delayedRobot, d, 45)
             else:
                 logger.error("Unknown type")
