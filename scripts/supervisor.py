@@ -942,7 +942,7 @@ class Supervisor(threading.Thread):
             #Try to remove the furure deadlines
             futureComs = []
             for a in self.plan.actions.values():
-                if "communicate-meta" in a["name"] and self.agent in a["name"] and not a["executed"]:
+                if "communicate" in a["name"] and self.agent in a["name"] and not a["executed"]:
                     futureComs.append(a["name"])
                     
             if len(futureComs) > 0:

@@ -84,6 +84,15 @@ class SupervisorRos(Supervisor):
                 logger.error("state field is not a string : " % data)
                 return False
             s = s.upper()
+            
+            if s == "STOPTRACKING":
+                if self.state == State.TRACKING:
+                    self.state = State.RUNNING
+                else:
+                    logger.info("Received the order to stop tracking. But I'm not tracking anything. Ignore it.")
+                    pass
+                return True
+            
             if s not in dir(State):
                 logger.error("State %s is unknown" % s)
                 return False
@@ -94,7 +103,6 @@ class SupervisorRos(Supervisor):
                 self.triggerRepair = True
             else:
                 self.state = getattr(State, s)
-            
             
             return True
         elif msg.aleaType == "sendMastn":
@@ -390,31 +398,61 @@ class SupervisorRos(Supervisor):
                 
                 # See if the plan is still temporally valid. It could be a problem if I added a ub for a com
                 # while the other robot was late : both constraints are problematic. In this case, drop my
-                # current com
+                # current com or the com of the other robot
                 try:
                     _ = Plan(json.dumps(p), self.agent)
                 except PlanImportError as e:
-                    logger.warning("The fused plan will not be valid. Try to drop my current com")
-                    for name,_,_ in self.ongoingActions:
+                    logger.warning("The fused plan will not be valid. Try to drop a current com")
+                    for action in p["actions"].values():
+                    #for name,_,_ in self.ongoingActions:
+                        name = action["name"]
+                        if self.agent not in name: continue
+                        #if not (action["startTp"] in p["absolute-time"] and not action["endTp"] in p["absolute-time"]):continue
                         if "communicate " in name:
-                            #Find the com meta name
-                            robot1,robot2 = name.split(" ")[1:3]
-                            nameIndex = None
-                            for k,a in self.plan.actions.items():
-                                if a["name"].startswith("communicate-meta %s %s" % (robot1,robot2)) or\
-                                   a["name"].startswith("communicate-meta %s %s" % (robot2,robot1)):
-                                    name = a["name"]
-                                    nameIndex = k
-                                    break
-                            
-                            if nameIndex is None:
-                                logger.error("Could not find the index of the com meta action !")
-                                self.state = State.ERROR
-                                return
-                            
-                            logger.warning("Dropping %s (%s)" % (name, nameIndex))
-                            
-                            self.dropCommunication(name)
+                            logger.info("I want to drop (%s,%s,%s)" % (name,action["startTp"],action["endTp"]))
+                            logger.info("%s" % (action))
+                            logger.info(action["startTp"] in p["absolute-time"] )
+                            logger.info(action["endTp"] in p["absolute-time"] )
+                            logger.info([a["name"] for a in self.plan.actions.values()])
+                            logger.info([a["name"] for a in otherPlan["actions"].values()])
+
+                            if action["agent"] == self.agent:
+                                #Find the com meta name
+                                robot1,robot2 = name.split(" ")[1:3]
+                                nameIndex = None
+                                for k,a in self.plan.actions.items():
+                                    if a["name"].startswith("communicate-meta %s %s" % (robot1,robot2)) or\
+                                       a["name"].startswith("communicate-meta %s %s" % (robot2,robot1)):
+                                        name = a["name"]
+                                        nameIndex = k
+                                        break
+                                
+                                if nameIndex is None:
+                                    logger.error("Could not find the index of the com meta action ! %s" % name)
+                                    continue
+                                    #self.state = State.ERROR
+                                    #return
+                                else:
+                                
+                                    logger.warning("Dropping %s (%s)" % (name, nameIndex))
+                                    
+                                    self.dropCommunication(name)
+                            else:
+                                robot1,robot2 = name.split(" ")[1:3]
+                                nameIndex = None
+                                for k,a in otherPlan["actions"].items():
+                                    if a["name"].startswith("communicate-meta %s %s" % (robot1,robot2)) or\
+                                       a["name"].startswith("communicate-meta %s %s" % (robot2,robot1)):
+                                        name = a["name"]
+                                        nameIndex = k
+                                        break
+                                
+                                if nameIndex is None:
+                                    logger.error("Could not find the index of the com meta action ! %s" % name)
+                                    continue
+                                    #self.state = State.ERROR
+                                    #return
+                                
 
                             logger.info("Length before %s" % len(otherPlan["actions"]))
                             otherPlan = Plan.removeAction(otherPlan, nameIndex) #remove the com meta for actions that I dropped
@@ -500,8 +538,8 @@ class SupervisorRos(Supervisor):
 
         with self.mutex:
                     
-            if data.planId != self.plan.ids[-1]:
-                logger.warning("I detect an inconsistency in the plan being executed by %s. (%s != %s). Ignoring this update" % (data._connection_header["callerid"], data.planId, self.plan.ids[-1]))
+            if data.planId != self.plan.ids[-1] and self.state not in [State.REPAIRINGPASSIVE]:
+                logger.warning("I detect an inconsistency in the plan being executed by %s. (%s != %s). I'm in state %s" % (data._connection_header["callerid"], data.planId, self.plan.ids[-1], State.reverse_mapping[self.state]))
                 self.startPlanSync()
                 return #ignore this message as it is not relevant anymore. It could cause inconsistency since it was computed on different plans
 
@@ -532,7 +570,7 @@ class SupervisorRos(Supervisor):
                     self.dropCommunication(c)
 
             if not self.plan.stn.isConsistent():
-                logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data._connection_header["callerid"]))
+                logger.error("Received an update from %s. When setting the constraints, stn become inconsistent" % (data.sender))
                 logger.error(data.arcs)
                 return
 

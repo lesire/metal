@@ -424,9 +424,9 @@ class Plan:
 
     def setForeignActionExecuted(self, key, agentFrom):
         if key not in self.jsonDescr["actions"]:
-            logger.error("Received an update from %s with executed actions %k. I do not know it" % (agentFrom, key))
+            logger.error("Received an update from %s with executed actions %s. I do not know it" % (agentFrom, key))
         elif self.jsonDescr["actions"][key]["agent"] != agentFrom:
-            logger.error("%s pretends he has executed %k. But this action belongs to %s" % (agentFrom, key, self.jsonDescr["actions"][key]["agent"]))
+            logger.error("%s pretends he has executed %s. But this action belongs to %s" % (agentFrom, key, self.jsonDescr["actions"][key]["agent"]))
         else:
             if "executed" not in self.jsonDescr["actions"][key] or not self.jsonDescr["actions"][key]["executed"]:
                 logger.info("I'm informed that %s has executed %s" % (agentFrom, self.jsonDescr["actions"][key]["name"]))
