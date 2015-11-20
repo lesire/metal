@@ -69,7 +69,7 @@ class AbstractPlanGen(object):
         self.data[self.nextIndex()] = {"type" : "state", "date":repairingTime, "to":repairingRobot, "data":{"state":"repairingactive"}}
 
         # Must finish the track to finish the plan
-        self.data[self.nextIndex()] = {"type" : "state", "date":endTrackingTime, "to":detectorRobot, "data":{"state":"running"}}
+        self.data[self.nextIndex()] = {"type" : "state", "date":endTrackingTime, "to":detectorRobot, "data":{"state":"stoptracking"}}
 
     def addDelayedAction(self, delayedRobot, time, delay):
         
@@ -81,6 +81,7 @@ class NominalGen(AbstractPlanGen):
     _name = "nominal"
     _description = "No alea."
     _descriptionFr = "Pas d'aléa."
+    _descriptionLatexFr = "Mission nominale."
     
     def _nextAlea(self):
         pass
@@ -89,7 +90,8 @@ class DeadRobotGen(AbstractPlanGen):
     _name = "deadRobot"
     _description = "A random robot is declared dead, another robot is notified after (might be quite late)."
     _descriptionFR = "Un robot meurt et un autre robot en est notifié (éventuellement beaucoup plus tard)."
-    
+    _descriptionLatexFr = "Un AXV devient non opérationnel"
+
     def _nextAlea(self):
         deadRobot,reparingRobot = random.sample(self.activeRobots, 2)
         d1 = random.uniform(0, self.planLength)  # death of the robot
@@ -102,6 +104,7 @@ class deadRobotIsolatedRobotGen(AbstractPlanGen):
     _name = "deadRobotIsolatedRobot"
     _description = "A random robot is declared dead, another robot is notified after (might be quite late). During this time, a third robot is isolated."
     _descriptionFR = "Un robot meurt et un autre robot en est notifié (éventuellement beaucoup plus tard). Pendant ce temps, un 3ème est isolé du reste de l'équipe."
+    _descriptionLatexFr = "Un AXV devient non opérationnel + Un AXV ne peut plus communiquer"
 
     def _nextAlea(self):
         deadRobot,reparingRobot,isolatedRobot = random.sample(self.activeRobots, 3)
@@ -116,7 +119,7 @@ class TargetFoundGen(AbstractPlanGen):
     _name = "targetFound"
     _description = "A random robot finds a target"
     _descriptionFR = "Un robot trouve une cible et la suit seul pendant une minute."
-
+    _descriptionLatexFr = "Un AXV détecte une cible"
     
     def _nextAlea(self):
         detectorRobot,repairingRobot = random.sample(self.activeRobots, 2)
@@ -129,6 +132,7 @@ class TargetFoundIsolatedRobotGen(AbstractPlanGen):
     _name = "targetFoundIsolatedRobot"
     _description = "A random robot finds a target while another one is isolated"
     _descriptionFR = "Un robot trouve une cible et la suit seul pendant une minute. Pendant ce temps, un autre robot est isolé du reste de l'équipe."
+    _descriptionLatexFr = "Un AXV détecte une cible + Un AXV ne peut plus communiquer"
 
     def _nextAlea(self):
         detectorRobot,repairingRobot,isolatedRobot = random.sample(self.activeRobots, 3)
@@ -142,6 +146,7 @@ class DoubleTargetFoundGen(AbstractPlanGen):
     _name = "doubleTargetFound"
     _description = "Two random different robots find a target !"
     _descriptionFR = "Deux robots distincts détectent deux cibles différentes."
+    _descriptionLatexFr = "Un AXV détecte une cible, répété deux fois"
 
     def _nextAlea(self):
         detectorRobot,repairingRobot,detectorRobot2,repairingRobot2 = random.sample(self.activeRobots, 4)
@@ -154,6 +159,7 @@ class simpleDelayGen(AbstractPlanGen):
     _name = "simpleDelay"
     _description = "A random robot has a delay of 45 sec"
     _descriptionFR = "Un robot prend un retard de 45 secondes sur une de ses actions."
+    _descriptionLatexFr = "Un AXV est en retard"
 
     def _nextAlea(self):
         delayedRobot = random.sample(self.activeRobots, 1)[0]
@@ -165,8 +171,8 @@ class simpleDelayIsolatedRobotGen(AbstractPlanGen):
     _name = "simpleDelayIsolatedRobot"
     _description = "A random robot has a delay of 45 sec  while another one is isolated"
     _descriptionFR = "Un robot prend un retard de 45 secondes sur une de ses actions. Pendant ce temps, un autre robot est isolé du reste de l'équipe."
+    _descriptionLatexFr = "Un AXV est en retard + Un AXV ne peut plus communiquer"
 
-    
     def _nextAlea(self):
         delayedRobot,isolatedRobot = random.sample(self.activeRobots, 2)
         d1 = random.uniform(5, self.planLength-5)  # Delayed action
@@ -178,12 +184,16 @@ class simpleDelayIsolatedRobotGen(AbstractPlanGen):
 class complexGen(AbstractPlanGen):
     _name = "complex"
     _description = "2 random aleas are created"
-    _description = "2 aléas sont introduits, espacés d'au moins 20 secondes"
-    
+    _descriptionFR = "2 aléas sont introduits, espacés d'au moins 40 secondes"
+    _descriptionLatexFr = "Deux événements sont générés"
+
     def _nextAlea(self):
+        """
         dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])
         while dates[1] - dates[0] < 20:
-            dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])        
+            dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])
+        """
+        dates = randomList(2, 5, self.planLength-5, 40)
 
         self.availRobots = set(self.activeRobots)
 

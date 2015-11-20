@@ -356,7 +356,7 @@ def parseSimu(outputDir):
                 coms.add((data["from"],data["to"]))
                 coms.add((data["to"],data["from"]))
             elif data["type"] == "track":
-                targets.append((data["x"], data["y"]))
+                targets.append((data["by"], data["x"], data["y"]))
             
             logger.debug(data)
 
@@ -366,7 +366,8 @@ def parseSimu(outputDir):
         result["coms"]["nbr"] = len(coms)/2 # Both side are in : from->to and to->from
         result["coms"]["ratio"] = float(result["coms"]["nbr"]) / result["coms"]["nominalNbr"]
         
-        result["target"]["nbrTrack"] = len(targets)
+        #TODO why in some cases I have serveral track for the same robot and same coordinates
+        result["target"]["nbrTrack"] = len(set(targets))
 
         ###### Compute the time of the plan based on the state of each robot #####
         hasError = False

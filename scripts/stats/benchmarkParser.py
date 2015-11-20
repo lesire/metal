@@ -13,7 +13,7 @@ def getDescription(name):
         import benchmarkGenerator
         for gen in benchmarkGenerator.AbstractPlanGen.__subclasses__():
             if gen._name == name:
-                return gen._descriptionFR
+                return gen._descriptionLatexFr
         return name
     except Exception as e:
         return name
@@ -44,31 +44,31 @@ def getRepairTimeList(l):
 #Each columns is defined by its name and its function.
 #The function is given two lists : the values for the current setting and the values for the nominal case
 columns = [
-            ("Min.",            lambda s,n: min(s) if len(s) else ""),
-            ("Max.",            lambda s,n: max(s) if len(s) else ""),
-            ("Moyenne",         lambda s,n: mean(s)),
-            ("Moyenne nom.",    lambda s,n: mean(n)),
-            ("Diff.",           lambda s,n: (mean(s) - mean(n))),
-            ("Diff.(%)",        lambda s,n: (mean(s) - mean(n))*100/(mean(n)) if mean(n) != 0 else ""),
-            ("Écart type(σ)",   lambda s,n: stddev(s)),
-            ("Variation(%)",    lambda s,n: stddev(s)*100/mean(s) if mean(s) != 0 else ""),
-            ("σ nom",           lambda s,n: stddev(n)),
-            ("Var. nom.(%)",    lambda s,n: stddev(n)*100/mean(n) if mean(n) != 0 else ""),
+            {"name":"Min.",            "func":lambda s,n: min(s) if len(s) else ""},
+            {"name":"Max.",            "func":lambda s,n: max(s) if len(s) else ""},
+            {"name":"Moyenne",         "func":lambda s,n: mean(s)},
+            {"name":"Moyenne nom.",    "func":lambda s,n: mean(n), "latexFont":"\\itshape "},
+            {"name":"Différence",           "func":lambda s,n: (mean(s) - mean(n))},
+            {"name":"Différence (%)",        "func":lambda s,n: (mean(s) - mean(n))*100/(mean(n)) if mean(n) != 0 else ""},
+            {"name":"Écart-type σ",   "func":lambda s,n: stddev(s)},
+            {"name":"σ (%)",    "func":lambda s,n: stddev(s)*100/mean(s) if mean(s) != 0 else ""},
+            {"name":"σ nom.",           "func":lambda s,n: stddev(n), "latexFont":"\\itshape "},
+            {"name":"σ nom. (%)",    "func":lambda s,n: stddev(n)*100/mean(n) if mean(n) != 0 else "", "latexFont":"\\itshape "},
           ]
 
 values = [
           ("Durée de la mission (s)",               functools.partial(oneValuePerRun, f=lambda x:x["finishTime"])),
           ("Nombre de points observés",             functools.partial(oneValuePerRun, f=lambda x:x["obsPoints"]["nbr"])),
           ("Nombre de rendez-vous réussis",         functools.partial(oneValuePerRun, f=lambda x:x["coms"]["nbr"])),
+          ("Nombre de suivis de cible",              functools.partial(oneValuePerRun, f=lambda x:x["target"]["nbrTrack"])),
           ("Nombre de réparations",                 functools.partial(oneValuePerRun, f=lambda x:x["repair"]["requestNbr"])),
           ("Temps passé en réparation (s)",         functools.partial(oneValuePerRun, f=lambda x:x["repair"]["totalTime"]/1000.)),
           ("Durée moyenne d'une réparation (s)",    getRepairTimeList),
           ("Nombre de messages transférés",         functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"])),
-          ("Nombre de messages part. transférés",   functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrPartial"])),
+          ("Nombre de messages partiellement transférés",   functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrPartial"])),
           ("Nombre de messages bloqués",            functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrFiltered"])),
-          ("Nombre de messages total",              functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"] + x["vNet"]["nbrPartial"] + x["vNet"]["nbrFiltered"])),
+          ("Nombre total de messages",              functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"] + x["vNet"]["nbrPartial"] + x["vNet"]["nbrFiltered"])),
           ("Taille totale des messages (~ko)",      functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["bandwith"]/1000.0)),
-          ("Nombre de suivi de cible",              functools.partial(oneValuePerRun, f=lambda x:x["target"]["nbrTrack"])),
           ]
 
 #Returns a table of string to be printed
@@ -105,7 +105,7 @@ def parseScenario(scenarioFolder, nominalFolder):
     results = [["" for _ in range(len(columns)+1)] for _ in range(len(values)+1)]
 
     for j in range(len(columns)):
-        results[0][j+1] = columns[j][0]
+        results[0][j+1] = columns[j]["name"]
 
     for i,(name,getValues) in enumerate(values):
         scenarioValues = getValues(resultsScenario.values())
@@ -113,7 +113,8 @@ def parseScenario(scenarioFolder, nominalFolder):
         
         results[i+1][0] = name
 
-        for j,(_,f) in enumerate(columns):
+        for j,c in enumerate(columns):
+            f = c["func"]
             value = f(scenarioValues,nominalValues)
             
             
@@ -151,26 +152,43 @@ def printBeginLatex():
 \\usepackage{amssymb}
 \\usepackage[frenchb]{babel}
 
+\\usepackage{float}
+\\usepackage{array}
+\\newcolumntype{M}[1]{>{\\centering\\arraybackslash}m{#1}}
 
 \\begin{document}
     """)
 
 def printTableLatex(header, table):
 
+    """
     print()
     print("\\begin{center}")
     print("\n".join(header))
     print("\\end{center}")
+    """
+    
+    
     print()
+    print(r"\begin{table}[H]")
+    print(r"\resizebox{\textwidth}{!}{%")
     
     table[0] = [l.replace("%", "\\%").replace("σ","$\\sigma$") for l in table[0]]
     
-    print("\\begin{tabular}{|" + ("c|" *len(table[0])) + "}\\hline")
+    for i in range(len(table)):
+        for j in range(len(table[i])):
+            table[i][j] = table[i][j].replace("~", r"$\sim$")
+    
+    print("\\begin{tabular}{|M{4cm}|" + ("M{2cm}|" *(len(table[0])-1)) + "}\\hline")
     for line in table:
-        print("&".join(line) + "\\\\\\hline")
+        print("&".join([" {" + (columns[i-1].get("latexFont","") if i > 0 else "") + item + "} " for i,item in enumerate(line)]) + "\\\\\\hline")
     print("\end{tabular}")
 
-    print("\n\\clearpage\n")
+    print("}")
+    print(r"\caption{%s}" % header[0].split(":")[1].strip())
+    print(r"\label{tab:stats:%s}" % header[0].split(":")[0].strip())
+    print(r"\end{table}")
+    #print("\n\\clearpage\n")
 
 def printEndLatex():
     print("\\end{document}")
