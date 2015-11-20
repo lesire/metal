@@ -6,6 +6,7 @@ import json
 import threading
 
 import rospy
+import rostopic
 from std_msgs.msg import Empty
 from metal.msg import StnVisu
 
@@ -41,10 +42,19 @@ class autoStart:
                 self.agents.add(msg.agent)
 
                 if len(self.expectedAgents) == len(self.agents):
-                    logger.info("Autostart has found everyone. Starting in 1 second")
+
+                    while rostopic.get_topic_class("/vnet/reload")[1] is None:
+                        logger.warning("Cannot find vnet ?!?")
+                        logger.warning(rostopic.get_topic_class("/vnet/reload"))
+                        time.sleep(5)
+                    
+                    self.pub_vnet = rospy.Publisher("/vnet/reload", Empty, queue_size=1)
+                    threading.Timer(1, lambda : self.pub_vnet.publish()).start()
+                
+                    logger.info("Autostart has found everyone. Starting in 3 seconds.")
                     self.started = True
-                    threading.Timer(1, lambda : self.pub.publish()).start()
-                    threading.Timer(3, lambda : rospy.signal_shutdown("Done")).start()
+                    threading.Timer(3, lambda : self.pub.publish()).start()
+                    threading.Timer(5, lambda : rospy.signal_shutdown("Done")).start()
 
 def main():
     sh = logging.StreamHandler()
