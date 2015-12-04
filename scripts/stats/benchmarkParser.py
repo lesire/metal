@@ -8,6 +8,13 @@ import os
 import re
 import sys
 
+try:
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import matplotlib.pyplot as plt
+except:
+    pass
+
 def getDescription(name):
     try:
         import benchmarkGenerator
@@ -71,6 +78,9 @@ values = [
           ("Taille totale des messages (~ko)",      functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["bandwith"]/1000.0)),
           ]
 
+#ordering for the scenarii
+namesOrdered = ["deadRobot", "deadRobotIsolatedRobot", "targetFound", "targetFoundIsolatedRobot", "doubleTargetFound", "simpleDelay", "simpleDelayIsolatedRobot", "complex"]
+
 #Returns a table of string to be printed
 def parseScenario(scenarioFolder, nominalFolder):
     resultsScenario = {}
@@ -123,7 +133,7 @@ def parseScenario(scenarioFolder, nominalFolder):
             else:
                 results[i+1][j+1] = str(value)
 
-    return header,results
+    return header,results,resultsScenario
 
 
 def printTableASCII(header,table):
@@ -193,12 +203,70 @@ def printTableLatex(header, table):
 def printEndLatex():
     print("\\end{document}")
 
+class Histo:
+    def __init__(self):
+        self.table = {}
+
+    def addTable(self, header, table, data):
+        self.table[header[0].split(":")[0].strip()] = (table,data)
+        
+    def printHisto(self):
+
+        for indexValue in [0,10]:
+            keys = []
+            means = []
+            errors = []
+            datas = []
+            
+            table,data = next(iter(self.table.values()))
+            keys.append("Nominal")
+            means.append(float(table[indexValue+1][table[0].index("Moyenne nom.")]))
+            errors.append(float(table[indexValue+1][table[0].index("σ nom.")]))
+            datas.append(data)
+            
+            plt.axvline(float(table[indexValue+1][table[0].index("Moyenne nom.")]), color="red")
+
+            for key in namesOrdered:
+                table,data = self.table[key]
+                keys.append(key)
+                means.append(float(table[indexValue+1][table[0].index("Moyenne")]))
+                errors.append(float(table[indexValue+1][table[0].index("Écart-type σ")]))
+                datas.append(data)
+
+            plt.barh(range(len(means)), means, xerr=errors, align='center', alpha=0.3, error_kw=dict(elinewidth=2,ecolor='blue'))
+
+            for i in range(1,len(means)):
+                valuesToDraw = values[indexValue][1](datas[i].values())
+                if i == 0: print(sorted(valuesToDraw))
+                if i == 0: print(sum(valuesToDraw)/len(valuesToDraw))
+                plt.scatter(valuesToDraw, [i]*len(valuesToDraw), c="black", marker="x", s=70, alpha=0.8)
+            
+            plt.yticks(range(len(means)), list(map(lambda x: getDescription(x).replace("+","\n"), keys)))
+            plt.xlabel(values[indexValue][0])
+            plt.gca().set_xlim(0)
+            plt.gca().set_ylim(-1, len(means))
+            
+            plt.gca().invert_yaxis()
+            plt.tight_layout()
+            
+            
+            
+            def onresize(event):
+                plt.tight_layout()
+
+            plt.gcf().canvas.mpl_connect('resize_event', onresize)
+            
+            plt.show()
+            
+        
+    
 def main(argv):
     parser = argparse.ArgumentParser(description="Parse a statistical simulation")
     parser.add_argument("outputFolder"   , type=os.path.abspath)
     parser.add_argument("--logLevel"       , type=str, default="info")
     parser.add_argument("--latex"       , action="store_true")
     parser.add_argument("--full-latex", action="store_true")
+    parser.add_argument("--histo", action="store_true")
     args = parser.parse_args(argv)
     
     #Configure the logger
@@ -214,21 +282,26 @@ def main(argv):
 
     if args.full_latex:
         printBeginLatex()
+    elif args.histo:
+        histo = Histo()
 
     #Compute an order among the outputs
-    namesOrdered = ["deadRobot", "deadRobotIsolatedRobot", "targetFound", "targetFoundIsolatedRobot", "doubleTargetFound", "simpleDelay", "simpleDelayIsolatedRobot", "complex"]
     scenariis = [d for d in os.listdir(args.outputFolder) if d.startswith("output_") and d != "output_nominal"]
     scenariis = sorted(scenariis, key=lambda x:namesOrdered.index(x.split("_")[1]) if x.split("_")[1] in namesOrdered else len(namesOrdered))
 
     for d in scenariis:
-        h,t = parseScenario(os.path.join(args.outputFolder, d), os.path.join(args.outputFolder, "output_nominal"))
+        h,t,data = parseScenario(os.path.join(args.outputFolder, d), os.path.join(args.outputFolder, "output_nominal"))
         if args.latex or args.full_latex:
             printTableLatex(h,t)
+        elif args.histo:
+            histo.addTable(h,t,data)
         else:
             printTableASCII(h,t)
 
     if args.full_latex:
         printEndLatex()
+    elif args.histo:
+        histo.printHisto()
     logger.info("Done")
             
 if __name__=="__main__":
