@@ -223,6 +223,50 @@ class complexGen(AbstractPlanGen):
             else:
                 logger.error("Unknown type")
 
+class complexHardGen(AbstractPlanGen):
+    _name = "complexHard"
+    _description = "5 random aleas are created"
+    _descriptionFR = "5 aléas sont introduits, espacés d'au moins 40 secondes"
+    _descriptionLatexFr = "Cinq événements sont générés"
+
+    def _nextAlea(self):
+        """
+        dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])
+        while dates[1] - dates[0] < 20:
+            dates = sorted([random.uniform(5, self.planLength-5) for _ in range(2)])
+        """
+        dates = randomList(5, 5, self.planLength-5, 40)
+
+        self.availRobots = set(self.robots)
+
+        for d in dates:
+            type = random.choice(["dead", "deadIsolated", "target", "targetIsolated", "delay"])
+            if type == "dead":
+                deadRobot,reparingRobot = random.sample(list(self.availRobots), 2)
+                self.addDeadRobot(deadRobot, d-2, reparingRobot, d+2)
+                self.availRobots.remove(deadRobot)
+            elif type == "deadIsolated":
+                deadRobot,reparingRobot,isolatedRobot = random.sample(list(self.availRobots), 3)
+                self.addDeadRobot(deadRobot, d-2, reparingRobot, d+2)
+                self.addIsolatedRobot(isolatedRobot, d-5, d+5)
+                self.availRobots.remove(deadRobot)
+                self.availRobots.remove(isolatedRobot)
+            elif type == "target":
+                detectorRobot,repairingRobot = random.sample(list(self.availRobots), 2)
+                self.addTargetFound(detectorRobot, d-2, repairingRobot, d+2)
+                self.availRobots.remove(detectorRobot)
+            elif type == "targetIsolated":
+                detectorRobot,repairingRobot,isolatedRobot = random.sample(list(self.availRobots), 3)
+                self.addTargetFound(detectorRobot, d-2, repairingRobot, d+2)
+                self.addIsolatedRobot(isolatedRobot, d-5, d+5)
+                self.availRobots.remove(detectorRobot)
+                self.availRobots.remove(isolatedRobot)
+            elif type == "delay":
+                delayedRobot = random.sample(list(self.availRobots), 1)[0]
+                self.addDelayedAction(delayedRobot, d, 45)
+            else:
+                logger.error("Unknown type")
+
 
 def getPlanFiles(missionFolder):
     assert("hipop-files" in os.listdir(missionFolder))
@@ -316,7 +360,7 @@ def main(argv):
     logger.info("Creating the alea files")
     
     for gen in AbstractPlanGen.__subclasses__():
-    #for gen in [NominalGen]:
+    #for gen in [complexHardGen]:
         #if gen == NominalGen: continue #do not run nominal
         logger.info("Creating problems with generator %s" % gen._name)
         

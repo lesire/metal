@@ -346,17 +346,20 @@ def parseSimu(outputDir):
         ###### Parse the actions dones : coms and observation #####
         obsPoints = set()
         coms = set()
+        usefulRobots = set()
         targets = []
         for _, msg, _ in bag.read_messages(topics="/hidden/stats"):
             data = json.loads(msg.data)
             
             if data["type"] == "observe":
                 obsPoints.add(data["to"])
+                usefulRobots.add(data["by"])
             elif data["type"] == "com":
                 coms.add((data["from"],data["to"]))
                 coms.add((data["to"],data["from"]))
             elif data["type"] == "track":
                 targets.append((data["by"], data["x"], data["y"]))
+                usefulRobots.add(data["by"])
             
             logger.debug(data)
 
@@ -368,6 +371,8 @@ def parseSimu(outputDir):
         
         #TODO why in some cases I have serveral track for the same robot and same coordinates
         result["target"]["nbrTrack"] = len(set(targets))
+        
+        result["usefulRobots"] = len(usefulRobots)
 
         ###### Compute the time of the plan based on the state of each robot #####
         hasError = False

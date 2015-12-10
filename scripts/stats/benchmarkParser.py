@@ -9,6 +9,7 @@ import re
 import sys
 
 try:
+    import matplotlib
     import matplotlib.pyplot as plt
     import numpy as np
     import matplotlib.pyplot as plt
@@ -64,22 +65,23 @@ columns = [
           ]
 
 values = [
-          ("Durée de la mission (s)",               functools.partial(oneValuePerRun, f=lambda x:x["finishTime"])),
-          ("Nombre de points observés",             functools.partial(oneValuePerRun, f=lambda x:x["obsPoints"]["nbr"])),
-          ("Nombre de rendez-vous réussis",         functools.partial(oneValuePerRun, f=lambda x:x["coms"]["nbr"])),
-          ("Nombre de suivis de cible",              functools.partial(oneValuePerRun, f=lambda x:x["target"]["nbrTrack"])),
-          ("Nombre de réparations",                 functools.partial(oneValuePerRun, f=lambda x:x["repair"]["requestNbr"])),
-          ("Temps passé en réparation (s)",         functools.partial(oneValuePerRun, f=lambda x:x["repair"]["totalTime"]/1000.)),
-          ("Durée moyenne d'une réparation (s)",    getRepairTimeList),
-          ("Nombre de messages transférés",         functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"])),
-          ("Nombre de messages partiellement transférés",   functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrPartial"])),
-          ("Nombre de messages bloqués",            functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrFiltered"])),
-          ("Nombre total de messages",              functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"] + x["vNet"]["nbrPartial"] + x["vNet"]["nbrFiltered"])),
-          ("Taille totale des messages (~ko)",      functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["bandwith"]/1000.0)),
+          {"title":"Durée de la mission (s)",               "shortTitle":"duree",     "func":functools.partial(oneValuePerRun, f=lambda x:x["finishTime"])},
+          {"title":"Nombre de points observés",             "shortTitle":"nbrObs",    "func":functools.partial(oneValuePerRun, f=lambda x:x["obsPoints"]["nbr"])},
+          {"title":"Nombre de rendez-vous réussis",         "shortTitle":"nbrRV",     "func":functools.partial(oneValuePerRun, f=lambda x:x["coms"]["nbr"])},
+          {"title":"Nombre de suivis de cible",             "shortTitle":"nbrTarget", "func":functools.partial(oneValuePerRun, f=lambda x:x["target"]["nbrTrack"])},
+          {"title":"Nombre de réparations",                 "shortTitle":"nbrRepair", "func":functools.partial(oneValuePerRun, f=lambda x:x["repair"]["requestNbr"])},
+          {"title":"Temps passé en réparation (s)",         "shortTitle":"tpsRepair", "func":functools.partial(oneValuePerRun, f=lambda x:x["repair"]["totalTime"]/1000.)},
+          {"title":"Durée moyenne d'une réparation (s)",    "shortTitle":"meanRepair","func":getRepairTimeList},
+          {"title":"Nombre de messages transférés",         "shortTitle":"nbrTrans",  "func":functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"])},
+          {"title":"Nombre de messages partiellement transférés", "shortTitle":"nbrPart", "func":functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrPartial"])},
+          {"title":"Nombre de messages bloqués",            "shortTitle":"nbrBlock",  "func":functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrFiltered"])},
+          {"title":"Nombre total de messages",              "shortTitle":"nbrMsg",    "func":functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["nbrForwarded"] + x["vNet"]["nbrPartial"] + x["vNet"]["nbrFiltered"])},
+          {"title":"Taille totale des messages (~ko)",      "shortTitle":"sizeMsg",   "func":functools.partial(oneValuePerRun, f=lambda x:x["vNet"]["bandwith"]/1000.0)},
+          {"title":"Nombre de robots utiles à la mission",  "shortTitle":"nbrUseful", "func":functools.partial(oneValuePerRun, f=lambda x:x["usefulRobots"])},
           ]
 
 #ordering for the scenarii
-namesOrdered = ["deadRobot", "deadRobotIsolatedRobot", "targetFound", "targetFoundIsolatedRobot", "doubleTargetFound", "simpleDelay", "simpleDelayIsolatedRobot", "complex"]
+namesOrdered = ["deadRobot", "deadRobotIsolatedRobot", "targetFound", "targetFoundIsolatedRobot", "doubleTargetFound", "simpleDelay", "simpleDelayIsolatedRobot", "complex", "complexHard"]
 
 #Returns a table of string to be printed
 def parseScenario(scenarioFolder, nominalFolder):
@@ -117,7 +119,9 @@ def parseScenario(scenarioFolder, nominalFolder):
     for j in range(len(columns)):
         results[0][j+1] = columns[j]["name"]
 
-    for i,(name,getValues) in enumerate(values):
+    for i in range(len(values)):
+        name = values[i]["title"]
+        getValues = values[i]["func"]
         scenarioValues = getValues(resultsScenario.values())
         nominalValues = getValues(resultsNominal.values())
         
@@ -209,10 +213,15 @@ class Histo:
 
     def addTable(self, header, table, data):
         self.table[header[0].split(":")[0].strip()] = (table,data)
-        
-    def printHisto(self):
+    
+    # output should be a folder
+    def printHisto(self, output=None):
 
-        for indexValue in [0,10]:
+        for indexValue in range(len(values)):
+            #if indexValue not in [0,10]: continue
+            
+            plt.clf()
+            
             keys = []
             means = []
             errors = []
@@ -227,6 +236,7 @@ class Histo:
             plt.axvline(float(table[indexValue+1][table[0].index("Moyenne nom.")]), color="red")
 
             for key in namesOrdered:
+                if key not in self.table: continue
                 table,data = self.table[key]
                 keys.append(key)
                 means.append(float(table[indexValue+1][table[0].index("Moyenne")]))
@@ -236,13 +246,13 @@ class Histo:
             plt.barh(range(len(means)), means, xerr=errors, align='center', alpha=0.3, error_kw=dict(elinewidth=2,ecolor='blue'))
 
             for i in range(1,len(means)):
-                valuesToDraw = values[indexValue][1](datas[i].values())
+                valuesToDraw = values[indexValue]["func"](datas[i].values())
                 if i == 0: print(sorted(valuesToDraw))
                 if i == 0: print(sum(valuesToDraw)/len(valuesToDraw))
                 plt.scatter(valuesToDraw, [i]*len(valuesToDraw), c="black", marker="x", s=70, alpha=0.8)
             
             plt.yticks(range(len(means)), list(map(lambda x: getDescription(x).replace("+","\n"), keys)))
-            plt.xlabel(values[indexValue][0])
+            plt.xlabel(values[indexValue]["title"])
             plt.gca().set_xlim(0)
             plt.gca().set_ylim(-1, len(means))
             
@@ -250,13 +260,17 @@ class Histo:
             plt.tight_layout()
             
             
-            
-            def onresize(event):
-                plt.tight_layout()
+            if output is not None:
+                #plt.gcf().set_size_inches(800/matplotlib.rcParams["savefig.dpi"],600/matplotlib.rcParams["savefig.dpi"],forward=True)
 
-            plt.gcf().canvas.mpl_connect('resize_event', onresize)
-            
-            plt.show()
+                plt.savefig(os.path.join(output, values[indexValue]["shortTitle"]) + ".pdf", pad_inches=0.1, bbox_inches='tight')
+            else:
+                def onresize(event):
+                    plt.tight_layout()
+    
+                plt.gcf().canvas.mpl_connect('resize_event', onresize)
+                
+                plt.show()
             
         
     
@@ -267,6 +281,7 @@ def main(argv):
     parser.add_argument("--latex"       , action="store_true")
     parser.add_argument("--full-latex", action="store_true")
     parser.add_argument("--histo", action="store_true")
+    parser.add_argument("--output", type=str)
     args = parser.parse_args(argv)
     
     #Configure the logger
@@ -298,10 +313,14 @@ def main(argv):
         else:
             printTableASCII(h,t)
 
+    if args.output is not None:
+        if not os.access(args.output, os.R_OK):
+            os.mkdir(args.output)
+
     if args.full_latex:
         printEndLatex()
     elif args.histo:
-        histo.printHisto()
+        histo.printHisto(output=args.output)
     logger.info("Done")
             
 if __name__=="__main__":
