@@ -39,6 +39,18 @@ def getAgentFromAction(l):
     return n
 
 class Plan:
+    """Represents a plan.
+
+    The main goal of this class is to :
+      - Import/Export Json-encoded plans
+      - create and maintain the stn associated to the plan (the stn attribute)
+
+    The actions are stored in a dictionnary, similar to the one in the plan file, under the "actions" attribute.
+
+    The stn used is a MaSTN from libSTN. The name of the timepoints are of the form "index-tag-action". The index is the index in the plan file. The tag is either "start" or "end". The action is the name of the associated action. This increase the size of the indexes but allow for better readability.
+    The numeric index (as in the plan) is under "startTp"/"endTp" and the new alphabetic index is under "tStart"/"tEnd". 
+    """
+
     def __init__(self, planStr, agent=None):
         d = json.loads(planStr)
         d = Plan.preprocessPlanDict(d, agent)
@@ -276,6 +288,7 @@ class Plan:
     # Do some checks and modification of the initial plan.
     @staticmethod
     def preprocessPlanDict(data, agent):
+        """Called before the plan is used to do some check on the Json description of the plan. """
         for a in data["actions"].values():
             if "agent" not in a:
                 if a["name"] == "dummy init" or a["name"] == "dummy end":
@@ -307,6 +320,7 @@ class Plan:
         return self.stn.getLength()/timeFactor
     
     def getJsonDescription(self, currentTime = None):
+        """export the current plan to a valid json description"""
         result = deepcopy(self.jsonDescr)
         
         if "absolute-time" in result:
@@ -325,7 +339,8 @@ class Plan:
     
     # Add a temporal constraint to the plan.
     # Will be exported into Json to be included during the repair attemps
-    def addTemporalConstraint(self, startTp, endTp, lb, ub = None, cbStnUpdated = (lambda x: logger.error("toto"))):
+    def addTemporalConstraint(self, startTp, endTp, lb, ub = None, cbStnUpdated = (lambda x: logger.error("unexpected callback"))):
+        """Add a temporal constraint to the plan. Record it to export it if needed. Expect a callback to record the operation (eg. send it in ROS)"""
         if startTp is None:
             startTp = self.stn.getStartId()
             startTpIndex = 0
@@ -353,7 +368,8 @@ class Plan:
         self.jsonDescr["temporal-links"].append(tLink)
 
     #assume value in ms
-    def setTimePoint(self, tpName, value, cbStnUpdated = (lambda x: logger.error("toto"))):
+    def setTimePoint(self, tpName, value, cbStnUpdated = (lambda x: logger.error("unexpected callback"))):
+        """Called when a timepoint is executed. Value is an int in ms"""
         logger.debug("plan.setTimpoint %s %s" % (tpName, value))
     
         c = self.stn.getBounds(tpName)
@@ -412,6 +428,7 @@ class Plan:
             self.jsonDescr["actions"][index] = action
 
     def getMastnMsg(self):
+        """return and reset the list of messages to send with the next MaSTN update"""
         l = self.mastnMsg
         self.mastnMsg = []
         return l
@@ -423,6 +440,7 @@ class Plan:
         self.jsonDescr["unavailable-actions"].append(action["name"])
 
     def setForeignActionExecuted(self, key, agentFrom):
+        """Called when another robot report the execution of an action"""
         if key not in self.jsonDescr["actions"]:
             logger.error("Received an update from %s with executed actions %s. I do not know it" % (agentFrom, key))
         elif self.jsonDescr["actions"][key]["agent"] != agentFrom:
@@ -435,6 +453,7 @@ class Plan:
     
     
     def setForeignTp(self, tpName, value):
+        """Called when another robot has executed one of its timepoints"""
         tp = tpName.split("-")[0]
         try:
             tp = int(tp)
@@ -461,6 +480,7 @@ class Plan:
 
     # Returns the plan with only actions for which the given agent is responsible 
     def getLocalJsonPlan(self, agent, currentTime = None):
+        """ Returns the plan with only actions for which the given agent is responsible """
         data = self.getJsonDescription(currentTime=currentTime)
         
         keysToDelete = set()
@@ -537,6 +557,13 @@ class Plan:
     # special case for "dead" robots : remove their actions and the link using them
     @staticmethod
     def mergeJsonPlans(data, idAgent=None):
+       """ Merge a set of local plans.
+
+       get a dictionnary of plan with agent as a key. Given plan sould be local
+       Index of actions and tps are assumed to be in the same 'namespace'
+       special case for "dead" robots : remove their actions and the link using $
+       """
+
         #Check for consistency
         for agent1,agent2 in itertools.combinations(data.keys(),2):
             actionKeys1 = set(data[agent1]["actions"].keys())
@@ -605,6 +632,7 @@ class Plan:
     # Remove all the relevant element to keep the plan consistent
     @staticmethod
     def removeAction(planJson, actionKey):
+        """remove an action from a json-encoded plan"""
         planJson = deepcopy(planJson)
         a = planJson["actions"][actionKey]
         

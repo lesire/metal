@@ -200,6 +200,7 @@ class Supervisor(threading.Thread):
         self.stnUpdated({"init" : self.plan.stn.export()})
     
     def onMissionStart(self):
+        """Called when the mission starts"""
         pass
     
     def visuUpdate(self):
