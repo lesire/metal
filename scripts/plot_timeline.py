@@ -3,6 +3,11 @@ import numpy as np
 import re
 import sys
 
+"""
+Obsolete ?
+Redondant with the one in simato (see actionvisu.py)
+"""
+
 # Transform input PDDL into arrays
 # 0.001: (move ressac1 ptAav_16239_5397 ptAav_8252_1404) [41.264]
 actions = {'ressac1': {'move': [], 'observe': [], 'communicate': [], 'communicate': [], 'has-communicated': []}

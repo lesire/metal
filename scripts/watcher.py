@@ -3,7 +3,7 @@
 """
 Simple ROS node that exit iff :
  - An agent goes into "ERROR" mode
- - All agents are done or dead
+ - All agents are done, dead or tracking
  
 Useful as a required node in a roslaunch
 """

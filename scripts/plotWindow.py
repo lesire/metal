@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+
+"""
+Library file for Timeline (define a new class for a Window in Qt)
+"""
+
 import sys
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *

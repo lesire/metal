@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 
+"""
+ROS node that take an alea file and them the alea to the robots.
+
+The alea file should be a json file representing a dictionnary.
+Each key is an alea. An alea must containt "to", "date", "type" and, if needed, a "data" field
+"""
+
 import logging; logger = logging.getLogger("delay")
 
 import argparse

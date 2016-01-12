@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+"""
+Expect a mission folder created by SIMATO (with a mission.launch and a run_morse.py) and a list of real or simulated robots
+Will create a "mission_hybrid.launch" with only the simulated robots (and the real ones in the morse file, listening for the pose send from the real robots)
+
+"""
+
 import re
 import argparse
 import os

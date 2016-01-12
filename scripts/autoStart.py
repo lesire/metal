@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+Will read from the plan taken from the ROS param server the list of robots and send the mission start signal when everybody is ready
+"""
+
 import logging; logger = logging.getLogger("hidden")
 
 import json

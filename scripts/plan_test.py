@@ -1,3 +1,11 @@
+"""
+Unit test for the plan.py file
+
+/!\ Obsolete, some tests are outdated
+
+Run with "python3 -m unittest plan_test.py"
+"""
+
 import unittest
 
 import plan

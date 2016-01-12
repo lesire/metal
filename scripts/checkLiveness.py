@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+Ping a set of host to check for liveness and connectivy
+"""
+
 import tkinter as tk
 import subprocess
 import threading
@@ -24,7 +28,7 @@ hosts = {
           "Mana" :                       {"addr" : "140.93.16.55",     "group":"LAAS"},
           "Momo" :                       {"addr" : "140.93.16.72",     "group":"LAAS"},
           "Minnie" :                     {"addr" : "140.93.16.57",     "group":"LAAS"},
-          "Passerelle ONERA-LASS" :      {"addr" : "134.212.90.100",   "group":"0 - Réseaux"},
+          "Passerelle ONERA-LAAS" :      {"addr" : "134.212.90.100",   "group":"0 - Réseaux"},
           "Access point WiFi 1" :        {"addr" : "134.212.244.109",  "group":"0 - Réseaux"},
           "Access point WiFi 2" :        {"addr" : "134.212.244.110",  "group":"0 - Réseaux"},
           "Effibot 1" :                  {"addr" : "134.212.244.71",  "group":"Effibot"},

@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+Extract from a bag file the list of stnupdate sent by/to a robot.
+Used by reimportStn
+"""
+
 import sys
 
 import rosbag

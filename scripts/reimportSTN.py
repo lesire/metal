@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+"""
+Use the ROS messages sent to replay the operation on the STN
+
+Use parseStnBag.py to parse the bag and then replay each action
+"""
+
 import argparse
 import json
 import logging

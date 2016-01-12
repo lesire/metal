@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+"""
+Timeline.
+
+Graphical representation of the plan and the internal state of each robot executing a METAL supervisor
+"""
+
 from __future__ import division
 
 import logging; logger = logging.getLogger("hidden")
