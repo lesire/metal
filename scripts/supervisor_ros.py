@@ -15,6 +15,7 @@ from supervisor import Supervisor,State
 from plan import Plan, PlanImportError
 
 class SupervisorRos(Supervisor):
+    """Implementation of the Supervisor using ROS"""
     def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
         if agent is None:
             logger.error("Cannot repair with ROS without an agent name")
@@ -49,6 +50,7 @@ class SupervisorRos(Supervisor):
             self.ubForTrack = f
 
     def onMissionStart(self):
+        """When the mission starts, get some parameters from the ROS parameter server"""
         if rospy.has_param("/hidden/ubForCom"):
             f = float(rospy.get_param("/hidden/ubForCom"))
             logger.info("Setting ubForCom to %s from the parameter server" % f)
@@ -66,6 +68,7 @@ class SupervisorRos(Supervisor):
         threading.Thread(target=sendRegularMaSTNUpdate,name=self.agent+"-mastnbeat").start()
 
     def aleaReceived(self,msg):
+        """Callback function to listen for aleas sent by the operator through the ROS topic 'alea'"""
         #logger.warning(msg)
         try:
             data = json.loads(msg.data)
@@ -122,6 +125,7 @@ class SupervisorRos(Supervisor):
         Supervisor.init(self, plan, agent)
 
     def sendNewStatusMessage(self, type, data = None):
+        """Send a new message on the repair topic"""
         if data is None:
             data = "{}"
         if not isinstance(data, str):
@@ -148,6 +152,7 @@ class SupervisorRos(Supervisor):
             logger.error("Invalid call to sendNewStatusMessage. Type : %s" % type)
 
     def repairCallback(self, data):
+        """Receives a message on the repair topic"""
         if self.state == State.DEAD:
             self.repair_sub.unregister()
             return
@@ -234,6 +239,7 @@ class SupervisorRos(Supervisor):
                 logger.warning("Received unsupported message of type %s from %s : %s" % (type, sender, msg))
 
     def sendVisuUpdate(self, onlyPast = False):
+        """Send a visu message with the current plan, used by Timeline"""
         data = []
 
         currentTime = 0
@@ -272,6 +278,7 @@ class SupervisorRos(Supervisor):
         self.stnvisu_pub.publish(self.agent, currentTime, State.reverse_mapping[self.state], data)
 
     def stnUpdated(self, data):
+        """Send every operation on the STN to a ROS topic to replay the operations on the STN"""
         if "init" in data:
             self.stnupdate_pub_latched.publish(json.dumps(data, sort_keys=True))
         else:
@@ -293,6 +300,7 @@ class SupervisorRos(Supervisor):
             self.sendMastnUpdate(arcs)
 
     def startPlanSync(self):
+        """Starts a plan synchronisation (if 2 robots are executing a plan with different IDs)"""
         if time.time() - self.lastPlanSyncRequest < 5:
             logger.info("Do not send a planSync request. Last update was requested at %d, %d seconds before" % (self.lastPlanSyncRequest, time.time() - self.lastPlanSyncRequest))
             return #Do nothing, an update from less than 5 seconds exists
@@ -301,6 +309,7 @@ class SupervisorRos(Supervisor):
         self.sendNewStatusMessage("planSyncRequest")
         
     def receivePlanSyncRequest(self, sender):
+        """callback for the plan synchronisation"""
         if time.time() - self.lastPlanSyncResponse < 5:
             logger.info("Do not send a planSync response. Last update was requested at %d, %d seconds before" % (self.lastPlanSyncResponse, time.time() - self.lastPlanSyncResponse))
             return #Do nothing, an update from less than 5 seconds exists
@@ -310,6 +319,7 @@ class SupervisorRos(Supervisor):
 
 
     def receivePlanSyncResponse(self, sender, otherPlan):
+        """callback for the plan synchronisation"""
         with self.mutex:
             myID = self.plan.ids[-1]
             otherID = otherPlan["ID"]["value"]
@@ -482,6 +492,7 @@ class SupervisorRos(Supervisor):
                 self.triggerRepair = True
     
     def sendMastnUpdate(self, arcs):
+        """Send the information of the MacroSTN given by the arcs parameters"""
         u = MaSTNUpdate()
         u.header.stamp = rospy.Time.now()
     
@@ -517,6 +528,7 @@ class SupervisorRos(Supervisor):
         self.mastn_pub.publish(u)
     
     def sendFullMastnUpdate(self):
+        """Send all the information of the MacroSTN"""
         with self.mutex:
             #only send a MaSTN update if the stn is consistent
             if self.plan.stn.isConsistent():
@@ -529,6 +541,7 @@ class SupervisorRos(Supervisor):
                 self.sendMastnUpdate(arcs)
 
     def mastnUpdate(self, data):
+        """Callback when a mastnUpdate message is received"""
         if self.state == State.DEAD:
             self.mastn_sub.unregister()
             return

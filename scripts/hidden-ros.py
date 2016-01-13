@@ -12,10 +12,15 @@ from std_msgs.msg import Empty
 import os
 
 class HiddenRos(Hidden):
+    """
+    ROS implementation of the main class to run METAL.
+    """
+
     def __init__(self):
         Hidden.__init__(self)
 
     def getDefaultPDDL(self):
+        """Gets the plan to execute from the ROS parameter server"""
         if rospy.has_param('/hidden/plan'):
             pddlFiles = {"plan":rospy.get_param('/hidden/plan')}
             if rospy.has_param("/hidden/pddl"):
@@ -28,6 +33,7 @@ class HiddenRos(Hidden):
         return None
         
     def waitSignal(self):
+        """Wait the the start command sent to the ROS topic /hidden/start"""
         self.sub = rospy.Subscriber("/hidden/start", Empty, lambda x: self.startCallback(x, x))
 
     def createSupervisor(self, plan, agent, pddlFiles):

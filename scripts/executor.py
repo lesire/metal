@@ -6,6 +6,14 @@ import threading
 import time
 
 class Executor(threading.Thread):
+    """Abstract call that represents an executor.
+    
+    Its goal is to run to do the interface between the supervisor and the autonomous agent.
+    It receives orders from the supervisor (start/stop and action) and send status report to the supervisor (action done, alea received, etc ...)
+    
+    If not overriden by subclasses, it will simulate the execution of all actions (ie. wait the their nominal time before signaling their end)
+    """
+
     def __init__ (self, inQueue, outQueue, stopEvent, actionExecutor=None, agent=None):
         self.inQueue = inQueue
         self.outQueue = outQueue
@@ -21,6 +29,7 @@ class Executor(threading.Thread):
 
     # get readable time
     def user_time(self, t):
+        """convert the time return by time.time (is seconds since epoch) to the time used in the plan (ms since the begining of the mission)"""
         return int(round(1000*(t-self.beginDate)))
 
     # end action callback

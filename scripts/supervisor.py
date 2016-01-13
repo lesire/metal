@@ -45,6 +45,7 @@ class ExecutionFailed(Exception):
         return self.msg
 
 class Supervisor(threading.Thread):
+
     def __init__ (self, inQueue, outQueue, planStr, startEvent, stopEvent, agent = None, pddlFiles=None):
         self.inQueue = inQueue
         self.outQueue = outQueue
@@ -86,6 +87,7 @@ class Supervisor(threading.Thread):
         self.visuUpdate()
         
     def init(self, planStr, agent):
+        """Called when a new plan is executed (either at the begining or when a reparation occured and a new plan has to be executed)"""
         with self.mutex:
             try:
                 if agent is None:
@@ -204,21 +206,24 @@ class Supervisor(threading.Thread):
         pass
     
     def visuUpdate(self):
+        """Start to send regularly the visu message, used by the Timeline"""
         if self.state == State.DEAD:
             self.sendVisuUpdate(onlyPast=True)
             #stop sending messages
         else:
             self.sendVisuUpdate()
             if not self.stopEvent.is_set():
-                threading.Timer(5, self.visuUpdate).start() #re-run it in 1 second
+                threading.Timer(5, self.visuUpdate).start() #re-run it in 5 second
 
     def setTimePoint(self, tpName, value):
+        """Set the date of the given timepoint"""
         return self.plan.setTimePoint(tpName, value, cbStnUpdated=self.stnUpdated)
     
     def getExecutableTps(self, now = True):
         return filter(lambda tp: self.isTpExecutable(tp, now), self.tp.keys())
     
     def getCurrentTime(self):
+        """Returns the current time in ms since the beginning of the plan"""
         if self.beginDate < 0:
             logger.error("getCurrentTime called before initialisation")
 
@@ -255,6 +260,7 @@ class Supervisor(threading.Thread):
         return False
     
     def executeTp(self, tp):
+        """Launch the execution of a timepoint"""
 
         if tp.startswith("1-endglobal-"):
             currentTime = self.getCurrentTime()
@@ -326,6 +332,7 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("\tA timepoint does not match its action %s" % tp)
 
     def executeAction(self, action, currentTime):
+        """launch the execution of an action"""
         if self.tp[action["tStart"]][1] != "controllable" and self.tp[action["tStart"]][1] != "future":
             logger.error("Cannot execute %s, the status of its start point is %s." % (action["name"], self.tp[action["tStart"]] ))
             return
@@ -410,7 +417,7 @@ class Supervisor(threading.Thread):
 
     # targetPos is a dict
     def targetFound(self, data = None, selfDetection = True, mustTrack = False):
-
+        """Called when a target is found"""
         logger.warning("Got a target found with : %s" % data)
 
         x,y = 0,0
@@ -464,6 +471,7 @@ class Supervisor(threading.Thread):
                 self.trackTimer.start()
 
     def endAction(self, msg):
+        """Called when an action finishes"""
         action = msg["action"]
         tp = action["tEnd"]
         value = msg["time"]
@@ -560,6 +568,7 @@ class Supervisor(threading.Thread):
             raise ExecutionFailed("Invalid STN when finishing execution of tp %s" % tp)
 
     def checkActionUB(self, msg):
+        """Called when an upper bound trigger. Check if the action is still ongoing. If so, cancel it to carry on with the plan."""
         if "action" not in msg or "date" not in msg:
             logger.error("Ill-formated ubAction message : %s" % msg)
 
@@ -582,6 +591,13 @@ class Supervisor(threading.Thread):
 
     # Remove the synchronising action of a communication.
     def dropCommunication(self, comName):
+        """Remove a communication from the plan. 
+        
+        Only remove the communicate-meta action : each robot keep its own communicate action.
+        The communicate-meta action is used to mandate both communicate actions to be overlapping.
+        Calling this function will remove the need for both robot to be at the same point.
+        comName can either be the name of the communicate or the communicate-meta action.
+        """
         #if comName in self.droppedComs: return #already done it
     
         # remove the communicate meta from the plan
@@ -657,6 +673,7 @@ class Supervisor(threading.Thread):
         
 
     def isExecuted(self):
+        """return true if all tps are executed"""
         with self.mutex:
             result = all([tp[1] == "past" for tp in self.tp.values()])
             return result
@@ -670,6 +687,7 @@ class Supervisor(threading.Thread):
             print("{: <70} ({}) : [{}, {}]".format(*i))
 
     def update(self):
+        """Called regularly. If the state is RUNNING, will try to launch the execution of an action"""
         if not self.state == State.RUNNING:
             return # do not execute the plan if not running
 
@@ -692,6 +710,7 @@ class Supervisor(threading.Thread):
 
     #Called when an alea is received
     def dealAlea(self, aleaType, data):
+        """Called when an alea is received"""
         if aleaType == "robotDead":
             if "robot" not in data:
                 logger.error("Missing field robot in an alea of type robotDead")
@@ -823,7 +842,7 @@ class Supervisor(threading.Thread):
         return planJson
         
     def repairPlan(self, planJson):
-    
+        
         fileBaseName = time.strftime("plan_broken_%Y_%m_%d_%H_%M_%S_" + self.agent)
         domainFile = fileBaseName + "_domain.pddl"
         prbFile = fileBaseName + "_prb.pddl"
@@ -924,7 +943,7 @@ class Supervisor(threading.Thread):
 
     
     def executionFail(self):
-        
+        """Called when the execution fails, will trigger a repair"""
         self.triggerRepair = False
 
         self.state = State.REPAIRINGACTIVE
@@ -980,6 +999,7 @@ class Supervisor(threading.Thread):
         self.mainLoop()
         
     def run(self):
+        """Start the execution"""
         logger.info("Supervisor launched")
         
         self.startEvent.wait()

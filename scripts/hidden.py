@@ -22,21 +22,14 @@ import supervisor
 from executors import create_executor, executors
 
 """
-Messages are dictionnary, with at least the key "type" that can be :
- - start        (supervisor -> executor): beginning of the execution
- - stop         (supervisor -> executor)
- - startAction  (supervisor -> executor) : for uncontrollable and controllable actions
- - endAction    (executor -> supervisor) : for uncontrollable and controllable actions
- - stopAction    (supervisor -> executor) : for controllable actions
- - alea         (executor -> supervisor)
-
-The field "time" is an int, in ms, measured from the startTime given in the "start" message
+Main entry point for METAL (still named after the name of the previous projet)
 """
 
-"""
-Filter used to filter the logs based on their filenames
-"""
+
 class FileFilter(logging.Filter):
+    """
+    Filter used to filter the logs based on their filenames
+    """
     def __init__(self, l):
         self.l = l
 
@@ -44,6 +37,22 @@ class FileFilter(logging.Filter):
         return os.path.splitext(os.path.basename(record.pathname))[0] in self.l
 
 class Hidden:
+    """
+    Main class to run METAL.
+    
+    Will create a supervisor thread and an executor thread. They exchange by messages using Queues.
+
+    Messages are dictionnary, with at least the key "type" that can be :
+     - start        (supervisor -> executor): beginning of the execution
+     - stop         (supervisor -> executor)
+     - startAction  (supervisor -> executor) : for uncontrollable and controllable actions
+     - endAction    (executor -> supervisor) : for uncontrollable and controllable actions
+     - stopAction    (supervisor -> executor) : for controllable actions
+     - alea         (executor -> supervisor)
+    
+    The field "time" is an int, in ms, measured from the startTime given in the "start" message
+    """
+
     def __init__(self):
         self.threadSupervisor = None
         self.startSupervisor = threading.Event()
@@ -52,6 +61,7 @@ class Hidden:
         #self.logger = logging.getLogger('hidden')
 
     def getDefaultPDDL(self):
+        """ If not plan is given, will call this function to get the plan to execute"""
         return None
 
     def init(self, argv):
@@ -128,6 +138,7 @@ class Hidden:
             self.startCallback('auto', None)
 
     def startCallback(self, signum, frame=None):
+        """Callback to call to launch the execution of the mission"""
         logger.info('Start callback called with signal %s' % signum)
         if self.started:
             logger.info("Supervisor already started: doing nothing")
