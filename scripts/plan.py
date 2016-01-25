@@ -557,12 +557,12 @@ class Plan:
     # special case for "dead" robots : remove their actions and the link using them
     @staticmethod
     def mergeJsonPlans(data, idAgent=None):
-       """ Merge a set of local plans.
+        """ Merge a set of local plans.
 
        get a dictionnary of plan with agent as a key. Given plan sould be local
        Index of actions and tps are assumed to be in the same 'namespace'
        special case for "dead" robots : remove their actions and the link using $
-       """
+        """
 
         #Check for consistency
         for agent1,agent2 in itertools.combinations(data.keys(),2):
